@@ -11,10 +11,10 @@ const Home = () => {
   console.log("HOME WITH USER");
   console.log(user?.user);
   return (
-    <SidebarProvider>
+    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
       <AppSidebar />
-      <SidebarInset className="ml-[var(--sidebar-width)] w-[calc(100vw-var(--sidebar-width))]">
-        <SidebarTrigger />
+      <SidebarInset className="bg-background">
+        <SidebarTrigger className="m-2" />
       </SidebarInset>
     </SidebarProvider>
   );

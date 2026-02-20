@@ -103,9 +103,15 @@ export const featureTiles: FeatureTile[] = [
 
 type LandingNavbarProps = {
   onContactClick: () => void;
+  onWebClick: () => void;
+  onDesktopClick: () => void;
 };
 
-export function LandingNavbar({ onContactClick }: LandingNavbarProps) {
+export function LandingNavbar({
+  onContactClick,
+  onWebClick,
+  onDesktopClick,
+}: LandingNavbarProps) {
   return (
     <nav className="animate-in fade-in-0 slide-in-from-top-2 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 duration-500 md:px-8">
       <div className="h-10 w-10 rounded-md object-contain md:h-12 md:w-12">
@@ -121,8 +127,18 @@ export function LandingNavbar({ onContactClick }: LandingNavbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40 rounded-xl">
-            <DropdownMenuItem>Desktop</DropdownMenuItem>
-            <DropdownMenuItem>Web</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onDesktopClick}
+              className="data-[highlighted]:bg-transparent data-[highlighted]:text-inherit hover:-translate-y-0.5"
+            >
+              Desktop
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={onWebClick}
+              className="data-[highlighted]:bg-transparent data-[highlighted]:text-inherit hover:-translate-y-0.5"
+            >
+              Web
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         <Button variant="ghost" onClick={onContactClick}>

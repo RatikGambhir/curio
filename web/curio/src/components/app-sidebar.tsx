@@ -10,6 +10,7 @@ import {
   Settings2,
   SquareTerminal,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import curioLogo from "../assets/curio-logo.png";
 import { NavMain } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
@@ -53,6 +54,10 @@ const data = {
       icon: SquareTerminal,
       isActive: true,
       items: [
+        {
+          title: "Home",
+          url: "/home",
+        },
         {
           title: "Question finder",
           url: "#",
@@ -136,17 +141,18 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        {/* TODO: Fix logo background color, for some reaso its not transparent */}
-        <img
-          src={curioLogo}
-          alt="Curio Logo"
-          className="mb-8 w-64 h-auto"
-          data-image="logo"
-          style={{ mixBlendMode: "lighten" }}
-        />
+      <SidebarHeader className="px-2 pt-2 pb-0">
+        <Link to="/home" className="flex items-start px-1">
+          <img
+            src={curioLogo}
+            alt="Curio Logo"
+            className="h-9 w-auto object-contain"
+            data-image="logo"
+            style={{ mixBlendMode: "multiply" }}
+          />
+        </Link>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="pt-0">
         <NavMain items={data.navMain} />
         <NavProjects projects={data.projects} />
       </SidebarContent>

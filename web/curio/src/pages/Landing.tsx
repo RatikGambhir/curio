@@ -6,6 +6,7 @@ import {
   LandingFooter,
   LandingNavbar,
 } from "@/components/landing/landing-sections";
+import { useNavigate } from "react-router-dom";
 
 const featureShowcaseItems = [
   {
@@ -39,6 +40,8 @@ const featureShowcaseItems = [
 ];
 
 const Landing = () => {
+  const navigate = useNavigate();
+
   const scrollToContact = () => {
     document.getElementById("contact")?.scrollIntoView({
       behavior: "smooth",
@@ -50,7 +53,11 @@ const Landing = () => {
     <main className="h-screen snap-y snap-mandatory overflow-y-auto scroll-smooth bg-muted text-foreground">
       <section className="snap-start">
         <div className="flex min-h-screen flex-col">
-          <LandingNavbar onContactClick={scrollToContact} />
+          <LandingNavbar
+            onContactClick={scrollToContact}
+            onWebClick={() => navigate("/login")}
+            onDesktopClick={() => navigate("/desktop-construction")}
+          />
           <HeroSection className="min-h-[calc(100vh-88px)] py-0" />
         </div>
       </section>
