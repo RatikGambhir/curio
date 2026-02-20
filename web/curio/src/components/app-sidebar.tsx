@@ -1,14 +1,13 @@
 import * as React from "react";
 import {
-  AudioWaveform,
   BookOpen,
-  Command,
   Frame,
-  GalleryVerticalEnd,
+  Globe,
+  House,
   Map,
+  MessageSquare,
   PieChart,
   Settings2,
-  SquareTerminal,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import curioLogo from "../assets/curio-logo.png";
@@ -23,100 +22,37 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 
-// This is sample data.
 const data = {
   user: {
     name: "shadcn",
     email: "m@example.com",
     avatar: "/avatars/shadcn.jpg",
   },
-  teams: [
-    {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
-  ],
   navMain: [
     {
-      title: "Homebase",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "Home",
-          url: "/home",
-        },
-        {
-          title: "Question finder",
-          url: "#",
-        },
-        {
-          title: "Question curator",
-          url: "#",
-        },
-        {
-          title: "Question metrics",
-          url: "#",
-        },
-        {
-          title: "Chat",
-          url: "/chat",
-        },
-      ],
+      title: "Home",
+      url: "/home",
+      icon: House,
     },
     {
-      title: "Collaboration",
+      title: "Vaults",
       url: "#",
       icon: BookOpen,
-      items: [
-        {
-          title: "Report a bug",
-          url: "#",
-        },
-        {
-          title: "Request a feature",
-          url: "#",
-        },
-        {
-          title: "Feedback",
-          url: "#",
-        },
-      ],
+    },
+    {
+      title: "Chat",
+      url: "/chat",
+      icon: MessageSquare,
+    },
+    {
+      title: "Knowledge Atals",
+      url: "#",
+      icon: Globe,
     },
     {
       title: "Settings",
-      url: "#",
+      url: "/profile",
       icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
     },
   ],
   projects: [
@@ -142,14 +78,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="px-2 pt-2 pb-0">
-        <Link to="/home" className="flex items-start px-1">
+        <Link to="/home" className="flex items-center gap-2 px-2 py-1">
           <img
             src={curioLogo}
             alt="Curio Logo"
-            className="h-9 w-auto object-contain"
+            className="h-12 w-auto object-contain"
             data-image="logo"
             style={{ mixBlendMode: "multiply" }}
           />
+          <span
+            className="truncate text-lg leading-none tracking-tight group-data-[collapsible=icon]:hidden"
+            style={{ fontFamily: "var(--font-serif)" }}
+          >
+            curio
+          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent className="pt-0">
