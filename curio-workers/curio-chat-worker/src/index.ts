@@ -29,6 +29,7 @@ export default {
 		const encoder = new TextEncoder();
 		const body = await request.json();
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
+		//TODO: DO VALIDATION
 		async function streamResponse() {
 			try {
 				const response = await gemini.models.generateContentStream({
