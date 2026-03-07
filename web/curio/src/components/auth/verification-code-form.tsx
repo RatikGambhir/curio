@@ -8,18 +8,22 @@ const TEN_MINUTES_IN_SECONDS = 10 * 60;
 
 type VerificationCodeFormProps = {
   email: string;
+  error?: string | null;
+  isSubmitting?: boolean;
   onComplete: (code: string) => void;
   onBack: () => void;
 };
 
 export function VerificationCodeForm({
   email,
+  error: externalError = null,
+  isSubmitting = false,
   onComplete,
   onBack,
 }: VerificationCodeFormProps) {
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [secondsLeft, setSecondsLeft] = useState(TEN_MINUTES_IN_SECONDS);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
@@ -49,11 +53,11 @@ export function VerificationCodeForm({
 
     const validationError = validateOtpDigits(nextDigits);
     if (validationError) {
-      setError(validationError);
+      setLocalError(validationError);
       return;
     }
 
-    setError(null);
+    setLocalError(null);
     onComplete(nextDigits.join(""));
   };
 
@@ -66,7 +70,7 @@ export function VerificationCodeForm({
     const nextDigits = [...digits];
     nextDigits[index] = value;
     setDigits(nextDigits);
-    setError(null);
+    setLocalError(null);
 
     if (value && index < OTP_LENGTH - 1) {
       inputRefs.current[index + 1]?.focus();
@@ -104,7 +108,7 @@ export function VerificationCodeForm({
       .map((_, index) => pasted[index] ?? "");
 
     setDigits(nextDigits);
-    setError(null);
+    setLocalError(null);
 
     const focusIndex = Math.min(pasted.length, OTP_LENGTH - 1);
     inputRefs.current[focusIndex]?.focus();
@@ -115,11 +119,11 @@ export function VerificationCodeForm({
     event.preventDefault();
     const validationError = validateOtpDigits(digits);
     if (validationError) {
-      setError(validationError);
+      setLocalError(validationError);
       return;
     }
 
-    setError(null);
+    setLocalError(null);
     onComplete(digits.join(""));
   };
 
@@ -157,9 +161,14 @@ export function VerificationCodeForm({
               />
             ))}
           </div>
-          {error ? (
+          {localError ? (
             <p className="text-center text-sm text-destructive" role="alert">
-              {error}
+              {localError}
+            </p>
+          ) : null}
+          {externalError ? (
+            <p className="text-center text-sm text-destructive" role="alert">
+              {externalError}
             </p>
           ) : null}
           {secondsLeft === 0 ? (
@@ -171,8 +180,8 @@ export function VerificationCodeForm({
             <Button type="button" variant="outline" onClick={onBack}>
               Back
             </Button>
-            <Button type="submit" disabled={secondsLeft <= 0}>
-              Verify code
+            <Button type="submit" disabled={secondsLeft <= 0 || isSubmitting}>
+              {isSubmitting ? "Verifying..." : "Verify code"}
             </Button>
           </div>
         </form>

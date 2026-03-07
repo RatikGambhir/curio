@@ -10,6 +10,7 @@ type AuthContextValue = {
   user: string | null; // you can type this as `User | null` later
   isAuthenticated: boolean;
   loginUser: (user: string | null) => void;
+  logoutUser: () => void;
 };
 
 export type { RegisterData, AuthContextValue };

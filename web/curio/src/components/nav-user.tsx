@@ -1,5 +1,7 @@
 "use client"
 
+import { useRef, useState } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   BadgeCheck,
   Bell,
@@ -29,6 +31,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
+import { supabase } from "@/supabase"
 
 export function NavUser({
   user,
@@ -40,6 +44,29 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const navigate = useNavigate()
+  const { logoutUser } = useAuthenticatedUser()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const hasTriggeredSignOutRef = useRef(false)
+
+  const handleSignOut = async () => {
+    if (isSigningOut || hasTriggeredSignOutRef.current) {
+      return
+    }
+
+    hasTriggeredSignOutRef.current = true
+    setIsSigningOut(true)
+
+    const { error } = await supabase.auth.signOut({ scope: "global" })
+    if (error) {
+      console.error("Failed to sign out from Supabase:", error.message)
+    }
+
+    logoutUser()
+    navigate("/login", { replace: true })
+    setIsSigningOut(false)
+    hasTriggeredSignOutRef.current = false
+  }
 
   return (
     <SidebarMenu>
@@ -102,9 +129,9 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={handleSignOut} disabled={isSigningOut}>
               <LogOut />
-              Log out
+              {isSigningOut ? "Signing out..." : "Log out"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

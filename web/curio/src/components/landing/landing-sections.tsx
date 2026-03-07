@@ -184,16 +184,16 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
           </h1>
 
             <h2
-                className="animate-in fade-in-0 slide-in-from-bottom-4 mb-5 text-2xl  tracking-tight duration-500 md:text-2xl"
+                className="animate-in fade-in-0 slide-in-from-bottom-4 mb-5 text-2xl tracking-tight duration-500 md:text-2xl"
                 style={{ fontFamily: "var(--font-serif)" }}
             >
               For every question, there's an{" "}
               <HyperText
-                as="h2"
+                as="span"
                 startOnView={true}
                 animateOnHover={false}
                 duration={2000}
-                className=" py-0 text-inherit font-sans"
+                className="inline-block py-0 text-inherit font-sans"
               >
                 Answer
               </HyperText>

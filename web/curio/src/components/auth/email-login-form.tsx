@@ -1,29 +1,26 @@
-import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { validateEmail } from "@/lib/validators/auth";
 
 type EmailLoginFormProps = {
-  onContinue: (email: string) => void;
+  email: string;
+  error: string | null;
+  isSubmitting?: boolean;
+  onEmailChange: (email: string) => void;
+  onSubmit: () => void;
 };
 
-export function EmailLoginForm({ onContinue }: EmailLoginFormProps) {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
+export function EmailLoginForm({
+  email,
+  error,
+  isSubmitting = false,
+  onEmailChange,
+  onSubmit,
+}: EmailLoginFormProps) {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const validationError = validateEmail(email);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setError(null);
-    onContinue(email.trim());
+    onSubmit();
   };
 
   return (
@@ -46,10 +43,7 @@ export function EmailLoginForm({ onContinue }: EmailLoginFormProps) {
               placeholder="name@example.com"
               value={email}
               onChange={(event) => {
-                setEmail(event.target.value);
-                if (error) {
-                  setError(null);
-                }
+                onEmailChange(event.target.value);
               }}
               aria-invalid={Boolean(error)}
               className="h-11 rounded-xl"
@@ -60,8 +54,12 @@ export function EmailLoginForm({ onContinue }: EmailLoginFormProps) {
               </p>
             ) : null}
           </div>
-          <Button type="submit" className="h-11 w-full rounded-xl">
-            Continue
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-xl"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Sending code..." : "Continue"}
           </Button>
         </form>
       </CardContent>

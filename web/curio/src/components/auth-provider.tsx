@@ -11,10 +11,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(id);
   }
 
+  function logoutUser() {
+    setUser(null);
+  }
+
   const value: AuthContextValue = {
     user,
     isAuthenticated: !!user,
     loginUser,
+    logoutUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
