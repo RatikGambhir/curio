@@ -21,6 +21,10 @@ interface Request {
 	prompt: string;
 }
 
+function isValidReq(req: any): boolean {
+	return true
+}
+
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
