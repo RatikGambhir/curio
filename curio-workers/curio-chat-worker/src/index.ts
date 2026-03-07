@@ -31,15 +31,17 @@ export default {
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
 		const encoder = new TextEncoder();
-		const body = await request.json();
+		const body = await request.json<Request>()
+		const prompt = body.prompt
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
 		//TODO: DO VALIDATION
 		async function streamResponse() {
 			try {
 				const response = await gemini.models.generateContentStream({
 					model: 'gemini-2.5-flash',
-					contents: 'Hello!',
+					contents: prompt,
 				});
+
 				for await (const chunk of response) {
 					if (chunk.text) {
 						const json = JSON.stringify({ token: chunk.text });
