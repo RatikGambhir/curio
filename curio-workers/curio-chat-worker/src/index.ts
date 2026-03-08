@@ -24,9 +24,44 @@ interface Request {
 function isValidReq(req: any): boolean {
 	return true
 }
+const ALLOWED_ORIGINS = new Set([
+	'http://localhost:5174',
+	// 'https://gettingcurio.com',
+]);
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+	const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
+
+	return {
+		...(allowOrigin ? { 'Access-Control-Allow-Origin': allowOrigin } : {}),
+		'Access-Control-Allow-Methods': 'POST, OPTIONS',
+		'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+		'Access-Control-Max-Age': '86400',
+	};
+}
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
+		const origin = request.headers.get('Origin');
+		const corsHeaders = getCorsHeaders(origin);
+		const url = new URL(request.url);
+
+		if (request.method === 'OPTIONS') {
+			return new Response(null, {
+				status: 204,
+				headers: corsHeaders,
+			});
+		}
+
+		if (url.pathname !== '/chat') {
+			return new Response('Not found', {
+				status: 404,
+				headers: {
+					...corsHeaders,
+					'Content-Type': 'text/plain; charset=utf-8',
+				},
+			});
+		}
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
