@@ -8,7 +8,6 @@ import {
 } from "./sidebar"
 import { Button } from "./button"
 import { PencilLine } from "lucide-react"
-import { Link } from "react-router-dom"
 
 export type ChatListItem = {
   id: string
@@ -20,22 +19,29 @@ export type ChatListItem = {
 type ChatNavProps = {
   chats: ChatListItem[]
   selectedChatId: string | null
+  isNewChat: boolean
   onSelectChat: (chatId: string) => void
+  onStartNewChat: () => void
 }
 
-const ChatNav = ({ chats, selectedChatId, onSelectChat }: ChatNavProps) => {
+const ChatNav = ({
+  chats,
+  selectedChatId,
+  isNewChat,
+  onSelectChat,
+  onStartNewChat,
+}: ChatNavProps) => {
   return (
     <SidebarGroup>
       <Button
-        asChild
         type="button"
         variant="ghost"
-        className="mb-3 h-11 w-full justify-start rounded-lg border border-sidebar-border bg-sidebar px-3 text-sm font-medium text-sidebar-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+        disabled={isNewChat}
+        onClick={onStartNewChat}
+        className="mb-3 h-11 w-full justify-start rounded-lg border border-sidebar-border bg-sidebar px-3 text-sm font-medium text-sidebar-foreground shadow-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground disabled:translate-y-0 disabled:cursor-default disabled:bg-sidebar-accent disabled:text-sidebar-accent-foreground disabled:opacity-100 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
       >
-        <Link to="/chat" aria-label="Start a new chat">
-          <PencilLine className="size-4" />
-          <span className="group-data-[collapsible=icon]:hidden">New chat</span>
-        </Link>
+        <PencilLine className="size-4" />
+        <span className="group-data-[collapsible=icon]:hidden">New chat</span>
       </Button>
       <SidebarGroupLabel>Chats</SidebarGroupLabel>
       <SidebarGroupContent>

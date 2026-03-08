@@ -7,8 +7,6 @@ import { mockMessagesByChatId } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
-const linenNoise =
-  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\")"
 
 const Chat = () => {
   const chats: ChatListItem[] = useMemo(
@@ -41,17 +39,20 @@ const Chat = () => {
     [],
   )
   const [selectedChatId, setSelectedChatId] = useState<string | null>(
-    chats[0]?.id ?? null,
+    null,
   )
 
   const messages = selectedChatId ? mockMessagesByChatId[selectedChatId] ?? [] : []
+  const isNewChat = selectedChatId === null
 
   return (
     <SidebarProvider className="h-screen w-full font-sans">
       <ChatSidebar
         chats={chats}
         selectedChatId={selectedChatId}
+        isNewChat={isNewChat}
         onSelectChat={setSelectedChatId}
+        onStartNewChat={() => setSelectedChatId(null)}
         className="bg-background"
       />
       <SidebarInset className="bg-background">
@@ -59,10 +60,10 @@ const Chat = () => {
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 opacity-[0.03]"
-            style={{ backgroundImage: linenNoise, backgroundRepeat: "repeat" }}
+            style={{ backgroundRepeat: "repeat" }}
           />
           <div className="relative z-10 flex h-full w-full flex-col">
-            {messages.length > 0 ? (
+            {!isNewChat ? (
               <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3">
                 <div className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] border border-border bg-background">
                   <ChatView messages={messages} />
