@@ -1,3 +1,5 @@
+import { motion } from "framer-motion"
+
 import { cn } from "@/lib/utils"
 import type { ChatMessage } from "@/mocks/chats"
 
@@ -7,7 +9,18 @@ type BaseMessageProps = {
 }
 
 function MessageRow({ children, className }: BaseMessageProps) {
-  return <div className={cn("flex w-full", className)}>{children}</div>
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+      className={cn("flex w-full", className)}
+    >
+      {children}
+    </motion.div>
+  )
 }
 
 function MessageBubble({ children, className }: BaseMessageProps) {

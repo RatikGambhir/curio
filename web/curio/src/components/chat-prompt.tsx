@@ -14,20 +14,24 @@ import { type FormEvent, useState } from "react"
 type ChatPromptProps = {
   className?: string
   placeholder?: string
+  onSubmit?: (text: string) => void
 }
 
 export function ChatPrompt({
   className,
   placeholder = "How can I help you today?",
+  onSubmit,
 }: ChatPromptProps) {
   const [text, setText] = useState("")
   const [model, setModel] = useState("sonnet-4.5")
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!text.trim()) {
+    const nextText = text.trim()
+    if (!nextText) {
       return
     }
+    onSubmit?.(nextText)
     setText("")
   }
 

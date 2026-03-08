@@ -33,6 +33,7 @@ export default {
 		const encoder = new TextEncoder();
 		const body = await request.json<Request>()
 		const prompt = body.prompt
+
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
 		//TODO: DO VALIDATION
 		async function streamResponse() {

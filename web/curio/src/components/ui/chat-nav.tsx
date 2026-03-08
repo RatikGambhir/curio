@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from "framer-motion"
 import {
   SidebarGroupContent,
   SidebarGroup,
@@ -46,34 +47,45 @@ const ChatNav = ({
       <SidebarGroupLabel>Chats</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu className="gap-2">
-          {chats.map((chat) => (
-            <SidebarMenuItem key={chat.id}>
-              <SidebarMenuButton
-                type="button"
-                tooltip={chat.title}
-                isActive={selectedChatId === chat.id}
-                onClick={() => onSelectChat(chat.id)}
-                className="h-auto items-start rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:border-sidebar-ring data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+          <AnimatePresence initial={false}>
+            {chats.map((chat) => (
+              <motion.div
+                key={chat.id}
+                layout
+                initial={{ opacity: 0, x: -14, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -10, scale: 0.98 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               >
-                <span className="hidden size-6 items-center justify-center rounded-md border border-sidebar-border text-xs font-semibold group-data-[collapsible=icon]:inline-flex">
-                  {chat.title.charAt(0).toUpperCase()}
-                </span>
-                <div className="flex w-full min-w-0 flex-col gap-1 group-data-[collapsible=icon]:hidden">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate font-medium">{chat.title}</span>
-                    <span className="shrink-0 text-[10px] text-sidebar-foreground/70">
-                      {chat.updatedAt}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    type="button"
+                    tooltip={chat.title}
+                    isActive={selectedChatId === chat.id}
+                    onClick={() => onSelectChat(chat.id)}
+                    className="h-auto items-start rounded-lg border border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:border-sidebar-ring data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2"
+                  >
+                    <span className="hidden size-6 items-center justify-center rounded-md border border-sidebar-border text-xs font-semibold group-data-[collapsible=icon]:inline-flex">
+                      {chat.title.charAt(0).toUpperCase()}
                     </span>
-                  </div>
-                  {chat.preview ? (
-                    <span className="truncate text-xs text-sidebar-foreground/70">
-                      {chat.preview}
-                    </span>
-                  ) : null}
-                </div>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+                    <div className="flex w-full min-w-0 flex-col gap-1 group-data-[collapsible=icon]:hidden">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium">{chat.title}</span>
+                        <span className="shrink-0 text-[10px] text-sidebar-foreground/70">
+                          {chat.updatedAt}
+                        </span>
+                      </div>
+                      {chat.preview ? (
+                        <span className="truncate text-xs text-sidebar-foreground/70">
+                          {chat.preview}
+                        </span>
+                      ) : null}
+                    </div>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

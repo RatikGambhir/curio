@@ -25,6 +25,7 @@
         "Authorization": "Bearer ${YOUR_API_KEY}"
       }
     },
-    "@magicui": "https://magicui.design/r/{name}"
+    "@magicui": "https://magicui.design/r/{name}",
+    "@moleculeui": "https://www.moleculeui.design/r/{name}.json"
   }
 }

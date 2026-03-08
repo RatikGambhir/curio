@@ -23,6 +23,7 @@ import {
 
 type ChatEmptyStateProps = {
   className?: string
+  onSubmit?: (text: string) => void
 }
 
 const models = [
@@ -43,7 +44,7 @@ const promptShortcuts: Array<{
   { id: "choice", icon: Sparkles, label: "Claude's choice" },
 ]
 
-export function ChatEmptyState({ className }: ChatEmptyStateProps) {
+export function ChatEmptyState({ className, onSubmit }: ChatEmptyStateProps) {
   const [draft, setDraft] = useState("")
   const [model, setModel] = useState(models[2]?.value ?? models[0].value)
 
@@ -51,6 +52,17 @@ export function ChatEmptyState({ className }: ChatEmptyStateProps) {
     () => models.find((option) => option.value === model) ?? models[0],
     [model],
   )
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextDraft = draft.trim()
+    if (!nextDraft) {
+      return
+    }
+
+    onSubmit?.(nextDraft)
+    setDraft("")
+  }
 
   return (
     <div
@@ -60,7 +72,10 @@ export function ChatEmptyState({ className }: ChatEmptyStateProps) {
       )}
     >
       <div className="flex h-full max-h-[20rem] w-full max-w-[96rem] flex-col items-center justify-center space-y-12">
-        <div className="h-full w-full max-w-[64rem] rounded-[2.85rem] border border-primary/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(124,153,130,0.08))] shadow-[0_18px_60px_rgba(55,72,58,0.10)] backdrop-blur-xl">
+        <form
+          onSubmit={handleSubmit}
+          className="h-full w-full max-w-[64rem] rounded-[2.85rem] border border-primary/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.42),rgba(124,153,130,0.08))] shadow-[0_18px_60px_rgba(55,72,58,0.10)] backdrop-blur-xl"
+        >
           <div className="grid grid-cols-[auto_1fr_auto] items-start gap-4 px-6 py-6 md:px-11 md:py-8">
             <Button
               type="button"
@@ -112,15 +127,16 @@ export function ChatEmptyState({ className }: ChatEmptyStateProps) {
             </Select>
 
             <Button
-              type="button"
+              type="submit"
               size="icon-lg"
               aria-label="Send message"
+              disabled={!draft.trim()}
               className="size-11 rounded-[1.15rem] bg-[linear-gradient(180deg,rgba(143,164,145,0.95),rgba(172,190,173,0.95))] text-primary-foreground shadow-[0_10px_24px_rgba(97,124,102,0.22)]"
             >
               <Send className="size-7 stroke-[2]" />
             </Button>
           </div>
-        </div>
+        </form>
 
         <div className="flex flex-wrap items-center justify-center gap-5">
           {promptShortcuts.map((shortcut) => {
