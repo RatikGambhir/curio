@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion"
-import {useCallback, useState} from "react"
+import {useRef, useState} from "react"
 import { ChatEmptyState } from "@/components/chat-empty-state"
 import { ChatPrompt } from "@/components/chat-prompt"
 import { ChatSidebar } from "@/components/chat-sidebar"
@@ -8,6 +8,10 @@ import { mockMessagesByChatId, type ChatMessage } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import {streamChat} from "@/lib/api/chat-api.ts";
+
+type ChunkData = {
+    token: string
+}
 
 const initialChats: ChatListItem[] = [
   {
@@ -71,8 +75,8 @@ const Chat = () => {
   const [messagesByChatId, setMessagesByChatId] = useState(mockMessagesByChatId)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
+  const [streamedText, setStreamedText] = useState("")
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
-
   const handleStartNewChat = () => {
     setSelectedChatId(null)
   }
@@ -100,9 +104,12 @@ const Chat = () => {
       ...currentMessages,
       [nextChatId]: [firstMessage],
     }))
+
+    //TODO: persist to local storage
     upsertChatMeta(nextChatId, text)
     setSelectedChatId(nextChatId)
-    await streamChat(text, askQuestion)
+    await streamChat(text, accChunks)
+
   }
 
   const handleSendMessage = async (text: string) => {
@@ -110,6 +117,10 @@ const Chat = () => {
       console.log("HELLO")
       return
     }
+
+    //TODO: persist to local storage
+
+    await streamChat(text, accChunks)
 
 
     const nextMessage = createUserMessage(text)
@@ -120,20 +131,14 @@ const Chat = () => {
     upsertChatMeta(selectedChatId, text)
   }
 
-  const askQuestion = useCallback((chunk: string, done: boolean) => {
-    let text = ""
-    text += chunk
-    console.log("text - > ", text)
-    const object = {
-      "chat": [
-        createLLMMessage(text)
-      ]
-    }
+  const accChunks = (chunk: string) => {
+    console.log("CHUNK:", chunk)
+    //TODO: Process Chunks here
+    const jsonString = chunk.slice(6);
+    const chunkJson: ChunkData = JSON.parse(jsonString)
+    setStreamedText(prev  => prev + chunkJson.token)
+  }
 
-    if (done) {
-    setMessagesByChatId(object)
-    }
-  }, [])
 
   return (
     <SidebarProvider className="h-screen w-full font-sans">
