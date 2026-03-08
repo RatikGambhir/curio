@@ -3,6 +3,7 @@ import { ChatEmptyState } from "@/components/chat-empty-state"
 import { ChatPrompt } from "@/components/chat-prompt"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { ChatView } from "@/components/chat-view"
+import { mockMessagesByChatId } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -43,8 +44,7 @@ const Chat = () => {
     chats[0]?.id ?? null,
   )
 
-  const messages: number[] = []
-  // TODO: Replace mock data and local state with backend chat sessions.
+  const messages = selectedChatId ? mockMessagesByChatId[selectedChatId] ?? [] : []
 
   return (
     <SidebarProvider className="h-screen w-full font-sans">
@@ -63,9 +63,9 @@ const Chat = () => {
           />
           <div className="relative z-10 flex h-full w-full flex-col">
             {messages.length > 0 ? (
-              <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-4">
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card">
-                  <ChatView />
+              <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3">
+                <div className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] border border-border bg-background">
+                  <ChatView messages={messages} />
                 </div>
                 <ChatPrompt />
               </div>

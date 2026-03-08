@@ -1,49 +1,38 @@
-import {
-  Conversation,
-  ConversationContent,
-  ConversationEmptyState,
-} from "./ai-elements/conversation";
-import { MessageSquare } from "lucide-react";
-import { Message, MessageContent } from "./ai-elements/message";
+import { MessageSquare } from "lucide-react"
 
-const messages: { key: string; value: string; from: "user" | "assistant" }[] = [
-  {
-    key: "1",
-    value: "Hello, how are you?",
-    from: "user",
-  },
-  {
-    key: "2",
-    value: "I'm good, thank you! How can I assist you today?",
-    from: "assistant",
-  },
-];
+import { ChatMessageItem } from "@/components/chat-message"
+import type { ChatMessage } from "@/mocks/chats"
 
-const mockMessages = [];
+type ChatViewProps = {
+  messages: ChatMessage[]
+}
 
-export function ChatView() {
-  //const { messages } = useChat();
+export function ChatView({ messages }: ChatViewProps) {
   return (
-    <div className="mx-auto p-4 max-h-250 w-full">
-      <div className="flex flex-col">
-        <Conversation>
-          <ConversationContent>
-            {mockMessages.length > 0 ? (
-              messages.map(({ key, value, from }) => (
-                <Message key={key} from={from}>
-                  <MessageContent>{value}</MessageContent>
-                </Message>
-              ))
-            ) : (
-              <ConversationEmptyState
-                icon={<MessageSquare className="size-12" />}
-                title="Start a conversation"
-                description="Type a message below to begin chatting"
-              />
-            )}
-          </ConversationContent>
-        </Conversation>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {messages.length > 0 ? (
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
+            {messages.map((message) => (
+              <ChatMessageItem key={message.id} {...message} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center p-8 text-center">
+            <div className="space-y-3">
+              <div className="flex justify-center text-muted-foreground">
+                <MessageSquare className="size-12" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-medium text-sm">Start a conversation</h3>
+                <p className="text-sm text-muted-foreground">
+                  Type a message below to begin chatting
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  );
+  )
 }
