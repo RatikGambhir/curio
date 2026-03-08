@@ -35,8 +35,8 @@ function ChatPage() {
           />
           <div className="relative z-10 flex h-full w-full flex-col">
             {messages.length > 0 ? (
-              <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-4">
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card">
+              <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3">
+                <div className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] border border-border bg-background">
                   <ChatView messages={messages} />
                 </div>
                 <ChatPrompt />

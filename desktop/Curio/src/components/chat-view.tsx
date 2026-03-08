@@ -1,5 +1,6 @@
 import { MessageSquare } from "lucide-react";
 
+import { ChatMessageItem } from "@/components/chat-message";
 import type { ChatMessage } from "@/mocks/chats";
 
 type ChatViewProps = {
@@ -26,27 +27,14 @@ export function ChatView({ messages }: ChatViewProps) {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col gap-6 overflow-y-auto p-6">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={[
-            "flex w-full",
-            message.from === "user" ? "justify-end" : "justify-start",
-          ].join(" ")}
-        >
-          <div
-            className={[
-              "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm",
-              message.from === "user"
-                ? "bg-secondary text-foreground"
-                : "bg-primary/10 text-foreground",
-            ].join(" ")}
-          >
-            {message.value}
-          </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-6">
+          {messages.map((message) => (
+            <ChatMessageItem key={message.id} {...message} />
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 }
