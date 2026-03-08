@@ -49,7 +49,10 @@ export default {
 					}
 				}
 			} catch (error) {
-				console.error('Error generating content:', error);
+				const json = JSON.stringify({
+					error: error instanceof Error ? error.message : 'Unknown error'
+				});
+				await writer.write(encoder.encode(`ERROR: ${json}\n\n`));
 			} finally {
 				await writer.close();
 			}
