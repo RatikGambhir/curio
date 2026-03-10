@@ -15,6 +15,7 @@ import { GoogleGenAI } from '@google/genai';
 
 interface Env {
 	GEMINI_API_KEY: string;
+	readonly CURIO_QUESTION_QUEUE: Queue
 }
 
 interface Request {
@@ -52,6 +53,7 @@ export default {
 		const origin = request.headers.get('Origin');
 		const corsHeaders = cors;
 		const url = new URL(request.url);
+		let text = "DATA -> "
 
 		if (request.method === 'OPTIONS') {
 			return new Response(null, {
@@ -86,10 +88,13 @@ export default {
 
 				for await (const chunk of response) {
 					if (chunk.text) {
+						text += chunk.text
 						const json = JSON.stringify({ token: chunk.text });
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
+				const responseQue = await env.CURIO_QUESTION_QUEUE.send(text)
+				console.log(text)
 			} catch (error) {
 				const json = JSON.stringify({
 					error: error instanceof Error ? error.message : 'Unknown error'

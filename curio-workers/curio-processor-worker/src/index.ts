@@ -11,8 +11,13 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+interface Env {}
+
+
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		return new Response('Hello World!');
+	async queue(batch, env, ctx): Promise<void> {
+		for (const message of batch.messages) {
+			console.log("consumed from our queue:", JSON.stringify(message.body));
+		}
 	},
 } satisfies ExportedHandler<Env>;
