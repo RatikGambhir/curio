@@ -40,7 +40,7 @@ export default {
 
 			const embeddings = await geminiClient.models.embedContent({
 				model: "gemini-embedding-001",
-				contents: "What is financial modeling, be in depth please"
+				contents: question
 			})
 
 			console.log("EMBEDDINGS: ", embeddings)
