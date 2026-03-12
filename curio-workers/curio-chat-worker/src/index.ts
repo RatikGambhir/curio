@@ -13,6 +13,8 @@
 
 import { GoogleGenAI } from '@google/genai';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
+import {genSupabaseClient} from "./SupabaseClient";
+import {SupabaseClient} from "@supabase/supabase-js";
 
 interface Env {
 	GEMINI_API_KEY: string;
@@ -24,11 +26,18 @@ interface Env {
 
 interface ChatRequestBody {
 	prompt: string;
+	attachments?: string
 }
 
 interface SupabaseUser {
 	id: string;
 	email?: string | null;
+}
+
+interface QueueBody {
+	userId: string
+	messageId: string
+
 }
 
 const supabaseJwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
@@ -101,63 +110,85 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 		throw error;
 	}
 }
+//
+// const validate = (request: Request): Response => {
+// 	const url = new URL(request.url);
+// 	if (request.method === 'OPTIONS') {
+// 		return new Response(null, {
+// 			status: 204,
+// 			headers: cors,
+// 		});
+// 	}
+//
+// 	if (url.pathname !== '/chat') {
+// 		return new Response('Not found', {
+// 			status: 404,
+// 			headers: {
+// 				...cors,
+// 				'Content-Type': 'text/plain; charset=utf-8',
+// 			},
+// 		});
+// 	}
+//
+// 	if (!env.SUPABASE_URL) {
+// 		return new Response('Supabase auth is not configured for this worker.', {
+// 			status: 500,
+// 			headers: {
+// 				...cors,
+// 				'Content-Type': 'text/plain; charset=utf-8',
+// 			},
+// 		});
+// 	}
+//
+// 	let authenticatedUser: SupabaseUser | null;
+// 	try {
+// 		authenticatedUser = await authenticateRequest(request, env);
+// 	} catch (error) {
+// 		console.error('Supabase auth verification failed', error);
+// 		return new Response('Authentication service unavailable.', {
+// 			status: 503,
+// 			headers: {
+// 				...cors,
+// 				'Content-Type': 'text/plain; charset=utf-8',
+// 			},
+// 		});
+// 	}
+//
+// 	if (!authenticatedUser) {
+// 		return new Response('Unauthorized', {
+// 			status: 401,
+// 			headers: {
+// 				...cors,
+// 				'Content-Type': 'text/plain; charset=utf-8',
+// 			},
+// 		});
+// 	}
+// 	const user = authenticatedUser;
+// }
+
+const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt: string,  text: string) => {
+	const {data, error} = await supabase.rpc("insert_prompt_response", {
+		userId: "1234",
+		prompt: prompt,
+		response: text,
+		kind: "chat"
+	})
+
+	if(!error) {
+		await env.CURIO_QUESTION_QUEUE.send(text);
+	}
+}
+
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
-		const url = new URL(request.url);
-		let text = 'DATA -> ';
+		const supabase = genSupabaseClient(env)
+		// if (validate(request)) {
+		//
+		// }
+		let aiResponse = 'DATA -> ';
 
-		// if (request.method === 'OPTIONS') {
-		// 	return new Response(null, {
-		// 		status: 204,
-		// 		headers: cors,
-		// 	});
-		// }
-		//
-		// if (url.pathname !== '/chat') {
-		// 	return new Response('Not found', {
-		// 		status: 404,
-		// 		headers: {
-		// 			...cors,
-		// 			'Content-Type': 'text/plain; charset=utf-8',
-		// 		},
-		// 	});
-		// }
-		//
-		// if (!env.SUPABASE_URL) {
-		// 	return new Response('Supabase auth is not configured for this worker.', {
-		// 		status: 500,
-		// 		headers: {
-		// 			...cors,
-		// 			'Content-Type': 'text/plain; charset=utf-8',
-		// 		},
-		// 	});
-		// }
-		//
-		// let authenticatedUser: SupabaseUser | null;
-		// try {
-		// 	authenticatedUser = await authenticateRequest(request, env);
-		// } catch (error) {
-		// 	console.error('Supabase auth verification failed', error);
-		// 	return new Response('Authentication service unavailable.', {
-		// 		status: 503,
-		// 		headers: {
-		// 			...cors,
-		// 			'Content-Type': 'text/plain; charset=utf-8',
-		// 		},
-		// 	});
-		// }
-		//
-		// if (!authenticatedUser) {
-		// 	return new Response('Unauthorized', {
-		// 		status: 401,
-		// 		headers: {
-		// 			...cors,
-		// 			'Content-Type': 'text/plain; charset=utf-8',
-		// 		},
-		// 	});
-		// }
-		// const user = authenticatedUser;
+
 
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
@@ -176,13 +207,22 @@ export default {
 
 				for await (const chunk of response) {
 					if (chunk.text) {
-						text += chunk.text;
+						aiResponse += chunk.text;
 						const json = JSON.stringify({ token: chunk.text });
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
-				await env.CURIO_QUESTION_QUEUE.send(text);
-				console.log('Generated response for user', text);
+				const {data, error} = await supabase.rpc("insert_prompt_response", {
+					userId: "1234",
+					prompt: prompt,
+					response: aiResponse,
+					kind: "chat"
+				})
+
+				if(!error) {
+					await env.CURIO_QUESTION_QUEUE.send(aiResponse);
+				}
+
 			} catch (error) {
 				const json = JSON.stringify({
 					error: error instanceof Error ? error.message : 'Unknown error',

@@ -21,7 +21,7 @@ interface User {
 	id: string
 }
 interface MessageBody {
-	question: string,
+	messageId: string,
 
 }
 
