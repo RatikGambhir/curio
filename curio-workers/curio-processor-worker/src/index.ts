@@ -38,6 +38,15 @@ export default {
 			const question = message.body as string
 			console.log("paresed question: ", question ?? "NOT PARESE");
 
+			const embeddings = await geminiClient.models.embedContent({
+				model: "gemini-embedding-001",
+				contents: "What is financial modeling, be in depth please"
+			})
+
+			console.log("EMBEDDINGS: ", embeddings)
+
+			//TODO: SAVE TO SUPABASE HERE
+
 		}
 	},
 } satisfies ExportedHandler<Env>;
