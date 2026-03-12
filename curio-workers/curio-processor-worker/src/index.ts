@@ -6,18 +6,38 @@
  * - Run `npm run deploy` to publish your worker
  *
  * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
+ * `Env` object can be regenerated with `is`.
  *
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-interface Env {}
+import {GoogleGenAI} from "@google/genai";
+
+interface Env {
+	GEMINI_API_KEY: string
+}
+
+interface User {
+	id: string
+}
+interface MessageBody {
+	question: string,
+
+}
+
+
+
 
 
 export default {
 	async queue(batch, env, ctx): Promise<void> {
+		const geminiClient = new GoogleGenAI({apiKey: env.GEMINI_API_KEY})
 		for (const message of batch.messages) {
-			console.log("consumed from our queue:", JSON.stringify(message.body));
+			console.log("consumed from our queue:");
+
+			const question = message.body as string
+			console.log("paresed question: ", question ?? "NOT PARESE");
+
 		}
 	},
 } satisfies ExportedHandler<Env>;
