@@ -11,7 +11,7 @@ import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 import ChatPage from "@/pages/chat";
 import HomePage from "@/pages/home";
 import LoginPage from "@/pages/login";
-import ProfilePage from "@/pages/profile";
+import SettingsPage from "@/pages/settings";
 import VerifyEmailPage from "@/pages/verify-email";
 
 function RequireAuth({ children }: { children: ReactElement }) {
@@ -70,7 +70,7 @@ export function AppRouter() {
           path="/profile"
           element={
             <RequireAuth>
-              <ProfilePage />
+              <SettingsPage />
             </RequireAuth>
           }
         />

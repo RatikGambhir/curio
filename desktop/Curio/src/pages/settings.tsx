@@ -8,7 +8,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-function ProfilePage() {
+function SettingsPage() {
   return (
     <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
       <AppSidebar />
@@ -65,4 +65,4 @@ function ProfilePage() {
   );
 }
 
-export default ProfilePage;
+export default SettingsPage;

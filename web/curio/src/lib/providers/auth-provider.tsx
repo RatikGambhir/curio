@@ -1,7 +1,7 @@
 // src/auth/AuthProvider.tsx
 import { useState, type ReactNode } from "react";
-import { AuthContext } from "../constants/AuthContext";
-import type { AuthContextValue } from "@/types/LoginRegisterTypes";
+import { AuthContext } from "../../constants/AuthContext.tsx";
+import type { AuthContextValue } from "@/types/LoginRegisterTypes.ts";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<string | null>(null);
