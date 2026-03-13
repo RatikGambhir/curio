@@ -172,12 +172,13 @@ const processAssets = async (env: Env,  supabase: SupabaseClient, asset: any) =>
 const processAssetMetadata = async (env: Env,  supabase: SupabaseClient, asset: any) => {
 
 }
-const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt: string,  text: string) => {
+const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt: string,  text: string, threadId: string) => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
 		userId: "1234",
 		prompt: prompt,
 		response: text,
-		kind: "chat"
+		kind: "chat",
+		threadId: threadId ?? ""
 	})
 
 	return {
@@ -225,6 +226,7 @@ export default {
 					prompt: prompt,
 					response: aiResponse,
 					kind: "chat",
+					threadId: "",
 				})
 
 				if(!error) {
