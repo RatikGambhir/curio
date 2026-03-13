@@ -165,7 +165,13 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 // 	}
 // 	const user = authenticatedUser;
 // }
+const processAssets = async (env: Env,  supabase: SupabaseClient, asset: any) => {
 
+}
+
+const processAssetMetadata = async (env: Env,  supabase: SupabaseClient, asset: any) => {
+
+}
 const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt: string,  text: string) => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
 		userId: "1234",
@@ -174,9 +180,11 @@ const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt
 		kind: "chat"
 	})
 
-	if(!error) {
-		await env.CURIO_QUESTION_QUEUE.send(text);
+	return {
+		data,
+		error
 	}
+
 }
 
 
@@ -216,7 +224,7 @@ export default {
 					userId: "1234",
 					prompt: prompt,
 					response: aiResponse,
-					kind: "chat"
+					kind: "chat",
 				})
 
 				if(!error) {
