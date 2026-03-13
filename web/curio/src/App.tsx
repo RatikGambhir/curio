@@ -7,7 +7,6 @@ import Home from "./pages/Home";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import ProfileSettings from "./pages/ProfileSettings";
-import Register from "./pages/Register";
 import VerifyEmail from "./pages/VerifyEmail";
 
 function App() {
@@ -21,7 +20,6 @@ function App() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<ProfileSettings />} />
-        <Route path="/register" element={<Register />} />
       </Routes>
     </Router>
   );

@@ -15,6 +15,7 @@ import { GoogleGenAI } from '@google/genai';
 
 interface Env {
 	GEMINI_API_KEY: string;
+	readonly CURIO_QUESTION_QUEUE: Queue
 }
 
 interface Request {
@@ -31,22 +32,28 @@ const ALLOWED_ORIGINS = new Set([
 	// 'https://gettingcurio.com',
 ]);
 
-function getCorsHeaders(origin: string | null): Record<string, string> {
-	const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
-
-	return {
-		"Access-Control-Allow-Origin": '*',
-		'Access-Control-Allow-Methods': 'POST, OPTIONS',
-		'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-		'Access-Control-Max-Age': '86400',
-	};
-}
+// function getCorsHeaders(origin: string | null): Record<string, string> {
+// 	const allowOrigin = origin && ALLOWED_ORIGINS.has(origin) ? origin : '';
+//
+// 	return {
+// 		"Access-Control-Allow-Origin": '*',
+// 		'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// 		'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// 		'Access-Control-Max-Age': '86400',
+// 	};
+// }
+const cors = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
 		const origin = request.headers.get('Origin');
-		const corsHeaders = getCorsHeaders(origin);
+		const corsHeaders = cors;
 		const url = new URL(request.url);
+		let text = "DATA -> "
 
 		if (request.method === 'OPTIONS') {
 			return new Response(null, {
@@ -82,10 +89,13 @@ export default {
 
 				for await (const chunk of response) {
 					if (chunk.text) {
+						text += chunk.text
 						const json = JSON.stringify({ token: chunk.text });
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
+				const responseQue = await env.CURIO_QUESTION_QUEUE.send(text)
+				console.log(text)
 			} catch (error) {
 				const json = JSON.stringify({
 					error: error instanceof Error ? error.message : 'Unknown error'
@@ -100,6 +110,7 @@ export default {
 
 		return new Response(readable, {
 			headers: {
+				...corsHeaders,
 				'Content-Type': 'text/event-stream',
 				'Cache-Control': 'no-cache',
 				Connection: 'keep-alive',

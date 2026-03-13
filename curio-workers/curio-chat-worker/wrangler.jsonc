@@ -7,7 +7,16 @@
 	"name": "curio-chat-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2026-03-07",
-	"workers_dev": true
+	"workers_dev": true,
+	"queues": {
+		"producers": [
+			{
+				"queue": "curio-question-queue",
+				"binding": "CURIO_QUESTION_QUEUE"
+			}
+		]
+	}
+}
 
 	/**
 	 * Smart Placement
@@ -39,4 +48,4 @@
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
 	 */
 	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
-}
+

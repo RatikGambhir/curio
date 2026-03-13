@@ -9,7 +9,17 @@
 	"compatibility_date": "2025-11-19",
 	"observability": {
 		"enabled": true
+	},
+	"queues": {
+		"consumers": [
+			{
+				"queue": "curio-question-queue",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5
+			}
+		]
 	}
+}
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
@@ -40,4 +50,4 @@
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
 	 */
 	// "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
-}
+
