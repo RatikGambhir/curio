@@ -173,13 +173,15 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
               className="animate-in fade-in-0 slide-in-from-bottom-4 mb-2 text-5xl font-semibold tracking-tight duration-500 md:text-7xl"
               style={{ fontFamily: "var(--font-serif)" }}
           >
-            <span className="flex items-center">
+            <span className="flex items-end gap-[0.32em] leading-none">
               <span>curio</span>
-              <img
-                src={curioLogo}
-                alt="Curio logo"
-                className="h-6/12 w-6/12 rounded-md object-contain"
-              />
+              <span className="relative mb-[0.04em] block h-[1.2em] w-[0.96em] shrink-0">
+                <img
+                  src={curioLogo}
+                  alt="Curio logo"
+                  className="absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 object-contain"
+                />
+              </span>
             </span>
           </h1>
 
@@ -187,15 +189,17 @@ export const HeroSection = ({ className }: HeroSectionProps) => {
                 className="animate-in fade-in-0 slide-in-from-bottom-4 mb-5 text-2xl tracking-tight duration-500 md:text-2xl"
                 style={{ fontFamily: "var(--font-serif)" }}
             >
-              For every question, there's an{" "}
+              For every question, there&apos;s an{" "}
               <HyperText
                 as="span"
                 startOnView={true}
                 animateOnHover={false}
                 duration={2000}
-                className="inline-block py-0 text-inherit font-sans"
+                preserveCase={true}
+                className="inline align-baseline text-inherit"
+                letterClassName="align-baseline font-inherit"
               >
-                Answer
+                answer
               </HyperText>
             </h2>
 

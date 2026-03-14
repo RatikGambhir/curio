@@ -22,6 +22,10 @@ interface HyperTextProps extends MotionProps {
     animateOnHover?: boolean
     /** Custom character set for scramble effect. Defaults to uppercase alphabet */
     characterSet?: CharacterSet
+    /** Whether to preserve the original letter casing */
+    preserveCase?: boolean
+    /** Optional className for each animated letter */
+    letterClassName?: string
 }
 
 const DEFAULT_CHARACTER_SET = Object.freeze(
@@ -39,6 +43,8 @@ export function HyperText({
                               startOnView = false,
                               animateOnHover = true,
                               characterSet = DEFAULT_CHARACTER_SET,
+                              preserveCase = false,
+                              letterClassName,
                               ...props
                           }: HyperTextProps) {
     const MotionComponent = motion.create(Component, {
@@ -126,7 +132,7 @@ export function HyperText({
     return (
         <MotionComponent
             ref={elementRef}
-            className={cn("overflow-hidden py-2 font-sans", className)}
+            className={cn("overflow-hidden whitespace-pre", className)}
             onMouseEnter={handleAnimationTrigger}
             {...props}
         >
@@ -134,9 +140,13 @@ export function HyperText({
                 {displayText.map((letter, index) => (
                     <motion.span
                         key={index}
-                        className={cn("font-mono", letter === " " ? "w-3" : "")}
+                        className={cn(
+                            "inline-block",
+                            letter === " " ? "w-[0.28em]" : "",
+                            letterClassName
+                        )}
                     >
-                        {letter.toUpperCase()}
+                        {preserveCase ? letter : letter.toUpperCase()}
                     </motion.span>
                 ))}
             </AnimatePresence>
