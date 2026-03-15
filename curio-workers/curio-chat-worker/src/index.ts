@@ -19,24 +19,50 @@ import {SupabaseClient} from "@supabase/supabase-js";
 interface Env {
 	GEMINI_API_KEY: string;
 	SUPABASE_URL: string;
-	SUPABASE_ANON_KEY: string;
+	SUPABASE_KEY: string;
 	SUPABASE_JWT_AUDIENCE?: string;
-	readonly CURIO_QUESTION_QUEUE: Queue;
+	readonly CURIO_QUESTION_QUEUE: Queue<QueueBody>;
 }
 
 interface ChatRequestBody {
+	userId: string;
 	prompt: string;
 	attachments?: string
+	threadId?: string
 }
+
+interface PromptProcessingResult {
+	userId: string,
+	threadId: string,
+	userMessageId: string,
+	assistantMessageId: string
+}
+
+interface AssetProcessingResult {
+	id: string,
+	path: string,
+	fullPath: string,
+}
+
+interface ProcessingResult {
+	promptResult: PromptProcessingResult,
+	assetResult: AssetProcessingResult
+}
+
+type Result<T, E = Error> = {ok: true, value: T} | {ok: false, errors: E}
 
 interface SupabaseUser {
 	id: string;
 	email?: string | null;
 }
 
+
 interface QueueBody {
 	userId: string
-	messageId: string
+	userMessageId: string
+	threadId: string
+	assistantMessageId: string,
+	assetBucketId: string
 
 }
 
@@ -165,25 +191,75 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 // 	}
 // 	const user = authenticatedUser;
 // }
-const processAssets = async (env: Env,  supabase: SupabaseClient, asset: any) => {
 
+const processAssetResult = async (supabase: SupabaseClient): Promise<Result<AssetProcessingResult>> => {
+	const {data, error} = await supabase.storage.from("user_assets").upload("/chat/body", "put file here!!")
+	if (error) {
+		return {
+			ok: false,
+			errors: error
+		}
+	}
+	return {
+		ok: true,
+		value: data as AssetProcessingResult
+	}
 }
 
-const processAssetMetadata = async (env: Env,  supabase: SupabaseClient, asset: any) => {
 
+const promptTransactionResult = async (supabase: SupabaseClient, requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
+	 return await Promise.all(
+		[processPromptResult(supabase, requestBody, response),
+			processAssetResult(supabase)]
+	).then(([promptResponse, assetResult]) => {
+		 if (!promptResponse.ok) {
+			 return {
+				 ok: false as const,
+				 errors: promptResponse.errors,
+			 }
+		 }
+
+		 if (!assetResult.ok) {
+			 return {
+				 ok: false as const,
+				 errors: assetResult.errors,
+			 }
+		 }
+
+		 return {
+			 ok: true as const,
+			 value: {
+				 promptResult: promptResponse.value,
+				 assetResult: assetResult.value,
+			 },
+		 }
+	}).catch((error: Error) => {
+		return {
+			ok: false as const,
+			errors: error,
+		}
+	})
 }
-const processPromptResponse = async (env: Env,  supabase: SupabaseClient, prompt: string,  text: string, threadId: string) => {
+
+const processPromptResult = async (supabase: SupabaseClient, requestBody: ChatRequestBody, response: string): Promise<Result<PromptProcessingResult>> => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
-		userId: "1234",
-		prompt: prompt,
-		response: text,
+		userId: requestBody.userId,
+		prompt: requestBody.prompt,
+		response: response,
 		kind: "chat",
-		threadId: threadId ?? ""
+		threadId: requestBody.threadId ?? null
 	})
 
+	if (error) {
+		return {
+			ok: false,
+			errors: error
+		}
+	}
+
 	return {
-		data,
-		error
+		ok: true,
+		value: data as PromptProcessingResult
 	}
 
 }
@@ -195,10 +271,7 @@ export default {
 		// if (validate(request)) {
 		//
 		// }
-		let aiResponse = 'DATA -> ';
-
-
-
+		let aiResponse = '';
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
@@ -221,23 +294,28 @@ export default {
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
-				const {data, error} = await supabase.rpc("insert_prompt_response", {
-					userId: "1234",
-					prompt: prompt,
-					response: aiResponse,
-					kind: "chat",
-					threadId: "",
-				})
+				const processingResult = await promptTransactionResult(supabase, body, aiResponse)
+				if (processingResult.ok) {
+					const promptResult = processingResult.value.promptResult
+					const assetResult = processingResult.value.assetResult
+					await env.CURIO_QUESTION_QUEUE.send({
+						userId: promptResult.userId,
+						threadId: promptResult.threadId,
+						userMessageId: promptResult.userMessageId,
+						assistantMessageId: promptResult.assistantMessageId,
+						assetBucketId: assetResult.id
+					})
+				} else {
+					const errorJson = JSON.stringify({ error: processingResult.errors });
+					await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
 
-				if(!error) {
-					await env.CURIO_QUESTION_QUEUE.send(aiResponse);
 				}
 
 			} catch (error) {
-				const json = JSON.stringify({
+				const errorJson = JSON.stringify({
 					error: error instanceof Error ? error.message : 'Unknown error',
 				});
-				await writer.write(encoder.encode(`ERROR: ${json}\n\n`));
+				await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
 			} finally {
 				await writer.close();
 			}
