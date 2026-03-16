@@ -197,14 +197,14 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 const processAssetResult = async (supabase: DBClient): Promise<Result<AssetProcessingResult>> => {
 	const {data, error} = await supabase.storage.from("user_assets").upload("/chat/body", "Second put file here hehehe!!")
 	if (error) {
-		console.log("asset didn't work")
+		console.error("[storage] Failed to upload asset to user_assets bucket", { error })
 
 		return {
 			ok: false,
 			errors: error
 		}
 	}
-	console.log("IT WORKED? bucket")
+	console.log("[storage] Asset uploaded successfully to user_assets bucket", { path: data.path })
 
 	return {
 		ok: true,
@@ -256,15 +256,14 @@ const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestB
 	})
 
 	if (error) {
-		console.log("prompt didn't work")
+		console.error("[db] RPC insert_prompt_response failed", { userId: requestBody.userId, error })
 
 		return {
 			ok: false,
 			errors: error
 		}
 	}
-	console.log("IT WORKED rpc?")
-
+	console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: (data as PromptProcessingResult).threadId });
 	return {
 		ok: true,
 		value: data as PromptProcessingResult
@@ -303,9 +302,9 @@ export default {
 				}
 				const processingResult = await procssPromptTransaction(supabase, body, accResponse)
 				if (processingResult.ok) {
-					console.log("IT WORKED?")
 					const promptResult = processingResult.value.promptResult
 					const assetResult = processingResult.value.assetResult
+					console.log("[chat] Stream complete — enqueueing to CURIO_QUESTION_QUEUE", { userId: promptResult.userId, threadId: promptResult.threadId, hasAsset: !!assetResult })
 					await env.CURIO_QUESTION_QUEUE.send({
 						userId: promptResult.userId,
 						threadId: promptResult.threadId,
