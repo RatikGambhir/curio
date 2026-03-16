@@ -6,6 +6,8 @@ type RegisterData = {
   phone: string | null;
 };
 
+
+
 type AuthContextValue = {
   user: string | null; // you can type this as `User | null` later
   isAuthenticated: boolean;
