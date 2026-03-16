@@ -13,7 +13,7 @@
 
 import { GoogleGenAI } from '@google/genai';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
-import {genSupabaseClient} from "./SupabaseClient";
+import {genSupabaseClient} from "./supabase";
 import {SupabaseClient} from "@supabase/supabase-js";
 
 interface Env {
@@ -46,7 +46,7 @@ interface AssetProcessingResult {
 
 interface ProcessingResult {
 	promptResult: PromptProcessingResult,
-	assetResult: AssetProcessingResult
+	assetResult: AssetProcessingResult | null
 }
 
 type Result<T, E = Error> = {ok: true, value: T} | {ok: false, errors: E}
@@ -55,6 +55,8 @@ interface SupabaseUser {
 	id: string;
 	email?: string | null;
 }
+
+type DBClient = SupabaseClient<any, "public", "messaging", any, any>
 
 
 interface QueueBody {
@@ -192,14 +194,18 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 // 	const user = authenticatedUser;
 // }
 
-const processAssetResult = async (supabase: SupabaseClient): Promise<Result<AssetProcessingResult>> => {
-	const {data, error} = await supabase.storage.from("user_assets").upload("/chat/body", "put file here!!")
+const processAssetResult = async (supabase: DBClient): Promise<Result<AssetProcessingResult>> => {
+	const {data, error} = await supabase.storage.from("user_assets").upload("/chat/body", "Second put file here hehehe!!")
 	if (error) {
+		console.log("asset didn't work")
+
 		return {
 			ok: false,
 			errors: error
 		}
 	}
+	console.log("IT WORKED? bucket")
+
 	return {
 		ok: true,
 		value: data as AssetProcessingResult
@@ -207,55 +213,57 @@ const processAssetResult = async (supabase: SupabaseClient): Promise<Result<Asse
 }
 
 
-const promptTransactionResult = async (supabase: SupabaseClient, requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
-	 return await Promise.all(
-		[processPromptResult(supabase, requestBody, response),
-			processAssetResult(supabase)]
-	).then(([promptResponse, assetResult]) => {
-		 if (!promptResponse.ok) {
-			 return {
-				 ok: false as const,
-				 errors: promptResponse.errors,
-			 }
-		 }
+const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
+	let savedAsset: AssetProcessingResult | null = null
+	if (requestBody.attachments != "") {
+		const assetResult = await processAssetResult(supabase)
+		if (!assetResult.ok) {
+			// TODO: Make a custom error or else we can just return prompt result
+			return {
+				ok: false as const,
+				errors: assetResult.errors
+			}
+		}
+		savedAsset = assetResult.value
+	}
 
-		 if (!assetResult.ok) {
-			 return {
-				 ok: false as const,
-				 errors: assetResult.errors,
-			 }
-		 }
-
-		 return {
-			 ok: true as const,
-			 value: {
-				 promptResult: promptResponse.value,
-				 assetResult: assetResult.value,
-			 },
-		 }
-	}).catch((error: Error) => {
+	const promptResult = await processPromptResult(supabase, requestBody, response)
+	if (!promptResult.ok) {
+		// TODO: Make a custom error or else we can just return prompt result
 		return {
 			ok: false as const,
-			errors: error,
+			errors: promptResult.errors
 		}
-	})
+	}
+	const promptVal = promptResult.value
+	return {
+		ok: true as const,
+		value: {
+			promptResult: promptVal,
+			assetResult: savedAsset
+		}
+	}
 }
 
-const processPromptResult = async (supabase: SupabaseClient, requestBody: ChatRequestBody, response: string): Promise<Result<PromptProcessingResult>> => {
+const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<PromptProcessingResult>> => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
-		userId: requestBody.userId,
-		prompt: requestBody.prompt,
-		response: response,
-		kind: "chat",
-		threadId: requestBody.threadId ?? null
+		p_user_id: requestBody.userId,
+		p_prompt: requestBody.prompt,
+		p_response: response,
+		p_kind: "chat",
+		p_thread_id: null,
+		p_attachments: null
 	})
 
 	if (error) {
+		console.log("prompt didn't work")
+
 		return {
 			ok: false,
 			errors: error
 		}
 	}
+	console.log("IT WORKED rpc?")
 
 	return {
 		ok: true,
@@ -271,7 +279,7 @@ export default {
 		// if (validate(request)) {
 		//
 		// }
-		let aiResponse = '';
+		let accResponse = '';
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
@@ -279,7 +287,6 @@ export default {
 		const body = await request.json<ChatRequestBody>();
 		const prompt = body.prompt;
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
-		//TODO: DO VALIDATION
 		async function streamResponse() {
 			try {
 				const response = await gemini.models.generateContentStream({
@@ -289,13 +296,14 @@ export default {
 
 				for await (const chunk of response) {
 					if (chunk.text) {
-						aiResponse += chunk.text;
+						accResponse += chunk.text;
 						const json = JSON.stringify({ token: chunk.text });
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
-				const processingResult = await promptTransactionResult(supabase, body, aiResponse)
+				const processingResult = await procssPromptTransaction(supabase, body, accResponse)
 				if (processingResult.ok) {
+					console.log("IT WORKED?")
 					const promptResult = processingResult.value.promptResult
 					const assetResult = processingResult.value.assetResult
 					await env.CURIO_QUESTION_QUEUE.send({
@@ -303,7 +311,7 @@ export default {
 						threadId: promptResult.threadId,
 						userMessageId: promptResult.userMessageId,
 						assistantMessageId: promptResult.assistantMessageId,
-						assetBucketId: assetResult.id
+						assetBucketId: assetResult?.id ?? ""
 					})
 				} else {
 					const errorJson = JSON.stringify({ error: processingResult.errors });
