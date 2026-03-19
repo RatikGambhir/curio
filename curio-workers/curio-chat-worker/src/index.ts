@@ -27,7 +27,7 @@ interface Env {
 interface ChatRequestBody {
 	userId: string;
 	prompt: string;
-	attachments?: string
+	attachments: File[] | null
 	threadId?: string
 }
 
@@ -44,19 +44,50 @@ interface AssetProcessingResult {
 	fullPath: string,
 }
 
+interface AssetMetadata {
+	fileName: string,
+	fileSize: string,
+	fileType: string,
+	lastModifiedDate: Date
+
+}
+
 interface ProcessingResult {
 	promptResult: PromptProcessingResult,
 	assetResult: AssetProcessingResult | null
 }
 
-type Result<T, E = Error> = {ok: true, value: T} | {ok: false, errors: E}
+interface ProcessingResult2 {
+	prompt: PromptProcessingResult
+	successfulAssets: AssetProcessingResult[] | null
+	failedAsset: File[] | null
+}
 
-interface SupabaseUser {
+type Success<T> = {ok: true, value: T}
+type Failure<E = Error> = {ok: false, error: E}
+
+type Result<T, E = Error> = Success<T> | Failure<E>
+
+export interface SupabaseUser {
 	id: string;
 	email?: string | null;
 }
 
 type DBClient = SupabaseClient<any, "public", "messaging", any, any>
+
+const Success = <T>(val: T) => {
+	return {
+		ok: true,
+		value: val
+	} as Success<T>
+}
+
+const Failure = (error: Error) => {
+	return {
+		ok: false,
+		error: error
+	} as Failure
+}
 
 
 interface QueueBody {
@@ -64,7 +95,7 @@ interface QueueBody {
 	userMessageId: string
 	threadId: string
 	assistantMessageId: string,
-	assetBucketId: string
+	assetPath: string
 
 }
 
@@ -194,37 +225,31 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 // 	const user = authenticatedUser;
 // }
 
-const processAssetResult = async (supabase: DBClient): Promise<Result<AssetProcessingResult>> => {
-	const {data, error} = await supabase.storage.from("user_assets").upload("/chat/body", "Second put file here hehehe!!")
-	if (error) {
-		console.error("[storage] Failed to upload asset to user_assets bucket", { error })
+const processAssetResult = async (supabase: DBClient, requestBody: ChatRequestBody):  Promise<Result<AssetProcessingResult>[]> => {
+	const attachments = requestBody.attachments ?? [];
+	return await Promise.all(
+		attachments.map(async (attachment): Promise<Result<AssetProcessingResult>> => {
+			const { data, error } = await supabase.storage
+				.from('user_assets')
+				.upload(genStorageKey(requestBody.userId, attachment), attachment);
 
-		return {
-			ok: false,
-			errors: error
-		}
-	}
-	console.log("[storage] Asset uploaded successfully to user_assets bucket", { path: data.path })
-
-	return {
-		ok: true,
-		value: data as AssetProcessingResult
-	}
+			if (error) {
+				console.error('[storage] Failed to upload asset to user_assets bucket', { error });
+				return Failure(error)
+			}
+			console.log('[storage] Asset uploaded successfully to user_assets bucket', { path: data.path });
+			return Success(data as AssetProcessingResult)
+		}),
+	);
 }
 
 
 const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
 	let savedAsset: AssetProcessingResult | null = null
-	if (requestBody.attachments != "") {
-		const assetResult = await processAssetResult(supabase)
-		if (!assetResult.ok) {
-			// TODO: Make a custom error or else we can just return prompt result
-			return {
-				ok: false as const,
-				errors: assetResult.errors
-			}
-		}
-		savedAsset = assetResult.value
+	if (requestBody.attachments && requestBody.attachments.length > 0) {
+		const processedAssets = await processAssetResult(supabase, requestBody)
+		const failedAssets = processedAssets.filter(asset => !asset.ok)
+		const successfulAssets = processedAssets.filter(asset => asset.ok)
 	}
 
 	const promptResult = await processPromptResult(supabase, requestBody, response)
@@ -232,7 +257,7 @@ const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequ
 		// TODO: Make a custom error or else we can just return prompt result
 		return {
 			ok: false as const,
-			errors: promptResult.errors
+			error: promptResult.error
 		}
 	}
 	const promptVal = promptResult.value
@@ -245,13 +270,28 @@ const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequ
 	}
 }
 
+const genStorageKey = ( userId: string,  asset: File) => {
+	return `chat/${userId}/${asset.name}/${asset.type}/${Date.now()}`
+}
+
+const genAssetMetadata = (files: File[]) => {
+	return files.map((file) => ({
+		fileName: file.name,
+		fileType: file.type,
+		fileSize: file.size,
+		lastModified: file.lastModified,
+		lastModifiedDate: new Date(file.lastModified).toISOString(),
+	}))
+}
+
+
 const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<PromptProcessingResult>> => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
 		p_user_id: requestBody.userId,
 		p_prompt: requestBody.prompt,
 		p_response: response,
 		p_kind: "chat",
-		p_thread_id: null,
+		p_thread_id: requestBody.threadId,
 		p_attachments: null
 	})
 
@@ -260,7 +300,7 @@ const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestB
 
 		return {
 			ok: false,
-			errors: error
+			error: new Error(error.message)
 		}
 	}
 	console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: (data as PromptProcessingResult).threadId });
@@ -270,20 +310,64 @@ const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestB
 	}
 
 }
+// const buildProcessCommand = (env: Env) => {
+// 	const supabase = genSupabaseClient(env)
+// 	return async (requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
+// 		let savedAsset: AssetProcessingResult | null = null
+// 		if (requestBody.attachments) {
+// 			const assetResult = await processAssetResult(supabase, requestBody)
+// 			if (!assetResult.ok) {
+// 				// TODO: Make a custom error or else we can just return prompt result
+// 				return {
+// 					ok: false as const,
+// 					error: assetResult.error
+// 				}
+// 			}
+// 			savedAsset = assetResult.value
+// 		}
+//
+// 		const promptResult = await processPromptResult(supabase, requestBody, response)
+// 		if (!promptResult.ok) {
+// 			// TODO: Make a custom error or else we can just return prompt result
+// 			return {
+// 				ok: false as const,
+// 				error: promptResult.error
+// 			}
+// 		}
+// 		const promptVal = promptResult.value
+// 		return {
+// 			ok: true as const,
+// 			value: {
+// 				promptResult: promptVal,
+// 				assetResult: savedAsset
+// 			}
+// 		}
+// 	}
+// }
 
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
 		const supabase = genSupabaseClient(env)
+		//const processCommand = buildProcessCommand(env)
+
+
 		// if (validate(request)) {
 		//
 		// }
 		let accResponse = '';
+		const form = await request.formData()
+
+		const body: ChatRequestBody = {
+			userId: String(form.get("userId") ?? ""),
+			prompt: String(form.get("prompt") ?? ""),
+			threadId: form.get("threadId") ? String(form.get("threadId")) : undefined,
+			attachments: form.getAll("attachment").filter((v): v is File => v instanceof File),
+		}
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
 		const encoder = new TextEncoder();
-		const body = await request.json<ChatRequestBody>();
 		const prompt = body.prompt;
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
 		async function streamResponse() {
@@ -300,6 +384,7 @@ export default {
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
+				//const commandResponse = await processCommand(body, accResponse)
 				const processingResult = await procssPromptTransaction(supabase, body, accResponse)
 				if (processingResult.ok) {
 					const promptResult = processingResult.value.promptResult
@@ -310,10 +395,10 @@ export default {
 						threadId: promptResult.threadId,
 						userMessageId: promptResult.userMessageId,
 						assistantMessageId: promptResult.assistantMessageId,
-						assetBucketId: assetResult?.id ?? ""
+						assetPath: assetResult?.fullPath ?? ""
 					})
 				} else {
-					const errorJson = JSON.stringify({ error: processingResult.errors });
+					const errorJson = JSON.stringify({ error: processingResult.error });
 					await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
 
 				}

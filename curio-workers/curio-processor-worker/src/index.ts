@@ -20,11 +20,32 @@ interface Env {
 interface User {
 	id: string
 }
+
+
 interface MessageBody {
-	messageId: string,
+	userId: string
+	userMessageId: string
+	threadId: string
+	assistantMessageId: string,
+	assetBucketId: string
 
 }
 
+const queryPromptData = async (messageId: string, threadId: string,  userId: string) => {
+
+}
+
+const queryAssetData = async (path: string) => {
+
+}
+
+const genEmbeddings = async (data: any) => {
+
+}
+
+const genPromptEmbeddings = async (promptData: MessageBody) => {
+
+}
 
 
 
@@ -35,12 +56,12 @@ export default {
 		for (const message of batch.messages) {
 			console.log("consumed from our queue:");
 
-			const question = message.body as string
-			console.log("paresed question: ", question ?? "NOT PARESE");
+			const messageBody = message.body as MessageBody
+			console.log("paresed question: ", messageBody.userId ?? "NOT PARESE");
 
 			const embeddings = await geminiClient.models.embedContent({
 				model: "gemini-embedding-001",
-				contents: question
+				contents: messageBody.assistantMessageId
 			})
 
 			console.log("EMBEDDINGS: ", embeddings)

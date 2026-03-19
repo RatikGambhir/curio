@@ -28582,43 +28582,49 @@ var genSupabaseClient = /* @__PURE__ */ __name((env) => {
 }, "genSupabaseClient");
 
 // src/index.ts
+var Success = /* @__PURE__ */ __name((val) => {
+  return {
+    ok: true,
+    value: val
+  };
+}, "Success");
+var Failure = /* @__PURE__ */ __name((error) => {
+  return {
+    ok: false,
+    error
+  };
+}, "Failure");
 var cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
   "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
-var processAssetResult = /* @__PURE__ */ __name(async (supabase) => {
-  const { data, error } = await supabase.storage.from("user_assets").upload("/chat/body", "Second put file here hehehe!!");
-  if (error) {
-    console.error("[storage] Failed to upload asset to user_assets bucket", { error });
-    return {
-      ok: false,
-      errors: error
-    };
-  }
-  console.log("[storage] Asset uploaded successfully to user_assets bucket", { path: data.path });
-  return {
-    ok: true,
-    value: data
-  };
+var processAssetResult = /* @__PURE__ */ __name(async (supabase, requestBody) => {
+  const attachments = requestBody.attachments ?? [];
+  return await Promise.all(
+    attachments.map(async (attachment) => {
+      const { data, error } = await supabase.storage.from("user_assets").upload(genStorageKey(requestBody.userId, attachment), attachment);
+      if (error) {
+        console.error("[storage] Failed to upload asset to user_assets bucket", { error });
+        return Failure(error);
+      }
+      console.log("[storage] Asset uploaded successfully to user_assets bucket", { path: data.path });
+      return Success(data);
+    })
+  );
 }, "processAssetResult");
 var procssPromptTransaction = /* @__PURE__ */ __name(async (supabase, requestBody, response) => {
   let savedAsset = null;
-  if (requestBody.attachments != "") {
-    const assetResult = await processAssetResult(supabase);
-    if (!assetResult.ok) {
-      return {
-        ok: false,
-        errors: assetResult.errors
-      };
-    }
-    savedAsset = assetResult.value;
+  if (requestBody.attachments && requestBody.attachments.length > 0) {
+    const processedAssets = await processAssetResult(supabase, requestBody);
+    const failedAssets = processedAssets.filter((asset) => !asset.ok);
+    const successfulAssets = processedAssets.filter((asset) => asset.ok);
   }
   const promptResult = await processPromptResult(supabase, requestBody, response);
   if (!promptResult.ok) {
     return {
       ok: false,
-      errors: promptResult.errors
+      error: promptResult.error
     };
   }
   const promptVal = promptResult.value;
@@ -28630,20 +28636,23 @@ var procssPromptTransaction = /* @__PURE__ */ __name(async (supabase, requestBod
     }
   };
 }, "procssPromptTransaction");
+var genStorageKey = /* @__PURE__ */ __name((userId, asset) => {
+  return `chat/${userId}/${asset.name}/${asset.type}/${Date.now()}`;
+}, "genStorageKey");
 var processPromptResult = /* @__PURE__ */ __name(async (supabase, requestBody, response) => {
   const { data, error } = await supabase.rpc("insert_prompt_response", {
     p_user_id: requestBody.userId,
     p_prompt: requestBody.prompt,
     p_response: response,
     p_kind: "chat",
-    p_thread_id: null,
+    p_thread_id: requestBody.threadId,
     p_attachments: null
   });
   if (error) {
     console.error("[db] RPC insert_prompt_response failed", { userId: requestBody.userId, error });
     return {
       ok: false,
-      errors: error
+      error: new Error(error.message)
     };
   }
   console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: data.threadId });
@@ -28656,11 +28665,17 @@ var src_default = {
   async fetch(request, env, ctx) {
     const supabase = genSupabaseClient(env);
     let accResponse = "";
+    const form = await request.formData();
+    const body = {
+      userId: String(form.get("userId") ?? ""),
+      prompt: String(form.get("prompt") ?? ""),
+      threadId: form.get("threadId") ? String(form.get("threadId")) : void 0,
+      attachments: form.getAll("attachment").filter((v) => v instanceof File)
+    };
     const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const encoder = new TextEncoder();
-    const body = await request.json();
     const prompt = body.prompt;
     async function streamResponse() {
       try {
@@ -28687,10 +28702,10 @@ var src_default = {
             threadId: promptResult.threadId,
             userMessageId: promptResult.userMessageId,
             assistantMessageId: promptResult.assistantMessageId,
-            assetBucketId: assetResult?.id ?? ""
+            assetPath: assetResult?.fullPath ?? ""
           });
         } else {
-          const errorJson = JSON.stringify({ error: processingResult.errors });
+          const errorJson = JSON.stringify({ error: processingResult.error });
           await writer.write(encoder.encode(`ERROR: ${errorJson}
 
 `));
@@ -28761,7 +28776,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// .wrangler/tmp/bundle-UKe3RW/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-ihEA9t/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -28793,7 +28808,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-UKe3RW/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-ihEA9t/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
