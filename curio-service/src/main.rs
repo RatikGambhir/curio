@@ -4,9 +4,9 @@ use axum::{
     Router,
     http::StatusCode,
     routing::get,
-    response::{IntoResponse, Response},
+    response::Response,
     middleware::{self, Next},
-    extract::{Request, Extension},
+    extract::Request,
 };
 
 
@@ -17,12 +17,11 @@ pub struct CurrentUser { /* ... */ }
 #[tokio::main]
 async fn main() {
     let app = Router::new()
+        .route("/", get(root))
         .nest("/user", user::gen_command_routes())
+        .nest("/user", user::gen_query_routes())
         .route_layer(middleware::from_fn(auth));
 
-
-let var = Option::Some("hello".to_string());
-    let string = var.unwrap_or_else(|| "hello".to_string());
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
@@ -53,7 +52,7 @@ async fn auth(mut req: Request, next: Next) -> Result<Response, StatusCode> {
     }
 }
 
-async fn authorize_current_user(auth_token: &str) -> Option<CurrentUser> {
+async fn authorize_current_user(_auth_token: &str) -> Option<CurrentUser> {
     let option = Option::Some(CurrentUser {});
   return option;
 }

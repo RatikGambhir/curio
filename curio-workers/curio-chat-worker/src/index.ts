@@ -235,7 +235,8 @@ const processAssetResult = async (supabase: DBClient, requestBody: ChatRequestBo
 
 			if (error) {
 				console.error('[storage] Failed to upload asset to user_assets bucket', { error });
-				return Failure(error)
+				const customError = new Error(`${attachment.name}:${attachment.type} - ${error.message}`)
+				return Failure(customError)
 			}
 			console.log('[storage] Asset uploaded successfully to user_assets bucket', { path: data.path });
 			return Success(data as AssetProcessingResult)

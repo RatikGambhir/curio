@@ -11,7 +11,136 @@
     </cargoProject>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="04781ae6-dcd4-428b-9070-74745f33af8a" name="Changes" comment="" />
+    <list default="true" id="04781ae6-dcd4-428b-9070-74745f33af8a" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/curio-service.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/curio-service.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/user/commands.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/user/commands.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/user/mod.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/user/mod.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/user/queries.rs" beforeDir="false" afterPath="$PROJECT_DIR$/src/user/queries.rs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/.rustc_info.json" beforeDir="false" afterPath="$PROJECT_DIR$/target/.rustc_info.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-7cef62fb5d8e8b80/dep-bin-curio-service" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-7cef62fb5d8e8b80/dep-bin-curio-service" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-7cef62fb5d8e8b80/output-bin-curio-service" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-bdacfe0a2773c9ae/dep-test-bin-curio-service" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-bdacfe0a2773c9ae/dep-test-bin-curio-service" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/.fingerprint/curio-service-bdacfe0a2773c9ae/output-test-bin-curio-service" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/build/httparse-839e23698d971916/root-output" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/build/httparse-839e23698d971916/root-output" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/build/proc-macro2-913ca31eeed64f0b/root-output" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/build/proc-macro2-913ca31eeed64f0b/root-output" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/build/serde-2beb76a2a4a45d11/root-output" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/build/serde-2beb76a2a4a45d11/root-output" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/build/serde_json-389d098075ae0fd1/root-output" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/build/serde_json-389d098075ae0fd1/root-output" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/build/zmij-0c00a8e263317524/root-output" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/build/zmij-0c00a8e263317524/root-output" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/curio-service" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/curio-service" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/curio-service.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/curio-service.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/axum-adfac891def7a360.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/axum-adfac891def7a360.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/axum-b4e8220e086b2f7e.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/axum-b4e8220e086b2f7e.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/axum_core-97da40e8323955ee.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/axum_core-97da40e8323955ee.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/axum_core-f3fe9c6fb000d6dd.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/axum_core-f3fe9c6fb000d6dd.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/curio_service-7cef62fb5d8e8b80.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/curio_service-7cef62fb5d8e8b80.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/curio_service-bdacfe0a2773c9ae.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/curio_service-bdacfe0a2773c9ae.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/errno-a57d47158c8fec69.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/errno-a57d47158c8fec69.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/errno-b75cf740dd51e683.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/errno-b75cf740dd51e683.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/form_urlencoded-72d53622942c245e.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/form_urlencoded-72d53622942c245e.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/form_urlencoded-d2229b62f38fcb2c.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/form_urlencoded-d2229b62f38fcb2c.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/futures_channel-817810f485379f99.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/futures_channel-817810f485379f99.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/futures_channel-84e4509813baf595.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/futures_channel-84e4509813baf595.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/futures_util-8f49b9d47e953c7d.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/futures_util-8f49b9d47e953c7d.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/futures_util-fa36c67b8601a227.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/futures_util-fa36c67b8601a227.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http-044b52af4387ce25.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http-044b52af4387ce25.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http-eb4a9f8369999e8e.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http-eb4a9f8369999e8e.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http_body-b030b6edd41b69ed.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http_body-b030b6edd41b69ed.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http_body-b67e042efcbb114a.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http_body-b67e042efcbb114a.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http_body_util-7bacd188eb3b15ba.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http_body_util-7bacd188eb3b15ba.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/http_body_util-b76628590fc2658a.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/http_body_util-b76628590fc2658a.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/httparse-5934c055ab1614be.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/httparse-5934c055ab1614be.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/httparse-e6e485a263eb8453.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/httparse-e6e485a263eb8453.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/hyper-19d02c1ee501b677.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/hyper-19d02c1ee501b677.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/hyper-a33b1d56b0d93fb1.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/hyper-a33b1d56b0d93fb1.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/hyper_util-0be2fda32d48fc5f.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/hyper_util-0be2fda32d48fc5f.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/hyper_util-9ae6c61514420ecd.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/hyper_util-9ae6c61514420ecd.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libaxum-adfac891def7a360.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libaxum-adfac891def7a360.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libaxum-adfac891def7a360.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libaxum-adfac891def7a360.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libaxum-b4e8220e086b2f7e.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libaxum-b4e8220e086b2f7e.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde-e322b78906551219.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde-e322b78906551219.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde-e322b78906551219.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde-e322b78906551219.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde-f9d115867326c89e.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde-f9d115867326c89e.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_core-b2f0b7d0820c4a8c.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_core-b2f0b7d0820c4a8c.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_core-f30588cc1dfc48da.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_core-f30588cc1dfc48da.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_core-f30588cc1dfc48da.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_core-f30588cc1dfc48da.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_derive-bee9821fb82a6746.dylib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_derive-bee9821fb82a6746.dylib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_json-34b62b06e95e1faf.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_json-34b62b06e95e1faf.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_json-ee333a7b2d92e63d.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_json-ee333a7b2d92e63d.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_json-ee333a7b2d92e63d.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_json-ee333a7b2d92e63d.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-8477109c7116be86.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-8477109c7116be86.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-8477109c7116be86.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-8477109c7116be86.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-d435ca408ddc6ebe.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_path_to_error-d435ca408ddc6ebe.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-715f5c372b5da6d7.rlib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-715f5c372b5da6d7.rlib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-715f5c372b5da6d7.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-715f5c372b5da6d7.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-8916de2707b66bec.rmeta" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libserde_urlencoded-8916de2707b66bec.rmeta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/libtokio_macros-7a534bff9fcc1d06.dylib" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/libtokio_macros-7a534bff9fcc1d06.dylib" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/lock_api-b39d18939fd97e2b.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/lock_api-b39d18939fd97e2b.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/lock_api-bbf09bff5a42552d.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/lock_api-bbf09bff5a42552d.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/parking_lot-326f23854492bb24.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/parking_lot-326f23854492bb24.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/parking_lot-e4e830345a77a5e6.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/parking_lot-e4e830345a77a5e6.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/parking_lot_core-8c4f4b4374bff60e.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/parking_lot_core-8c4f4b4374bff60e.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/parking_lot_core-ebf251cf64c2ebf4.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/parking_lot_core-ebf251cf64c2ebf4.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/proc_macro2-e7f548cc64fe319f.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/proc_macro2-e7f548cc64fe319f.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/quote-f7f1ef0f1b6a9d68.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/quote-f7f1ef0f1b6a9d68.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde-e322b78906551219.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde-e322b78906551219.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde-f9d115867326c89e.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde-f9d115867326c89e.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_core-b2f0b7d0820c4a8c.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_core-b2f0b7d0820c4a8c.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_core-f30588cc1dfc48da.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_core-f30588cc1dfc48da.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_derive-bee9821fb82a6746.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_derive-bee9821fb82a6746.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_json-34b62b06e95e1faf.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_json-34b62b06e95e1faf.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_json-ee333a7b2d92e63d.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_json-ee333a7b2d92e63d.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_path_to_error-8477109c7116be86.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_path_to_error-8477109c7116be86.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_path_to_error-d435ca408ddc6ebe.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_path_to_error-d435ca408ddc6ebe.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_urlencoded-715f5c372b5da6d7.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_urlencoded-715f5c372b5da6d7.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/serde_urlencoded-8916de2707b66bec.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/serde_urlencoded-8916de2707b66bec.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/signal_hook_registry-ac1e4c36c0ed3891.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/signal_hook_registry-ac1e4c36c0ed3891.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/signal_hook_registry-e217250ddf3c7f2a.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/signal_hook_registry-e217250ddf3c7f2a.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/syn-3f682b28b0c88e8d.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/syn-3f682b28b0c88e8d.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tokio-88c4d1978dac83e4.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tokio-88c4d1978dac83e4.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tokio-f9797ab599373cac.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tokio-f9797ab599373cac.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tokio_macros-7a534bff9fcc1d06.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tokio_macros-7a534bff9fcc1d06.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tower-3252300ad28dab3b.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tower-3252300ad28dab3b.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tower-d451844142f121db.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tower-d451844142f121db.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tracing-76fddd170aa993da.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tracing-76fddd170aa993da.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/tracing-836f2f9351af7626.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/tracing-836f2f9351af7626.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/zmij-5ebd53ef9124e758.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/zmij-5ebd53ef9124e758.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/deps/zmij-c3387323a095706f.d" beforeDir="false" afterPath="$PROJECT_DIR$/target/debug/deps/zmij-c3387323a095706f.d" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wnnerg-1geismb-ej6rzojl6ya9yvewfcbtvs9tn/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wnnerg-1geismb-ej6rzojl6ya9yvewfcbtvs9tn/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wnnerg-1geismb-ej6rzojl6ya9yvewfcbtvs9tn/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wnnerg-1geismb.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wphkic-1ktbj6c-working/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wphkic-1ktbj6c-working/dep-graph.part.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wphkic-1ktbj6c-working/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wphkic-1ktbj6c-working/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wphkic-1ktbj6c.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wpnh8e-1vr85zh-working/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wpnh8e-1vr85zh-working/dep-graph.part.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wpnh8e-1vr85zh-working/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wpnh8e-1vr85zh-working/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2ea61rg80fmqk/s-hgg5wpnh8e-1vr85zh.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wnnerf-13zma4r-d6ifp45v2k25u5bpa2xv8eemj/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wnnerf-13zma4r-d6ifp45v2k25u5bpa2xv8eemj/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wnnerf-13zma4r-d6ifp45v2k25u5bpa2xv8eemj/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wnnerf-13zma4r.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wphkif-0s4rh1l-working/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wphkif-0s4rh1l-working/dep-graph.part.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wphkif-0s4rh1l-working/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wphkif-0s4rh1l-working/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wphkif-0s4rh1l.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wpnh8e-1eq0ysw-working/dep-graph.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wpnh8e-1eq0ysw-working/dep-graph.part.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wpnh8e-1eq0ysw-working/query-cache.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wpnh8e-1eq0ysw-working/work-products.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/target/debug/incremental/curio_service-2w1j36xgtveqk/s-hgg5wpnh8e-1eq0ysw.lock" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/.wrangler/tmp/bundle-ihEA9t/middleware-insertion-facade.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/.wrangler/tmp/bundle-ihEA9t/middleware-loader.entry.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/.wrangler/tmp/dev-jWCxLB/index.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/.wrangler/tmp/dev-jWCxLB/index.js.map" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../curio-workers/curio-chat-worker/src/index.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -28,7 +157,7 @@
   </component>
   <component name="GOROOT" url="file:///usr/local/go" />
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
   <component name="MacroExpansionManager">
     <option name="directoryName" value="bHlUy733" />
@@ -46,6 +175,7 @@
     "ASKED_ADD_EXTERNAL_FILES": "true",
     "Cargo.Run curio-service.executor": "Run",
     "DefaultGoTemplateProperty": "Go File",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
@@ -57,10 +187,10 @@
     "RunOnceActivity.rust.reset.selective.auto.import": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "master",
+    "git-widget-placeholder": "workers/link-attachments",
     "go.import.settings.migrated": "true",
     "go.sdk.automatically.set": "true",
-    "last_opened_file_path": "/Users/ratikgambhir/curio-service",
+    "last_opened_file_path": "/Users/ratikgambhir/curio/curio-service",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -69,6 +199,7 @@
     "org.rust.cargo.project.model.PROJECT_DISCOVERY": "true",
     "org.rust.cargo.project.model.impl.CargoExternalSystemProjectAware.subscribe.first.balloon": "",
     "org.rust.disableDetachedFileInspection/Users/ratikgambhir/curio-service/src/user/routes.rs": "true",
+    "settings.editor.selected.configurable": "settings.sync",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -112,7 +243,7 @@
     </recent_temporary>
   </component>
   <component name="RustProjectSettings">
-    <option name="toolchainHomeDirectory" value="$PROJECT_DIR$/../.cargo/bin" />
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/.cargo/bin" />
   </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
@@ -123,6 +254,7 @@
       <option name="presentableId" value="Default" />
       <updated>1772918377073</updated>
       <workItem from="1772918378276" duration="15593000" />
+      <workItem from="1774044813728" duration="586000" />
     </task>
     <servers />
   </component>
