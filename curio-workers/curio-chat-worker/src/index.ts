@@ -15,6 +15,7 @@ import { GoogleGenAI } from '@google/genai';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import {genSupabaseClient} from "./supabase";
 import {SupabaseClient} from "@supabase/supabase-js";
+import validate = WebAssembly.validate;
 
 interface Env {
 	GEMINI_API_KEY: string;
@@ -24,24 +25,25 @@ interface Env {
 	readonly CURIO_QUESTION_QUEUE: Queue<QueueBody>;
 }
 
-interface ChatRequestBody {
+interface RequestBody {
 	userId: string;
 	prompt: string;
 	attachments: File[] | null
 	threadId?: string
 }
 
-interface PromptProcessingResult {
+interface PromptMetadataResult {
 	userId: string,
 	threadId: string,
 	userMessageId: string,
 	assistantMessageId: string
 }
 
-interface AssetProcessingResult {
+interface AssetBucketResult {
 	id: string,
 	path: string,
 	fullPath: string,
+	asset: File
 }
 
 interface AssetMetadata {
@@ -52,14 +54,19 @@ interface AssetMetadata {
 
 }
 
+interface FailedAssetResult {
+	asset: File
+	error: Error
+}
+
 interface ProcessingResult {
-	promptResult: PromptProcessingResult,
-	assetResult: AssetProcessingResult | null
+	promptResult: PromptMetadataResult,
+	assetResult: AssetBucketResult[]
 }
 
 interface ProcessingResult2 {
-	prompt: PromptProcessingResult
-	successfulAssets: AssetProcessingResult[] | null
+	prompt: PromptMetadataResult
+	successfulAssets: AssetBucketResult[] | null
 	failedAsset: File[] | null
 }
 
@@ -225,10 +232,11 @@ async function authenticateRequest(request: Request, env: Env): Promise<Supabase
 // 	const user = authenticatedUser;
 // }
 
-const processAssetResult = async (supabase: DBClient, requestBody: ChatRequestBody):  Promise<Result<AssetProcessingResult>[]> => {
+
+const processAssetResult = async (supabase: DBClient, requestBody: RequestBody):  Promise<Result<AssetBucketResult>[]> => {
 	const attachments = requestBody.attachments ?? [];
 	return await Promise.all(
-		attachments.map(async (attachment): Promise<Result<AssetProcessingResult>> => {
+		attachments.map(async (attachment): Promise<Result<AssetBucketResult>> => {
 			const { data, error } = await supabase.storage
 				.from('user_assets')
 				.upload(genStorageKey(requestBody.userId, attachment), attachment);
@@ -239,20 +247,26 @@ const processAssetResult = async (supabase: DBClient, requestBody: ChatRequestBo
 				return Failure(customError)
 			}
 			console.log('[storage] Asset uploaded successfully to user_assets bucket', { path: data.path });
-			return Success(data as AssetProcessingResult)
+			return Success({asset: attachment, ...data} as AssetBucketResult)
 		}),
 	);
 }
 
-
-const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
-	let savedAsset: AssetProcessingResult | null = null
-	if (requestBody.attachments && requestBody.attachments.length > 0) {
-		const processedAssets = await processAssetResult(supabase, requestBody)
-		const failedAssets = processedAssets.filter(asset => !asset.ok)
-		const successfulAssets = processedAssets.filter(asset => asset.ok)
+const genAssetResult = (result: Result<AssetBucketResult>[]) => {
+	return {
+		successfulAssets: result.filter(val => val.ok).map(result => result.value),
+		unsuccessfulAssets: result.filter(val => !val.ok).map(failure => failure.error)
 	}
+}
 
+
+const procssPromptTransaction = async (supabase: DBClient, requestBody: RequestBody, response: string): Promise<Result<ProcessingResult>> => {
+	let savedAsset: AssetBucketResult[] = []
+	if (requestBody.attachments && requestBody.attachments.length > 0) {
+		const {successfulAssets, unsuccessfulAssets} = await processAssetResult(supabase, requestBody).then(genAssetResult)
+		savedAsset = successfulAssets
+		//TODO: Handle Failure here
+	}
 	const promptResult = await processPromptResult(supabase, requestBody, response)
 	if (!promptResult.ok) {
 		// TODO: Make a custom error or else we can just return prompt result
@@ -266,7 +280,7 @@ const procssPromptTransaction = async (supabase: DBClient, requestBody: ChatRequ
 		ok: true as const,
 		value: {
 			promptResult: promptVal,
-			assetResult: savedAsset
+			assetResult: savedAsset ?? []
 		}
 	}
 }
@@ -286,7 +300,7 @@ const genAssetMetadata = (files: File[]) => {
 }
 
 
-const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestBody, response: string): Promise<Result<PromptProcessingResult>> => {
+const processPromptResult = async (supabase: DBClient, requestBody: RequestBody, response: string): Promise<Result<PromptMetadataResult>> => {
 	const {data, error} = await supabase.rpc("insert_prompt_response", {
 		p_user_id: requestBody.userId,
 		p_prompt: requestBody.prompt,
@@ -304,78 +318,68 @@ const processPromptResult = async (supabase: DBClient, requestBody: ChatRequestB
 			error: new Error(error.message)
 		}
 	}
-	console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: (data as PromptProcessingResult).threadId });
+	console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: (data as PromptMetadataResult).threadId });
 	return {
 		ok: true,
-		value: data as PromptProcessingResult
+		value: data as PromptMetadataResult
 	}
 
 }
-// const buildProcessCommand = (env: Env) => {
-// 	const supabase = genSupabaseClient(env)
-// 	return async (requestBody: ChatRequestBody, response: string): Promise<Result<ProcessingResult>> => {
-// 		let savedAsset: AssetProcessingResult | null = null
-// 		if (requestBody.attachments) {
-// 			const assetResult = await processAssetResult(supabase, requestBody)
-// 			if (!assetResult.ok) {
-// 				// TODO: Make a custom error or else we can just return prompt result
-// 				return {
-// 					ok: false as const,
-// 					error: assetResult.error
-// 				}
-// 			}
-// 			savedAsset = assetResult.value
-// 		}
-//
-// 		const promptResult = await processPromptResult(supabase, requestBody, response)
-// 		if (!promptResult.ok) {
-// 			// TODO: Make a custom error or else we can just return prompt result
-// 			return {
-// 				ok: false as const,
-// 				error: promptResult.error
-// 			}
-// 		}
-// 		const promptVal = promptResult.value
-// 		return {
-// 			ok: true as const,
-// 			value: {
-// 				promptResult: promptVal,
-// 				assetResult: savedAsset
-// 			}
-// 		}
-// 	}
-// }
+const genProcessor = (env: Env, requestBody: RequestBody) => {
+	const supabase = genSupabaseClient(env)
+	return async (response: string): Promise<Result<ProcessingResult>> => {
+		let savedAsset: AssetBucketResult[] = []
+		if (requestBody.attachments && requestBody.attachments.length > 0) {
+			const {successfulAssets, unsuccessfulAssets} = await processAssetResult(supabase, requestBody).then(genAssetResult)
+			savedAsset = successfulAssets
+			//TODO: Handle Failure here
+		}
+		const promptResult = await processPromptResult(supabase, requestBody, response)
+		if (!promptResult.ok) {
+			// TODO: Make a custom error or else we can just return prompt result
+			return {
+				ok: false as const,
+				error: promptResult.error
+			}
+		}
+		const promptVal = promptResult.value
+		return {
+			ok: true as const,
+			value: {
+				promptResult: promptVal,
+				assetResult: savedAsset ?? []
+			}
+		}
+	}
+}
+
+const extractRequestData = async (request:  Request<unknown, IncomingRequestCfProperties<unknown>>): Promise<RequestBody> => {
+	const form = await request.formData()
+	return{
+		userId: String(form.get("userId") ?? ""),
+		prompt: String(form.get("prompt") ?? ""),
+		threadId: form.get("threadId") ? String(form.get("threadId")) : undefined,
+		attachments: form.getAll("attachment").filter((v): v is File => v instanceof File),
+	}
+}
 
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
 		const supabase = genSupabaseClient(env)
-		//const processCommand = buildProcessCommand(env)
-
-
-		// if (validate(request)) {
-		//
-		// }
+		const data = await extractRequestData(request)
+		//const responseProcessor = genProcessor(env, data)
 		let accResponse = '';
-		const form = await request.formData()
-
-		const body: ChatRequestBody = {
-			userId: String(form.get("userId") ?? ""),
-			prompt: String(form.get("prompt") ?? ""),
-			threadId: form.get("threadId") ? String(form.get("threadId")) : undefined,
-			attachments: form.getAll("attachment").filter((v): v is File => v instanceof File),
-		}
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
 		const { readable, writable } = new TransformStream();
 		const writer = writable.getWriter();
 		const encoder = new TextEncoder();
-		const prompt = body.prompt;
 		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
 		async function streamResponse() {
 			try {
 				const response = await gemini.models.generateContentStream({
 					model: 'gemini-2.5-flash',
-					contents: prompt,
+					contents: data.prompt,
 				});
 
 				for await (const chunk of response) {
@@ -385,8 +389,8 @@ export default {
 						await writer.write(encoder.encode(`data: ${json}\n\n`));
 					}
 				}
-				//const commandResponse = await processCommand(body, accResponse)
-				const processingResult = await procssPromptTransaction(supabase, body, accResponse)
+			//	const execute = responseProcessor(accResponse)
+				const processingResult = await procssPromptTransaction(supabase, data, accResponse)
 				if (processingResult.ok) {
 					const promptResult = processingResult.value.promptResult
 					const assetResult = processingResult.value.assetResult
@@ -396,7 +400,7 @@ export default {
 						threadId: promptResult.threadId,
 						userMessageId: promptResult.userMessageId,
 						assistantMessageId: promptResult.assistantMessageId,
-						assetPath: assetResult?.fullPath ?? ""
+						assetPath:  ""
 					})
 				} else {
 					const errorJson = JSON.stringify({ error: processingResult.error });
