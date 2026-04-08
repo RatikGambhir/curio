@@ -74,6 +74,14 @@ export function AppRouter() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <SettingsPage />
+            </RequireAuth>
+          }
+        />
         <Route path="*" element={<Navigate replace to="/login" />} />
       </Routes>
     </HashRouter>

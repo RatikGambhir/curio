@@ -36,7 +36,7 @@ const data = {
     },
     {
       title: "Vaults",
-      url: "#",
+      url: "/vault",
       icon: BookOpen,
     },
     {
