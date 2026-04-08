@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import ProfileSetupWizard from "./pages/ProfileSetupWizard";
 import ProfileSettings from "./pages/ProfileSettings";
 import VerifyEmail from "./pages/VerifyEmail";
+import Vault from "./pages/Vault";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/home" element={<Home />} />
+        <Route path="/vault" element={<Vault />} />
         <Route path="/profile" element={<ProfileSettings />} />
         <Route path="/settings" element={<ProfileSettings />} />
       </Routes>
