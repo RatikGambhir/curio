@@ -1,160 +1,173 @@
-import { useState } from "react";
-import { Button } from "../components/ui/button";
-import { Link } from "react-router-dom";
+import { useMemo, useRef, useState } from "react"
+import { useNavigate } from "react-router-dom"
+import { ApiKeysTab } from "@/components/settings/tabs/api-keys-tab"
+import { AttachmentsTab } from "@/components/settings/tabs/attachments-tab"
+import { ContactTab } from "@/components/settings/tabs/contact-tab"
+import { CustomizationTab } from "@/components/settings/tabs/customization-tab"
+import { HistorySyncTab } from "@/components/settings/tabs/history-sync-tab"
+import { ModelsTab } from "@/components/settings/tabs/models-tab"
+import { AccountTab } from "@/components/settings/tabs/account-tab"
+import { SettingsSidebar } from "@/components/settings/settings-sidebar"
+import { SettingsTabs } from "@/components/settings/settings-tabs"
+import {
+  type AttachmentFilter,
+  type AttachmentRecord,
+  type AttachmentSortDirection,
+  type SettingsTabId,
+} from "@/components/settings/settings.types"
+import { Button } from "@/components/ui/button"
+import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
+import { supabase } from "@/supabase"
+import { ArrowLeft, LogOut, MessageSquareText } from "lucide-react"
 
 function ProfileSettings() {
-  const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    bio: "Software developer passionate about creating amazing user experiences.",
-    location: "San Francisco, CA",
-    website: "https://johndoe.dev",
-  });
+  const navigate = useNavigate()
+  const { user, logoutUser } = useAuthenticatedUser()
+  const hasTriggeredSignOutRef = useRef(false)
 
-  const handleInputChange = (field: string, value: string) => {
-    setProfile((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  const [activeTab, setActiveTab] = useState<SettingsTabId>("attachments")
+  const [selectedFilter, setSelectedFilter] = useState<AttachmentFilter>("all")
+  const [sortDirection, setSortDirection] =
+    useState<AttachmentSortDirection>("desc")
+  const [attachments] = useState<AttachmentRecord[]>([])
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
-  const handleSave = () => {
-    // Here you would typically save to an API
-    console.log("Saving profile:", profile);
-    alert("Profile saved successfully!");
-  };
+  const profileSummary = useMemo(
+    () => ({
+      name: "Curio Member",
+      email: user ? `${user.slice(0, 8)}@curio.app` : "member@curio.app",
+      planLabel: "Base plan",
+    }),
+    [user],
+  )
+
+  const filteredAttachments = useMemo(() => {
+    if (selectedFilter === "all") {
+      return attachments
+    }
+
+    const fileType = selectedFilter === "images" ? "image" : "document"
+    return attachments.filter((attachment) => attachment.type === fileType)
+  }, [attachments, selectedFilter])
+
+  const sortedAttachments = useMemo(() => {
+    const sortMultiplier = sortDirection === "asc" ? 1 : -1
+
+    return [...filteredAttachments].sort((left, right) => {
+      const leftTimestamp = Date.parse(left.createdAt)
+      const rightTimestamp = Date.parse(right.createdAt)
+      return (leftTimestamp - rightTimestamp) * sortMultiplier
+    })
+  }, [filteredAttachments, sortDirection])
+
+  const handleSignOut = async () => {
+    if (isSigningOut || hasTriggeredSignOutRef.current) {
+      return
+    }
+
+    hasTriggeredSignOutRef.current = true
+    setIsSigningOut(true)
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "global" })
+      if (error) {
+        console.error("Failed to sign out from Supabase:", error.message)
+      }
+
+      logoutUser()
+      navigate("/login", { replace: true })
+    } finally {
+      setIsSigningOut(false)
+      hasTriggeredSignOutRef.current = false
+    }
+  }
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "account":
+        return <AccountTab />
+      case "customization":
+        return <CustomizationTab />
+      case "history":
+        return <HistorySyncTab />
+      case "models":
+        return <ModelsTab />
+      case "api":
+        return <ApiKeysTab />
+      case "attachments":
+        return (
+          <AttachmentsTab
+            selectedFilter={selectedFilter}
+            onFilterChange={setSelectedFilter}
+            attachments={sortedAttachments}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
+          />
+        )
+      case "contact":
+        return <ContactTab />
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Profile Settings
-            </h1>
-            <Link to="/">
-              <Button variant="outline">Back to Home</Button>
-            </Link>
-          </div>
-
-          <div className="space-y-6">
-            {/* Profile Picture Section */}
-            <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-gray-300 rounded-full flex items-center justify-center">
-                <span className="text-2xl text-gray-600">👤</span>
-              </div>
-              <div>
-                <Button variant="outline" size="sm">
-                  Change Photo
-                </Button>
-                <p className="text-sm text-gray-500 mt-1">
-                  JPG, PNG or GIF. Max size 2MB.
-                </p>
-              </div>
-            </div>
-
-            {/* Name Field */}
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Full Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={profile.name}
-                onChange={(e) => handleInputChange("name", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your full name"
-              />
-            </div>
-
-            {/* Email Field */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Email Address
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={profile.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your email address"
-              />
-            </div>
-
-            {/* Bio Field */}
-            <div>
-              <label
-                htmlFor="bio"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Bio
-              </label>
-              <textarea
-                id="bio"
-                value={profile.bio}
-                onChange={(e) => handleInputChange("bio", e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Tell us about yourself"
-              />
-            </div>
-
-            {/* Location Field */}
-            <div>
-              <label
-                htmlFor="location"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Location
-              </label>
-              <input
-                type="text"
-                id="location"
-                value={profile.location}
-                onChange={(e) => handleInputChange("location", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter your location"
-              />
-            </div>
-
-            {/* Website Field */}
-            <div>
-              <label
-                htmlFor="website"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Website
-              </label>
-              <input
-                type="url"
-                id="website"
-                value={profile.website}
-                onChange={(e) => handleInputChange("website", e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="https://your-website.com"
-              />
-            </div>
-
-            {/* Save Button */}
-            <div className="flex justify-end space-x-3 pt-4">
-              <Link to="/">
-                <Button variant="outline">Cancel</Button>
-              </Link>
-              <Button onClick={handleSave}>Save Changes</Button>
+    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[90rem]">
+        <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[1.75rem] border border-border bg-card p-4 shadow-sm sm:p-5">
+          <div className="flex items-start gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={() => navigate("/chat")}
+            >
+              <ArrowLeft className="size-4" />
+              Back to chat
+            </Button>
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold text-card-foreground">Settings</h1>
+              <p className="text-sm text-muted-foreground">
+                Manage your account and workspace preferences.
+              </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              className="rounded-full"
+              onClick={() => navigate("/chat")}
+              aria-label="Open chat"
+            >
+              <MessageSquareText className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+              onClick={handleSignOut}
+              disabled={isSigningOut}
+            >
+              <LogOut className="size-4" />
+              {isSigningOut ? "Signing out..." : "Sign out"}
+            </Button>
+          </div>
+        </header>
+
+        <div className="grid gap-4 lg:grid-cols-[19.5rem_minmax(0,1fr)] lg:items-start">
+          <SettingsSidebar profile={profileSummary} />
+
+          <section className="space-y-4">
+            <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            {renderTabContent()}
+          </section>
         </div>
       </div>
-    </div>
-  );
+    </main>
+  )
 }
 
-export default ProfileSettings;
+export default ProfileSettings

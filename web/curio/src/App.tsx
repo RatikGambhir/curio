@@ -20,6 +20,7 @@ function App() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/home" element={<Home />} />
         <Route path="/profile" element={<ProfileSettings />} />
+        <Route path="/settings" element={<ProfileSettings />} />
       </Routes>
     </Router>
   );
