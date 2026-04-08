@@ -69,7 +69,7 @@ function Login() {
     }
 
     loginUser(data.user?.id ?? null);
-    navigate("/home");
+    navigate("/profile-setup");
   };
 
   return (
