@@ -31,7 +31,7 @@ function VerifyEmail() {
       <VerificationCodeForm
         email={email}
         onBack={() => navigate("/login")}
-        onComplete={() => navigate("/home")}
+        onComplete={() => navigate("/profile-setup")}
       />
     </div>
   );

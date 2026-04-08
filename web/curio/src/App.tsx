@@ -6,6 +6,7 @@ import DesktopConstruction from "./pages/DesktopConstruction";
 import Home from "./pages/Home";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import ProfileSetupWizard from "./pages/ProfileSetupWizard";
 import ProfileSettings from "./pages/ProfileSettings";
 import VerifyEmail from "./pages/VerifyEmail";
 
@@ -15,6 +16,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/profile-setup" element={<ProfileSetupWizard />} />
         <Route path="/desktop-construction" element={<DesktopConstruction />} />
         <Route path="/" element={<Landing />} />
         <Route path="/chat" element={<Chat />} />
