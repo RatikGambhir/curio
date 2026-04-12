@@ -46,7 +46,7 @@ function VerifyEmailPage() {
           window.setTimeout(() => {
             completeLogin(email);
             setIsVerifyingCode(false);
-            navigate("/home", { replace: true });
+            navigate("/profile-setup", { replace: true });
           }, 450);
         }}
       />
