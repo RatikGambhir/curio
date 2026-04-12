@@ -26,7 +26,7 @@ import {
 const data = {
   navMain: [
     { title: "Home", url: "/home", icon: House },
-    { title: "Vaults", url: "#", icon: BookOpen },
+    { title: "Vaults", url: "/vault", icon: BookOpen },
     { title: "Chat", url: "/chat", icon: MessageSquare },
     { title: "Knowledge Atals", url: "#", icon: Globe },
     { title: "Settings", url: "/profile", icon: Settings2 },

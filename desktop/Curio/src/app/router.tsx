@@ -14,6 +14,7 @@ import LoginPage from "@/pages/login";
 import ProfileSetupPage from "@/pages/profile-setup";
 import SettingsPage from "@/pages/settings";
 import VerifyEmailPage from "@/pages/verify-email";
+import VaultPage from "@/pages/vault";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const { isAuthenticated } = useAuthenticatedUser();
@@ -27,8 +28,7 @@ function RequireAuth({ children }: { children: ReactElement }) {
 }
 
 function RedirectIfAuthenticated({ children }: { children: ReactElement }) {
-  const { isAuthenticated } = useAuthenticatedUser();
-  return children
+  return children;
 }
 
 export function AppRouter() {
@@ -72,6 +72,14 @@ export function AppRouter() {
           element={
             <RequireAuth>
               <ChatPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/vault"
+          element={
+            <RequireAuth>
+              <VaultPage />
             </RequireAuth>
           }
         />
