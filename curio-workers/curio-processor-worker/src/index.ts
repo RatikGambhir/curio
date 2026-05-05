@@ -30,6 +30,8 @@ interface User {
 
 
 
+
+
 interface MessageBody {
 	userId: string
 	userMessageId: string
@@ -84,9 +86,8 @@ const Failure = (error: Error) => {
 	} as Failure
 }
 
-
-const queryEmbedding = async (content: string) => {
-	return await gemini.models.embedContent({
+const queryEmbedding = async (content: string, geminiClient: GoogleGenAI) => {
+	return await geminiClient.models.embedContent({
 		model: "gemini-embedding-001",
 		contents: content
 	}).then((result) => Success(result as EmbedContentResponse))
@@ -96,14 +97,36 @@ const queryEmbedding = async (content: string) => {
 		})
 }
 
-const embeddContent = async (content: Success<MessageResult[]>) => {
-	return await Promise.all(
+
+
+
+const embeddContent = async (content: Success<MessageResult[]>, geminiClient: GoogleGenAI): Promise<Result<EmbedContentResponse[], Error>> => {
+	const result = await Promise.all(
 		content.value.map((val) => {
-			return queryEmbedding(val.content)
+			return queryEmbedding(val.content, geminiClient)
 		})
 	)
 
+
+	const failed = result.find((result) => !result.ok)
+
+	if (failed) {
+		return Failure(failed.error)
+	}
+
+	const succeeded = result.map((embedding) => {
+		if (embedding.ok) {
+			return embedding.value
+		}
+	}).filter(x => x !== undefined)
+
+	return Success(succeeded)
+
 }
+
+
+
+
 
 const encode = async (blob: Blob) => {
 	const bytes = new Uint8Array(await blob.bytes())
@@ -115,95 +138,131 @@ const encode = async (blob: Blob) => {
 	return btoa(binary)
 }
 
-const queryContent = async (body: QueueBody, supabase: DBClient): Promise<Result<MessageResult[]>> => {
+const queryContent = async (body: QueueBody, dbClient: DBClient): Promise<Result<MessageResult[]>> => {
 	try {
-		const {data, error} = await supabase.schema("messaging").from("messages")
+		const {data, error} = await dbClient.schema("messaging").from("messages")
 			.select('id, role, content')
 			.in('id', [body.userMessageId, body.assistantMessageId])
 		if (error) {
+			console.log("FAILURE: ", body.userMessageId)
+
 			return Failure(error)
 		}
 		return Success(data as MessageResult[])
 	} catch (error) {
+		console.log("FAILURE: ", body.userMessageId)
+
 		return Failure(error as Error)
 	}
 
 }
 
+// const saveEmbeddings = async (embeddings: string, dbClient: DBClient) => {
+// 	try {
+// 		const {data, error} = await dbClient.schema("messaging").from("messages").upsert()
+// 	}
+// }
 
 
-const genAssetEmbeddings = async (assets: Result<Blob, Error>[]) => {
-	return await Promise.all(
-		assets.map(async (asset) => {
-			if (!asset.ok) {
-				return asset
-			}
-			return await queryEmbedding(await encode(asset.value))
+
+
+
+const genAssetEmbeddings = async (
+	assets: Success<Blob[]>,
+	geminiClient: GoogleGenAI
+): Promise<Result<EmbedContentResponse[], Error>> => {
+	const results = await Promise.all(
+		assets.value.map(async (blob) => {
+			const encoded = await encode(blob)
+			return queryEmbedding(encoded, geminiClient)
 		})
 	)
+
+	const failed = results.find((result) => !result.ok)
+
+	if (failed) {
+		return Failure(failed.error)
+	}
+
+	const succeeded = results.map((embedding) => {
+		if (embedding.ok) {
+			return embedding.value
+		}
+	}).filter(x => x !== undefined)
+
+	return Success(succeeded)
 }
 
 
-const queryAsset = async (path: string, supabase: DBClient): Promise<Result<Blob>> => {
+const queryAsset = async (path: string, dbClient: DBClient): Promise<Result<Blob>> => {
 	try {
-		const {data, error} = await supabase.storage.from("user_assets").download(path)
+		const {data, error} = await dbClient.storage.from("user_assets").download(path)
 		if (error) {
+			console.log("FAILURE: ", path)
 			return Failure(error)
 		}
 		return Success(data as Blob)
 	} catch (error) {
+		console.log("FAILURE: ", path)
+
 		return Failure(error as Error)
 	}
 }
-const queryAssets = async (paths: string[], supabase: DBClient): Promise<Result<Blob>[]> => {
+
+
+const queryAssets = async (paths: string[], dbClient: DBClient): Promise<Result<Blob[]>> => {
 	return await Promise.all(
 		paths.map(async (path) => {
-			return queryAsset(path, supabase)
-
+			return queryAsset(path, dbClient)
 		})
-	).then(data => data);
+	).then(data => {
+		const blob: Blob[] = []
+		data.forEach((result) => {
+			if (!result.ok) {
+				return Failure(result.error)
+			}
+			blob.push(result.value)
+		})
+		return Success(blob)
+	});
 }
 
 
+
+
 export default {
-	async queue(batch, env, ctx): Promise<void> {
+	async queue(batch: MessageBatch<QueueBody>, env: Env, ctx: ExecutionContext): Promise<void> {
 		const geminiClient = new GoogleGenAI({apiKey: env.GEMINI_API_KEY})
 		const supabaseClient = genSupabaseClient(env)
 		for (const message of batch.messages) {
-			const assetResult = await queryAssets(queueBody.assetPath, supabaseClient).then(assetResults => genAssetEmbeddings(assetResults))
 
-			const contentResult = await queryContent(queueBody, supabaseClient).then((result) => {
-				if (result.ok) {
-					return embeddContent(result)
+			const assetResult = await queryAssets(queueBody.assetPath, supabaseClient)
+
+
+			const content = await queryContent(queueBody, supabaseClient)
+			if (content.ok && assetResult.ok) {
+				console.log("RESULT: ", content.value)
+				assetResult.value.forEach((result) => {
+					console.log("RESULT: ", result)
+
+				})
+
+				content.value.forEach((message) => {
+					console.log("RESULT: ", message.content)
+				})
+
+
+				const embeddedContent = await embeddContent(content, geminiClient)
+				const embeddedAssets = await genAssetEmbeddings(assetResult, geminiClient)
+
+
+				if (embeddedAssets.ok && embeddedContent.ok) {
+					// Save here
 				}
 
-			})
 
-			contentResult?.forEach((result: { ok: any; value: { metadata: any; embeddings: any; }; error: any; }) => {
-				if (result.ok) {
-					console.log("Content Embeddings Metadata: ", result.value.metadata)
-
-					console.log("Content Embeddings: ", result.value.embeddings)
-
-				} else {
-					console.log("ERROR: Asset Embeddings: ", result.error)
-
-				}
-
-			})
-
-			assetResult.forEach((assetResult: { ok: any; value: { metadata: any; embeddings: any; }; error: any; } ) => {
-				if (assetResult.ok) {
-					console.log("Asset Embeddings Metadata: ", assetResult.value.metadata)
-
-					console.log("Asset Embeddings: ", assetResult.value.embeddings)
-				} else {
-					console.log("ERROR: Asset Embeddings: ", assetResult.error)
-
-				}
-
-			})
+			}
 
 		}
 	},
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env, QueueBody>;

@@ -80,8 +80,6 @@ export interface SupabaseUser {
 	email?: string | null;
 }
 
-type DBClient = SupabaseClient<any, "public", "messaging", any, any>
-
 const Success = <T>(val: T) => {
 	return {
 		ok: true,
@@ -97,12 +95,16 @@ const Failure = (error: Error) => {
 }
 
 
+type DBClient = SupabaseClient<any, "public", "messaging", any, any>
+
+
+
 interface QueueBody {
 	userId: string
 	userMessageId: string
 	threadId: string
 	assistantMessageId: string,
-	assetPath: string
+	assetPath: string[]
 
 }
 
@@ -259,30 +261,49 @@ const genAssetResult = (result: Result<AssetBucketResult>[]) => {
 	}
 }
 
+const rollbackUploadedAssets = async (supabase: DBClient, assets: AssetBucketResult[]): Promise<Result<void>> => {
+	if (assets.length === 0) {
+		return Success(undefined)
+	}
+
+	const paths = assets.map((asset) => asset.path)
+	const { error } = await supabase.storage.from("user_assets").remove(paths)
+	if (error) {
+		console.error("[storage] Failed to rollback uploaded assets", { paths, error })
+		return Failure(new Error(`Asset rollback failed: ${error.message}`))
+	}
+
+	console.log("[storage] Rolled back uploaded assets", { paths })
+	return Success(undefined)
+}
+
 
 const procssPromptTransaction = async (supabase: DBClient, requestBody: RequestBody, response: string): Promise<Result<ProcessingResult>> => {
 	let savedAsset: AssetBucketResult[] = []
 	if (requestBody.attachments && requestBody.attachments.length > 0) {
 		const {successfulAssets, unsuccessfulAssets} = await processAssetResult(supabase, requestBody).then(genAssetResult)
+		if (unsuccessfulAssets.length > 0) {
+			const rollbackResult = await rollbackUploadedAssets(supabase, successfulAssets)
+			if (!rollbackResult.ok) {
+				return Failure(new Error(`Asset upload failed and rollback failed: ${rollbackResult.error.message}`))
+			}
+			const failureMessages = unsuccessfulAssets.map((error) => error.message).join("; ")
+			return Failure(new Error(`Asset upload failed: ${failureMessages}`))
+		}
 		savedAsset = successfulAssets
-		//TODO: Handle Failure here
 	}
 	const promptResult = await processPromptResult(supabase, requestBody, response)
 	if (!promptResult.ok) {
-		// TODO: Make a custom error or else we can just return prompt result
-		return {
-			ok: false as const,
-			error: promptResult.error
+		const rollbackResult = await rollbackUploadedAssets(supabase, savedAsset)
+		if (!rollbackResult.ok) {
+			return Failure(new Error(`Prompt persistence failed and rollback failed: ${rollbackResult.error.message}`))
 		}
+		return Failure(promptResult.error)
 	}
-	const promptVal = promptResult.value
-	return {
-		ok: true as const,
-		value: {
-			promptResult: promptVal,
-			assetResult: savedAsset ?? []
-		}
-	}
+	return Success({
+		promptResult: promptResult.value,
+		assetResult: savedAsset
+	})
 }
 
 const genStorageKey = ( userId: string,  asset: File) => {
@@ -313,43 +334,16 @@ const processPromptResult = async (supabase: DBClient, requestBody: RequestBody,
 	if (error) {
 		console.error("[db] RPC insert_prompt_response failed", { userId: requestBody.userId, error })
 
-		return {
-			ok: false,
-			error: new Error(error.message)
-		}
+		return Failure(new Error(error.message))
 	}
 	console.log("[db] Prompt and response persisted successfully", { userId: requestBody.userId, threadId: (data as PromptMetadataResult).threadId });
-	return {
-		ok: true,
-		value: data as PromptMetadataResult
-	}
+	return Success(data as PromptMetadataResult)
 
 }
 const genProcessor = (env: Env, requestBody: RequestBody) => {
 	const supabase = genSupabaseClient(env)
 	return async (response: string): Promise<Result<ProcessingResult>> => {
-		let savedAsset: AssetBucketResult[] = []
-		if (requestBody.attachments && requestBody.attachments.length > 0) {
-			const {successfulAssets, unsuccessfulAssets} = await processAssetResult(supabase, requestBody).then(genAssetResult)
-			savedAsset = successfulAssets
-			//TODO: Handle Failure here
-		}
-		const promptResult = await processPromptResult(supabase, requestBody, response)
-		if (!promptResult.ok) {
-			// TODO: Make a custom error or else we can just return prompt result
-			return {
-				ok: false as const,
-				error: promptResult.error
-			}
-		}
-		const promptVal = promptResult.value
-		return {
-			ok: true as const,
-			value: {
-				promptResult: promptVal,
-				assetResult: savedAsset ?? []
-			}
-		}
+		return procssPromptTransaction(supabase, requestBody, response)
 	}
 }
 
@@ -400,7 +394,7 @@ export default {
 						threadId: promptResult.threadId,
 						userMessageId: promptResult.userMessageId,
 						assistantMessageId: promptResult.assistantMessageId,
-						assetPath:  ""
+						assetPath:  assetResult.map(asset => asset.path)
 					})
 				} else {
 					const errorJson = JSON.stringify({ error: processingResult.error });
