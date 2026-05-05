@@ -1,1 +1,1 @@
-/Users/ratikgambhir/curio-service/target/debug/curio-service: /Users/ratikgambhir/curio-service/src/main.rs
+/Users/ratikgambhir/curio/curio-service/target/debug/curio-service: /Users/ratikgambhir/curio/curio-service/src/main.rs /Users/ratikgambhir/curio/curio-service/src/user/commands.rs /Users/ratikgambhir/curio/curio-service/src/user/mod.rs /Users/ratikgambhir/curio/curio-service/src/user/queries.rs

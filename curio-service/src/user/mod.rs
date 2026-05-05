@@ -14,9 +14,9 @@ pub fn gen_command_routes() -> Router {
 
 }
 
-fn gen_query_routes() -> Router {
+pub fn gen_query_routes() -> Router {
     Router::new()
-    .route("/conversations/:id", get(handler))
+    .route("/conversations/:id", get(queries::get_user_info))
 }
 
 
