@@ -335,12 +335,7 @@ const processPromptResult = async (supabase: DBClient, requestBody: RequestBody,
 	return Success(data as PromptMetadataResult)
 
 }
-const genProcessor = (env: Env, requestBody: RequestBody) => {
-	const supabase = genSupabaseClient(env)
-	return async (response: string): Promise<Result<ProcessingResult>> => {
-		return procssPromptTransaction(supabase, requestBody, response)
-	}
-}
+
 
 const extractRequestData = async (request: Request): Promise<RequestBody> => {
 	const contentType = request.headers.get("Content-Type") ?? ""

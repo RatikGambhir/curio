@@ -22,16 +22,6 @@ interface Env {
 
 type DBClient = SupabaseClient<any, "public", "messaging", any, any>
 
-
-interface User {
-	id: string
-}
-
-
-
-
-
-
 interface MessageBody {
 	userId: string
 	userMessageId: string
@@ -51,7 +41,6 @@ interface QueueBody {
 	threadId: string
 	assistantMessageId: string,
 	assetPath: string[]
-
 }
 
 type Success<T> = {ok: true, value: T}
@@ -90,22 +79,16 @@ const queryEmbedding = async (content: string, geminiClient: GoogleGenAI) => {
 }
 
 
-
-
-const embeddContent = async (content: Success<MessageResult[]>, geminiClient: GoogleGenAI): Promise<Result<EmbedContentResponse[], Error>> => {
+const genContentEmbeddings = async (content: Success<MessageResult[]>, geminiClient: GoogleGenAI): Promise<Result<EmbedContentResponse[], Error>> => {
 	const result = await Promise.all(
 		content.value.map((val) => {
 			return queryEmbedding(val.content, geminiClient)
 		})
 	)
-
-
 	const failed = result.find((result) => !result.ok)
-
 	if (failed) {
 		return Failure(failed.error)
 	}
-
 	const succeeded = result.map((embedding) => {
 		if (embedding.ok) {
 			return embedding.value
@@ -113,11 +96,7 @@ const embeddContent = async (content: Success<MessageResult[]>, geminiClient: Go
 	}).filter(x => x !== undefined)
 
 	return Success(succeeded)
-
 }
-
-
-
 
 
 const encode = async (blob: Blob) => {
@@ -149,16 +128,6 @@ const queryContent = async (body: QueueBody, dbClient: DBClient): Promise<Result
 
 }
 
-// const saveEmbeddings = async (embeddings: string, dbClient: DBClient) => {
-// 	try {
-// 		const {data, error} = await dbClient.schema("messaging").from("messages").upsert()
-// 	}
-// }
-
-
-
-
-
 const genAssetEmbeddings = async (
 	assets: Success<Blob[]>,
 	geminiClient: GoogleGenAI
@@ -169,19 +138,15 @@ const genAssetEmbeddings = async (
 			return queryEmbedding(encoded, geminiClient)
 		})
 	)
-
 	const failed = results.find((result) => !result.ok)
-
 	if (failed) {
 		return Failure(failed.error)
 	}
-
 	const succeeded = results.map((embedding) => {
 		if (embedding.ok) {
 			return embedding.value
 		}
 	}).filter(x => x !== undefined)
-
 	return Success(succeeded)
 }
 
@@ -219,40 +184,34 @@ const queryAssets = async (paths: string[], dbClient: DBClient): Promise<Result<
 	});
 }
 
-
-
-
 export default {
 	async queue(batch: MessageBatch<QueueBody>, env: Env, ctx: ExecutionContext): Promise<void> {
 		const geminiClient = new GoogleGenAI({apiKey: env.GEMINI_API_KEY})
 		const supabaseClient = genSupabaseClient(env)
 		for (const message of batch.messages) {
-
 			const assetResult = await queryAssets(message.body.assetPath, supabaseClient)
-
-
 			const content = await queryContent(message.body, supabaseClient)
 			if (content.ok && assetResult.ok) {
 				console.log("RESULT: ", content.value)
 				assetResult.value.forEach((result) => {
 					console.log("RESULT: ", result)
-
 				})
-
 				content.value.forEach((message) => {
 					console.log("RESULT: ", message.content)
 				})
-
-
-				const embeddedContent = await embeddContent(content, geminiClient)
+				const embeddedContent = await genContentEmbeddings(content, geminiClient)
 				const embeddedAssets = await genAssetEmbeddings(assetResult, geminiClient)
-
-
 				if (embeddedAssets.ok && embeddedContent.ok) {
 					// Save here
+				} else {
+					console.error("QUEUE FAILED")
+					message.retry()
 				}
 
 
+			} else {
+				console.error("QUEUE FAILED")
+				message.retry()
 			}
 
 		}
