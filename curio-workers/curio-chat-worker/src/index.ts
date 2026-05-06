@@ -443,7 +443,7 @@ export default {
 						threadId: promptResult.threadId,
 						userMessageId: promptResult.userMessageId,
 						assistantMessageId: promptResult.assistantMessageId,
-						assetPath:  assetResult.map(asset => asset.path)
+						assetPath:  assetResult.map(asset => asset.fullPath)
 					})
 				} else {
 					const errorJson = JSON.stringify({ error: processingResult.error });
