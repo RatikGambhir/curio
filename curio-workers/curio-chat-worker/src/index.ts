@@ -347,7 +347,18 @@ const genProcessor = (env: Env, requestBody: RequestBody) => {
 	}
 }
 
-const extractRequestData = async (request:  Request<unknown, IncomingRequestCfProperties<unknown>>): Promise<RequestBody> => {
+const extractRequestData = async (request: Request): Promise<RequestBody> => {
+	const contentType = request.headers.get("Content-Type") ?? ""
+	if (contentType.includes("application/json")) {
+		const body = await request.json() as Partial<RequestBody>
+		return {
+			userId: String(body.userId ?? ""),
+			prompt: String(body.prompt ?? ""),
+			threadId: typeof body.threadId === "string" ? body.threadId : undefined,
+			attachments: null,
+		}
+	}
+
 	const form = await request.formData()
 	return{
 		userId: String(form.get("userId") ?? ""),
@@ -360,8 +371,45 @@ const extractRequestData = async (request:  Request<unknown, IncomingRequestCfPr
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
+		if (request.method === "OPTIONS") {
+			return new Response(null, {
+				status: 204,
+				headers: cors,
+			})
+		}
+
+		if (request.method !== "POST") {
+			return new Response("Method not allowed", {
+				status: 405,
+				headers: {
+					...cors,
+					"Content-Type": "text/plain; charset=utf-8",
+				},
+			})
+		}
+
 		const supabase = genSupabaseClient(env)
-		const data = await extractRequestData(request)
+		let data: RequestBody
+		try {
+			data = await extractRequestData(request)
+		} catch (error) {
+			return new Response("Invalid request body", {
+				status: 400,
+				headers: {
+					...cors,
+					"Content-Type": "text/plain; charset=utf-8",
+				},
+			})
+		}
+		if (!data.prompt.trim()) {
+			return new Response("prompt is required", {
+				status: 400,
+				headers: {
+					...cors,
+					"Content-Type": "text/plain; charset=utf-8",
+				},
+			})
+		}
 		//const responseProcessor = genProcessor(env, data)
 		let accResponse = '';
 		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });

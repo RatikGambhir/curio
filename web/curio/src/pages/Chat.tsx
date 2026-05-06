@@ -1,17 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion"
-import {useRef, useState} from "react"
+import { useState } from "react"
 import { ChatEmptyState } from "@/components/chat-empty-state"
 import { ChatPrompt } from "@/components/chat-prompt"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { ChatView } from "@/components/chat-view"
-import { mockMessagesByChatId, type ChatMessage } from "@/mocks/chats"
+import { mockMessagesByChatId } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import {streamChat} from "@/lib/api/chat-api.ts";
-
-type ChunkData = {
-    token: string
-}
+import { useChat } from "@/hooks/useChat"
 
 const initialChats: ChatListItem[] = [
   {
@@ -54,28 +50,12 @@ function buildChatPreview(text: string) {
   return normalized.length > 52 ? `${normalized.slice(0, 52).trimEnd()}...` : normalized
 }
 
-function createUserMessage(value: string): ChatMessage {
-  return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    from: "user",
-    value,
-  }
-}
-
-function createLLMMessage(value: string): ChatMessage {
-  return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    from: "assistant",
-    value,
-  }
-}
-
 const Chat = () => {
   const [chats, setChats] = useState<ChatListItem[]>(initialChats)
   const [messagesByChatId, setMessagesByChatId] = useState(mockMessagesByChatId)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
-  const [streamedText, setStreamedText] = useState("")
+  const { sendMessage } = useChat()
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
   const handleStartNewChat = () => {
     setSelectedChatId(null)
@@ -98,45 +78,23 @@ const Chat = () => {
 
   const handleCreateChat = async (text: string) => {
     const nextChatId = `chat-${Date.now()}`
-    const firstMessage = createUserMessage(text)
-
-    setMessagesByChatId((currentMessages) => ({
-      ...currentMessages,
-      [nextChatId]: [firstMessage],
-    }))
 
     //TODO: persist to local storage
     upsertChatMeta(nextChatId, text)
     setSelectedChatId(nextChatId)
-    await streamChat(text, accChunks)
+    await sendMessage({ chatId: nextChatId, text, setMessagesByChatId })
 
   }
 
   const handleSendMessage = async (text: string) => {
     if (!selectedChatId) {
-      console.log("HELLO")
       return
     }
 
     //TODO: persist to local storage
 
-    await streamChat(text, accChunks)
-
-
-    const nextMessage = createUserMessage(text)
-    setMessagesByChatId((currentMessages) => ({
-      ...currentMessages,
-      [selectedChatId]: [...(currentMessages[selectedChatId] ?? []), nextMessage],
-    }))
+    await sendMessage({ chatId: selectedChatId, text, setMessagesByChatId })
     upsertChatMeta(selectedChatId, text)
-  }
-
-  const accChunks = (chunk: string) => {
-    console.log("CHUNK:", chunk)
-    //TODO: Process Chunks here
-    const jsonString = chunk.slice(6);
-    const chunkJson: ChunkData = JSON.parse(jsonString)
-    setStreamedText(prev  => prev + chunkJson.token)
   }
 
 
