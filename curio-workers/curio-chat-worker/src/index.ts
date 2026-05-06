@@ -114,7 +114,19 @@ const cors = {
 	'Access-Control-Allow-Origin': '*',
 	'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 	'Access-Control-Allow-Methods': 'POST, OPTIONS',
+	'Access-Control-Max-Age': '86400',
 };
+
+const textResponse = (body: string | null, status: number, headers: HeadersInit = {}) => {
+	return new Response(body, {
+		status,
+		headers: {
+			...cors,
+			'Content-Type': 'text/plain; charset=utf-8',
+			...headers,
+		},
+	})
+}
 
 function getBearerToken(request: Request): string | null {
 	const authorization = request.headers.get('Authorization');
@@ -371,106 +383,110 @@ const extractRequestData = async (request: Request): Promise<RequestBody> => {
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
-		if (request.method === "OPTIONS") {
-			return new Response(null, {
-				status: 204,
-				headers: cors,
-			})
-		}
-
-		if (request.method !== "POST") {
-			return new Response("Method not allowed", {
-				status: 405,
-				headers: {
-					...cors,
-					"Content-Type": "text/plain; charset=utf-8",
-				},
-			})
-		}
-
-		const supabase = genSupabaseClient(env)
-		let data: RequestBody
 		try {
-			data = await extractRequestData(request)
-		} catch (error) {
-			return new Response("Invalid request body", {
-				status: 400,
-				headers: {
-					...cors,
-					"Content-Type": "text/plain; charset=utf-8",
-				},
-			})
-		}
-		if (!data.prompt.trim()) {
-			return new Response("prompt is required", {
-				status: 400,
-				headers: {
-					...cors,
-					"Content-Type": "text/plain; charset=utf-8",
-				},
-			})
-		}
-		//const responseProcessor = genProcessor(env, data)
-		let accResponse = '';
-		const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
-		const { readable, writable } = new TransformStream();
-		const writer = writable.getWriter();
-		const encoder = new TextEncoder();
-
-		//TODO: Payload validation, custom prompting, Response cleaning, and post processing
-		async function streamResponse() {
-			try {
-				const response = await gemini.models.generateContentStream({
-					model: 'gemini-2.5-flash',
-					contents: data.prompt,
-				});
-
-				for await (const chunk of response) {
-					if (chunk.text) {
-						accResponse += chunk.text;
-						const json = JSON.stringify({ token: chunk.text });
-						await writer.write(encoder.encode(`data: ${json}\n\n`));
-					}
-				}
-			//	const execute = responseProcessor(accResponse)
-				const processingResult = await procssPromptTransaction(supabase, data, accResponse)
-				if (processingResult.ok) {
-					const promptResult = processingResult.value.promptResult
-					const assetResult = processingResult.value.assetResult
-					console.log("[chat] Stream complete — enqueueing to CURIO_QUESTION_QUEUE", { userId: promptResult.userId, threadId: promptResult.threadId, hasAsset: !!assetResult })
-					await env.CURIO_QUESTION_QUEUE.send({
-						userId: promptResult.userId,
-						threadId: promptResult.threadId,
-						userMessageId: promptResult.userMessageId,
-						assistantMessageId: promptResult.assistantMessageId,
-						assetPath:  assetResult.map(asset => asset.fullPath)
-					})
-				} else {
-					const errorJson = JSON.stringify({ error: processingResult.error });
-					await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
-
-				}
-
-			} catch (error) {
-				const errorJson = JSON.stringify({
-					error: error instanceof Error ? error.message : 'Unknown error',
-				});
-				await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
-			} finally {
-				await writer.close();
+			if (request.method === "OPTIONS") {
+				return new Response(null, {
+					status: 204,
+					headers: cors,
+				})
 			}
+
+			if (request.method !== "POST") {
+				return textResponse("Method not allowed", 405)
+			}
+
+			if (!env.GEMINI_API_KEY) {
+				return textResponse("GEMINI_API_KEY is not configured for this worker.", 500)
+			}
+
+			let data: RequestBody
+			try {
+				data = await extractRequestData(request)
+			} catch (error) {
+				return textResponse("Invalid request body", 400)
+			}
+			if (!data.prompt.trim()) {
+				return textResponse("prompt is required", 400)
+			}
+			//const responseProcessor = genProcessor(env, data)
+			let accResponse = '';
+			const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+			const { readable, writable } = new TransformStream();
+			const writer = writable.getWriter();
+			const encoder = new TextEncoder();
+
+			//TODO: Payload validation, custom prompting, Response cleaning, and post processing
+			async function streamResponse() {
+				try {
+					const response = await gemini.models.generateContentStream({
+						model: 'gemini-2.5-flash',
+						contents: data.prompt,
+					});
+
+					for await (const chunk of response) {
+						if (chunk.text) {
+							accResponse += chunk.text;
+							const json = JSON.stringify({ token: chunk.text });
+							await writer.write(encoder.encode(`data: ${json}\n\n`));
+						}
+					}
+
+					if (!data.userId) {
+						console.warn("[chat] Skipping persistence because request did not include userId")
+						return
+					}
+
+					if (!env.SUPABASE_URL || !env.SUPABASE_KEY) {
+						console.warn("[chat] Skipping persistence because Supabase is not configured")
+						return
+					}
+
+					const supabase = genSupabaseClient(env)
+				//	const execute = responseProcessor(accResponse)
+					const processingResult = await procssPromptTransaction(supabase, data, accResponse)
+					if (processingResult.ok) {
+						const promptResult = processingResult.value.promptResult
+						const assetResult = processingResult.value.assetResult
+						console.log("[chat] Stream complete — enqueueing to CURIO_QUESTION_QUEUE", { userId: promptResult.userId, threadId: promptResult.threadId, hasAsset: !!assetResult })
+						if (env.CURIO_QUESTION_QUEUE) {
+							await env.CURIO_QUESTION_QUEUE.send({
+								userId: promptResult.userId,
+								threadId: promptResult.threadId,
+								userMessageId: promptResult.userMessageId,
+								assistantMessageId: promptResult.assistantMessageId,
+								assetPath:  assetResult.map(asset => asset.fullPath)
+							})
+						}
+					} else {
+						const errorJson = JSON.stringify({ error: processingResult.error.message });
+						await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
+
+					}
+
+				} catch (error) {
+					const errorJson = JSON.stringify({
+						error: error instanceof Error ? error.message : 'Unknown error',
+					});
+					await writer.write(encoder.encode(`ERROR: ${errorJson}\n\n`));
+				} finally {
+					await writer.close();
+				}
+			}
+
+			ctx.waitUntil(streamResponse());
+
+			return new Response(readable, {
+				headers: {
+					...cors,
+					'Content-Type': 'text/event-stream',
+					'Cache-Control': 'no-cache',
+					Connection: 'keep-alive',
+					'X-Accel-Buffering': 'no',
+				},
+			});
+		} catch (error) {
+			console.error("[chat] Unhandled request failure", error)
+			return textResponse("Internal server error", 500)
 		}
-
-		ctx.waitUntil(streamResponse());
-
-		return new Response(readable, {
-			headers: {
-				...cors,
-				'Content-Type': 'text/event-stream',
-				'Cache-Control': 'no-cache',
-				Connection: 'keep-alive',
-				'X-Accel-Buffering': 'no',
-			},
-		});
 	},
 } satisfies ExportedHandler<Env>;
