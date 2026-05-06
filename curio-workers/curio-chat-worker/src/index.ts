@@ -15,7 +15,6 @@ import { GoogleGenAI } from '@google/genai';
 import { createRemoteJWKSet, errors, jwtVerify } from 'jose';
 import {genSupabaseClient} from "./supabase";
 import {SupabaseClient} from "@supabase/supabase-js";
-import validate = WebAssembly.validate;
 
 interface Env {
 	GEMINI_API_KEY: string;
@@ -46,29 +45,13 @@ interface AssetBucketResult {
 	asset: File
 }
 
-interface AssetMetadata {
-	fileName: string,
-	fileSize: string,
-	fileType: string,
-	lastModifiedDate: Date
-
-}
-
-interface FailedAssetResult {
-	asset: File
-	error: Error
-}
 
 interface ProcessingResult {
 	promptResult: PromptMetadataResult,
 	assetResult: AssetBucketResult[]
 }
 
-interface ProcessingResult2 {
-	prompt: PromptMetadataResult
-	successfulAssets: AssetBucketResult[] | null
-	failedAsset: File[] | null
-}
+
 
 type Success<T> = {ok: true, value: T}
 type Failure<E = Error> = {ok: false, error: E}
@@ -391,6 +374,7 @@ export default {
 				})
 			}
 
+
 			if (request.method !== "POST") {
 				return textResponse("Method not allowed", 405)
 			}
@@ -415,7 +399,7 @@ export default {
 			const writer = writable.getWriter();
 			const encoder = new TextEncoder();
 
-			//TODO: Payload validation, custom prompting, Response cleaning, and post processing
+			//TODO: going to need to paramertize models, instructions, and skills
 			async function streamResponse() {
 				try {
 					const response = await gemini.models.generateContentStream({
@@ -454,7 +438,7 @@ export default {
 								threadId: promptResult.threadId,
 								userMessageId: promptResult.userMessageId,
 								assistantMessageId: promptResult.assistantMessageId,
-								assetPath:  assetResult.map(asset => asset.fullPath)
+								assetPath:  assetResult.map(asset => asset.fullPath) ?? []
 							})
 						}
 					} else {

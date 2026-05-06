@@ -10,7 +10,6 @@ declare namespace Cloudflare {
 		GEMINI_API_KEY: string;
 		SUPABASE_URL: string;
 		SUPABASE_KEY: string;
-		CLOUDFLARE_API_TOKEN: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

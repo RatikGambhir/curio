@@ -5,3 +5,4 @@ dist/
 curio-workers/**/.wrangler/tmp/
 
 tasks
+target/

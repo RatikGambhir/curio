@@ -9,18 +9,33 @@ type StreamParams = {
   chatId: string
   text: string
   setMessagesByChatId: Dispatch<SetStateAction<MessagesByChatId>>
+  userId?: string | null
+  userMessageId?: string
+  threadId?: string
+  assistantMessageId?: string
 }
 
 type StreamChunk = {
   token: string
 }
 
+type WorkerRequestBody = {
+  userId: string
+  prompt: string
+  attachments: null
+  threadId?: string
+}
+
 const workerURLString = import.meta.env.CHAT_WORKER_URL
 const workerURL = new URL(workerURLString ?? "https://api.gettingcurio.com/chat")
 
-function createMessage(from: ChatMessage["from"], value: string): ChatMessage {
+function createMessage(
+  from: ChatMessage["from"],
+  value: string,
+  id: string = crypto.randomUUID(),
+): ChatMessage {
   return {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id,
     from,
     value,
   }
@@ -108,12 +123,20 @@ export function useChat() {
   const [streamError, setStreamError] = useState<string | null>(null)
 
   const sendMessage = useCallback(
-    async ({ chatId, text, setMessagesByChatId }: StreamParams) => {
+    async ({
+      chatId,
+      text,
+      setMessagesByChatId,
+      userId,
+      userMessageId,
+      threadId,
+      assistantMessageId,
+    }: StreamParams) => {
       setStreamError(null)
       setIsStreaming(true)
 
-      const userMessage = createMessage("user", text)
-      const assistantMessage = createMessage("assistant", "")
+      const userMessage = createMessage("user", text, userMessageId)
+      const assistantMessage = createMessage("assistant", "", assistantMessageId)
 
       setMessagesByChatId((currentMessages) => ({
         ...currentMessages,
@@ -121,8 +144,15 @@ export function useChat() {
       }))
 
       try {
+        const body: WorkerRequestBody = {
+          userId: userId ?? "266ee938-12db-47d1-9ffd-6d53d0b25808",
+          prompt: text,
+          attachments: null,
+          threadId,
+        }
+
         const response = await fetch(workerURL, {
-          body: JSON.stringify({ prompt: text }),
+          body: JSON.stringify(body),
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })

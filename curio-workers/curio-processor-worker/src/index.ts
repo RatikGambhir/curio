@@ -54,14 +54,6 @@ interface QueueBody {
 
 }
 
-const queueBody: QueueBody = {
-	userId: "266ee938-12db-47d1-9ffd-6d53d0b25808",
-	userMessageId: "cd7eb020-3e46-467d-a4e5-5a3dab7db25b",
-	threadId: "18b2c081-60d6-4357-82b6-e786453fbb0d",
-	assistantMessageId: "46193a0e-9dec-433b-8445-79968ac175fe",
-	assetPath: ["chat/body", "chat/body2"],
-
-}
 type Success<T> = {ok: true, value: T}
 type Failure<E = Error> = {ok: false, error: E}
 
@@ -236,10 +228,10 @@ export default {
 		const supabaseClient = genSupabaseClient(env)
 		for (const message of batch.messages) {
 
-			const assetResult = await queryAssets(queueBody.assetPath, supabaseClient)
+			const assetResult = await queryAssets(message.body.assetPath, supabaseClient)
 
 
-			const content = await queryContent(queueBody, supabaseClient)
+			const content = await queryContent(message.body, supabaseClient)
 			if (content.ok && assetResult.ok) {
 				console.log("RESULT: ", content.value)
 				assetResult.value.forEach((result) => {

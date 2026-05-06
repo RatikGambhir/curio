@@ -7,6 +7,7 @@ import { ChatView } from "@/components/chat-view"
 import { mockMessagesByChatId } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
 import { useChat } from "@/hooks/useChat"
 
 const initialChats: ChatListItem[] = [
@@ -50,12 +51,42 @@ function buildChatPreview(text: string) {
   return normalized.length > 52 ? `${normalized.slice(0, 52).trimEnd()}...` : normalized
 }
 
+function findUserIdInLocalStorage() {
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index)
+    if (!key) {
+      continue
+    }
+
+    const rawValue = localStorage.getItem(key)
+    if (!rawValue) {
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(rawValue) as {
+        user?: { id?: unknown }
+        currentSession?: { user?: { id?: unknown } }
+      }
+      const userId = parsed.user?.id ?? parsed.currentSession?.user?.id
+      if (typeof userId === "string" && userId.length > 0) {
+        return userId
+      }
+    } catch {
+      // Ignore unrelated localStorage entries.
+    }
+  }
+
+  return null
+}
+
 const Chat = () => {
   const [chats, setChats] = useState<ChatListItem[]>(initialChats)
   const [messagesByChatId, setMessagesByChatId] = useState(mockMessagesByChatId)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
   const { sendMessage } = useChat()
+  const { user } = useAuthenticatedUser()
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
   const handleStartNewChat = () => {
     setSelectedChatId(null)
@@ -77,12 +108,23 @@ const Chat = () => {
   }
 
   const handleCreateChat = async (text: string) => {
-    const nextChatId = `chat-${Date.now()}`
+    const threadId = crypto.randomUUID()
+    const userMessageId = crypto.randomUUID()
+    const assistantMessageId = crypto.randomUUID()
+    const userId = user ?? findUserIdInLocalStorage()
 
     //TODO: persist to local storage
-    upsertChatMeta(nextChatId, text)
-    setSelectedChatId(nextChatId)
-    await sendMessage({ chatId: nextChatId, text, setMessagesByChatId })
+    upsertChatMeta(threadId, text)
+    setSelectedChatId(threadId)
+    await sendMessage({
+      chatId: threadId,
+      text,
+      setMessagesByChatId,
+      userId,
+      userMessageId,
+      threadId,
+      assistantMessageId,
+    })
 
   }
 
@@ -130,7 +172,6 @@ const Chat = () => {
             ) : (
               <motion.div
                 key={selectedChatId ?? "thread"}
-                layout
                 className="relative z-10 mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3"
                 initial={{ opacity: 0, y: 24, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -138,12 +179,11 @@ const Chat = () => {
                 transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
               >
                 <motion.div
-                  layout
                   className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] bg-background"
                 >
                   <ChatView messages={messages} />
                 </motion.div>
-                <motion.div layout>
+                <motion.div>
                   <ChatPrompt onSubmit={handleSendMessage} />
                 </motion.div>
               </motion.div>
