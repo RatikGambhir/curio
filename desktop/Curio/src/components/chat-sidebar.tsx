@@ -20,13 +20,17 @@ import {
 type ChatSidebarProps = React.ComponentProps<typeof Sidebar> & {
   chats: ChatListItem[];
   selectedChatId: string | null;
+  isNewChat: boolean;
   onSelectChat: (chatId: string) => void;
+  onStartNewChat: () => void;
 };
 
 export function ChatSidebar({
   chats,
   selectedChatId,
+  isNewChat,
   onSelectChat,
+  onStartNewChat,
   className,
   ...props
 }: ChatSidebarProps) {
@@ -64,7 +68,13 @@ export function ChatSidebar({
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <ChatNav chats={chats} selectedChatId={selectedChatId} onSelectChat={onSelectChat} />
+        <ChatNav
+          chats={chats}
+          selectedChatId={selectedChatId}
+          isNewChat={isNewChat}
+          onSelectChat={onSelectChat}
+          onStartNewChat={onStartNewChat}
+        />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
