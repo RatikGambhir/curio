@@ -25,6 +25,18 @@ export type ChatStreamEvent =
   | ChatStreamErrorEvent
   | ChatStreamDoneEvent
 
+export type ChatStreamRequest = {
+  conversationId: string
+  userMessageId: string
+  assistantMessageId: string
+  prompt: string
+}
+
+export type ExpectedChatStream = {
+  conversationId: string
+  messageId: string
+}
+
 export type ChatStreamProtocolErrorCode =
   | "malformed_event"
   | "truncated_stream"
@@ -36,6 +48,16 @@ export class ChatStreamProtocolError extends Error {
   constructor(code: ChatStreamProtocolErrorCode, message: string) {
     super(message)
     this.name = "ChatStreamProtocolError"
+    this.code = code
+  }
+}
+
+export class ChatStreamRequestError extends Error {
+  readonly code: string
+
+  constructor(code: string, message: string) {
+    super(message)
+    this.name = "ChatStreamRequestError"
     this.code = code
   }
 }
@@ -200,4 +222,126 @@ export class ChatStreamParser {
       this.terminalEventReceived = true
     }
   }
+}
+
+function serviceErrorMessage(value: unknown): string | null {
+  if (typeof value === "string") {
+    const valueTrimmed = value.trim()
+    if (!valueTrimmed) {
+      return null
+    }
+
+    try {
+      return serviceErrorMessage(JSON.parse(valueTrimmed)) ?? valueTrimmed
+    } catch {
+      return valueTrimmed
+    }
+  }
+
+  if (value && typeof value === "object") {
+    const payload = value as { message?: unknown; error?: unknown }
+    return serviceErrorMessage(payload.message) ?? serviceErrorMessage(payload.error)
+  }
+
+  return null
+}
+
+function validateCorrelation(event: ChatStreamEvent, expected: ExpectedChatStream) {
+  if (
+    event.conversationId !== expected.conversationId ||
+    event.messageId !== expected.messageId
+  ) {
+    throw new ChatStreamProtocolError(
+      "malformed_event",
+      "Chat stream event identifiers do not match the request.",
+    )
+  }
+}
+
+export async function readChatStream(
+  body: ReadableStream<Uint8Array> | null,
+  expected: ExpectedChatStream,
+  onEvent: (event: ChatStreamEvent) => void,
+): Promise<ChatStreamDoneEvent | ChatStreamErrorEvent> {
+  if (!body) {
+    throw new ChatStreamRequestError(
+      "missing_response_body",
+      "The chat service returned an empty response.",
+    )
+  }
+
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  const parser = new ChatStreamParser()
+
+  const processEvents = (events: ChatStreamEvent[]) => {
+    for (const event of events) {
+      validateCorrelation(event, expected)
+      onEvent(event)
+      if (event.type === "done" || event.type === "error") {
+        return event
+      }
+    }
+
+    return null
+  }
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) {
+      break
+    }
+
+    const terminal = processEvents(parser.push(decoder.decode(value, { stream: true })))
+    if (terminal) {
+      return terminal
+    }
+  }
+
+  const decodedTail = decoder.decode()
+  if (decodedTail) {
+    const terminal = processEvents(parser.push(decodedTail))
+    if (terminal) {
+      return terminal
+    }
+  }
+
+  const terminal = processEvents(parser.finish())
+  if (terminal) {
+    return terminal
+  }
+
+  throw new ChatStreamProtocolError(
+    "truncated_stream",
+    "Chat stream ended before a terminal event.",
+  )
+}
+
+export async function streamCurioChat(
+  serviceUrl: string,
+  request: ChatStreamRequest,
+  signal: AbortSignal,
+  onEvent: (event: ChatStreamEvent) => void,
+) {
+  const endpoint = new URL("/v1/chat/stream", serviceUrl)
+  const response = await fetch(endpoint, {
+    body: JSON.stringify(request),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal,
+  })
+
+  if (!response.ok) {
+    const responseText = await response.text()
+    throw new ChatStreamRequestError(
+      "http_error",
+      serviceErrorMessage(responseText) ?? `Chat service returned HTTP ${response.status}.`,
+    )
+  }
+
+  return readChatStream(
+    response.body,
+    { conversationId: request.conversationId, messageId: request.assistantMessageId },
+    onEvent,
+  )
 }
