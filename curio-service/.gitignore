@@ -1,2 +1,8 @@
 target/
 .idea/workspace.xml
+.env
+curio.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
