@@ -14,7 +14,11 @@ async fn main() {
     );
     let config = ServiceConfig::from_env().expect("invalid curio-service configuration");
 
-    axum::serve(listener, app_with_config(config))
+    let app = app_with_config(config)
+        .await
+        .expect("failed to initialize curio-service database");
+
+    axum::serve(listener, app)
         .await
         .expect("curio-service stopped unexpectedly");
 }

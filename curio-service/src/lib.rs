@@ -1,5 +1,6 @@
 pub mod chat;
 pub mod config;
+pub mod database;
 mod user;
 
 use axum::{
@@ -14,7 +15,7 @@ use http::HeaderValue;
 use serde::Serialize;
 use tower_http::cors::CorsLayer;
 
-use crate::{chat::ChatState, config::ServiceConfig};
+use crate::{chat::ChatState, config::ServiceConfig, database::Database};
 
 #[derive(Clone, Debug)]
 pub struct CurrentUser;
@@ -29,7 +30,7 @@ pub fn app() -> Router {
     base_router()
 }
 
-pub fn app_with_config(config: ServiceConfig) -> Router {
+pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Error> {
     let allowed_origins = config
         .cors_allowed_origins
         .iter()
@@ -39,17 +40,24 @@ pub fn app_with_config(config: ServiceConfig) -> Router {
         .allow_origin(allowed_origins)
         .allow_methods([http::Method::GET, http::Method::POST])
         .allow_headers([header::CONTENT_TYPE]);
+    let database = Database::connect(&config.database_url).await?;
     let chat_state = ChatState::new(
         config.openai_api_key,
         config.openai_model,
         config.openai_base_url,
+        database,
     );
 
     let chat_routes = Router::new()
         .route("/v1/chat/stream", post(chat::stream_chat))
+        .route("/v1/conversations", get(chat::list_conversations))
+        .route(
+            "/v1/conversations/{id}/messages",
+            get(chat::conversation_messages),
+        )
         .with_state(chat_state);
 
-    base_router().merge(chat_routes).layer(cors)
+    Ok(base_router().merge(chat_routes).layer(cors))
 }
 
 fn base_router() -> Router {
@@ -226,10 +234,8 @@ mod tests {
         );
         let (base_url, mock_task) = start_mock_openai(StatusCode::OK, provider_stream).await;
 
-        let response = app_with_config(test_config(base_url))
-            .oneshot(chat_request())
-            .await
-            .unwrap();
+        let app = app_with_config(test_config(base_url)).await.unwrap();
+        let response = app.clone().oneshot(chat_request()).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
             response.headers()[header::CONTENT_TYPE],
@@ -245,6 +251,25 @@ mod tests {
         assert!(body.contains("event: done"));
         assert!(body.contains(r#""responseId":"response-1""#));
 
+        let history = app
+            .oneshot(
+                Request::get("/v1/conversations/conversation-1/messages")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let history: Value = serde_json::from_slice(&history).unwrap();
+        assert_eq!(history["messages"][0]["content"], "Hello");
+        assert_eq!(history["messages"][1]["content"], "Hello");
+        assert_eq!(history["messages"][1]["status"], "completed");
+        assert_eq!(history["messages"][1]["responseId"], "response-1");
+
         mock_task.abort();
     }
 
@@ -255,6 +280,8 @@ mod tests {
             start_mock_openai(StatusCode::TOO_MANY_REQUESTS, sensitive_detail).await;
 
         let response = app_with_config(test_config(base_url))
+            .await
+            .unwrap()
             .oneshot(chat_request())
             .await
             .unwrap();
@@ -271,6 +298,8 @@ mod tests {
     #[tokio::test]
     async fn configured_web_origin_receives_cors_headers() {
         let response = app_with_config(test_config("http://127.0.0.1:1".to_owned()))
+            .await
+            .unwrap()
             .oneshot(
                 Request::options("/v1/chat/stream")
                     .header(header::ORIGIN, "http://localhost:5173")
