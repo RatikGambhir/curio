@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 
-import { supabase } from "@/lib/SupabaseClient";
+import { supabaseAuth } from "@/lib/auth/supabase-auth";
 
 type LoginForm = {
   email: string;
@@ -39,7 +39,7 @@ export function LoginForm({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     console.log(loginInput);
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseAuth.auth.signInWithPassword({
       email: loginInput.email,
       password: loginInput.password,
     });

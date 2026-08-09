@@ -32,7 +32,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-import { supabase } from "@/supabase"
+import { supabaseAuth } from "@/lib/auth/supabase-auth"
 
 export function NavUser({
   user,
@@ -57,7 +57,7 @@ export function NavUser({
     hasTriggeredSignOutRef.current = true
     setIsSigningOut(true)
 
-    const { error } = await supabase.auth.signOut({ scope: "global" })
+    const { error } = await supabaseAuth.auth.signOut({ scope: "global" })
     if (error) {
       console.error("Failed to sign out from Supabase:", error.message)
     }

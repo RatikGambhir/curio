@@ -5,7 +5,7 @@ import { EmailLoginForm } from "@/components/auth/email-login-form";
 import { VerificationCodeForm } from "@/components/auth/verification-code-form";
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 import { validateEmail } from "@/lib/validators/auth";
-import { supabase } from "@/supabase";
+import { supabaseAuth } from "@/lib/auth/supabase-auth";
 import curioLogo from "../assets/curio-logo.png";
 
 function Login() {
@@ -29,7 +29,7 @@ function Login() {
     setOtpError(null);
     setIsSendingCode(true);
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabaseAuth.auth.signInWithOtp({
       email: trimmedEmail,
       options: {
         shouldCreateUser: true,
@@ -55,7 +55,7 @@ function Login() {
     setOtpError(null);
     setIsVerifyingCode(true);
 
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabaseAuth.auth.verifyOtp({
       email,
       token: code,
       type: "email",

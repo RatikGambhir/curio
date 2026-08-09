@@ -17,7 +17,7 @@ import {
 } from "@/components/settings/settings.types"
 import { Button } from "@/components/ui/button"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-import { supabase } from "@/supabase"
+import { supabaseAuth } from "@/lib/auth/supabase-auth"
 import { ArrowLeft, LogOut, MessageSquareText } from "lucide-react"
 
 function ProfileSettings() {
@@ -69,7 +69,7 @@ function ProfileSettings() {
     setIsSigningOut(true)
 
     try {
-      const { error } = await supabase.auth.signOut({ scope: "global" })
+      const { error } = await supabaseAuth.auth.signOut({ scope: "global" })
       if (error) {
         console.error("Failed to sign out from Supabase:", error.message)
       }

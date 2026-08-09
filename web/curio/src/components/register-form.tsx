@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { RegisterData } from "@/types/LoginRegisterTypes";
-import { supabase } from "@/lib/SupabaseClient";
+import { supabaseAuth } from "@/lib/auth/supabase-auth";
 import { useNavigate } from "react-router-dom";
 export function RegisterForm({
   className,
@@ -34,9 +34,8 @@ export function RegisterForm({
 
   const registerUser = async () => {
     console.log("Registering user...", registerData);
-    console.log("supasbase", supabase);
     // TODO: Add db trigger to supabase to write custom user data to custom table
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabaseAuth.auth.signUp({
       phone: registerData.phone ?? "",
       email: registerData.email,
       password: registerData.password,
