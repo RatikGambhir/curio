@@ -1,4 +1,4 @@
-use curio_service::app;
+use curio_service::{app_with_config, config::ServiceConfig};
 
 #[tokio::main]
 async fn main() {
@@ -12,7 +12,9 @@ async fn main() {
         "curio-service listening on {}",
         listener.local_addr().unwrap()
     );
-    axum::serve(listener, app())
+    let config = ServiceConfig::from_env().expect("invalid curio-service configuration");
+
+    axum::serve(listener, app_with_config(config))
         .await
         .expect("curio-service stopped unexpectedly");
 }
