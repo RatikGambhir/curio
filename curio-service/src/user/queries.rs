@@ -1,8 +1,17 @@
-use axum::Extension;
+use axum::{Extension, Json, extract::Path};
+use serde::Serialize;
+
 use crate::CurrentUser;
 
-pub async fn get_user_info(
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConversationResponse {
+    id: String,
+}
+
+pub async fn get_conversation(
     Extension(_current_user): Extension<CurrentUser>,
-) -> String {
-    return 42.to_string();
+    Path(id): Path<String>,
+) -> Json<ConversationResponse> {
+    Json(ConversationResponse { id })
 }

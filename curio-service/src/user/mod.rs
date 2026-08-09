@@ -1,23 +1,16 @@
-pub mod commands;
-pub mod queries;
+mod commands;
+mod queries;
 
-use axum::Router;
-use axum::routing::post;
-use axum::routing::get;
-use commands::my_handler;
-use commands::handler;
-pub fn gen_command_routes() -> Router {
+use axum::{
+    Router,
+    routing::{get, post},
+};
+
+pub fn routes() -> Router {
     Router::new()
-        // queries
-        .route("/conversations", post(my_handler))
-        .route("/conversations/:id", post(handler))
-
+        .route("/conversations", post(commands::create_conversation))
+        .route(
+            "/conversations/{id}",
+            get(queries::get_conversation).post(commands::update_conversation),
+        )
 }
-
-pub fn gen_query_routes() -> Router {
-    Router::new()
-    .route("/conversations/:id", get(queries::get_user_info))
-}
-
-
-
