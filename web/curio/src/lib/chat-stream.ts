@@ -1,0 +1,203 @@
+export type ChatStreamTokenEvent = {
+  type: "token"
+  conversationId: string
+  messageId: string
+  token: string
+}
+
+export type ChatStreamErrorEvent = {
+  type: "error"
+  conversationId: string
+  messageId: string
+  code: string
+  message: string
+}
+
+export type ChatStreamDoneEvent = {
+  type: "done"
+  conversationId: string
+  messageId: string
+  responseId: string
+}
+
+export type ChatStreamEvent =
+  | ChatStreamTokenEvent
+  | ChatStreamErrorEvent
+  | ChatStreamDoneEvent
+
+export type ChatStreamProtocolErrorCode =
+  | "malformed_event"
+  | "truncated_stream"
+  | "event_after_terminal"
+
+export class ChatStreamProtocolError extends Error {
+  readonly code: ChatStreamProtocolErrorCode
+
+  constructor(code: ChatStreamProtocolErrorCode, message: string) {
+    super(message)
+    this.name = "ChatStreamProtocolError"
+    this.code = code
+  }
+}
+
+function malformed(message: string): never {
+  throw new ChatStreamProtocolError("malformed_event", message)
+}
+
+function requireObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return malformed("Stream event data must be a JSON object.")
+  }
+
+  return value as Record<string, unknown>
+}
+
+function requireString(
+  payload: Record<string, unknown>,
+  field: string,
+  eventName: string,
+): string {
+  const value = payload[field]
+  if (typeof value !== "string" || value.length === 0) {
+    return malformed(`Stream ${eventName} event is missing ${field}.`)
+  }
+
+  return value
+}
+
+export function parseChatStreamEvent(eventBlock: string): ChatStreamEvent | null {
+  let eventName = ""
+  const dataLines: string[] = []
+
+  for (const line of eventBlock.split(/\r?\n/)) {
+    if (!line || line.startsWith(":")) {
+      continue
+    }
+
+    const separatorIndex = line.indexOf(":")
+    const field = separatorIndex === -1 ? line : line.slice(0, separatorIndex)
+    let value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 1)
+    if (value.startsWith(" ")) {
+      value = value.slice(1)
+    }
+
+    if (field === "event") {
+      eventName = value
+    } else if (field === "data") {
+      dataLines.push(value)
+    }
+  }
+
+  if (!eventName && dataLines.length === 0) {
+    return null
+  }
+
+  if (eventName !== "token" && eventName !== "error" && eventName !== "done") {
+    return malformed(`Unsupported stream event: ${eventName || "message"}.`)
+  }
+
+  if (dataLines.length === 0) {
+    return malformed(`Stream ${eventName} event is missing data.`)
+  }
+
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(dataLines.join("\n"))
+  } catch {
+    return malformed(`Stream ${eventName} event contains malformed JSON.`)
+  }
+
+  const payload = requireObject(decoded)
+  const common = {
+    conversationId: requireString(payload, "conversationId", eventName),
+    messageId: requireString(payload, "messageId", eventName),
+  }
+
+  if (eventName === "token") {
+    const token = payload.token
+    if (typeof token !== "string") {
+      return malformed("Stream token event is missing token.")
+    }
+
+    return { type: "token", ...common, token }
+  }
+
+  if (eventName === "error") {
+    return {
+      type: "error",
+      ...common,
+      code: requireString(payload, "code", eventName),
+      message: requireString(payload, "message", eventName),
+    }
+  }
+
+  return {
+    type: "done",
+    ...common,
+    responseId: requireString(payload, "responseId", eventName),
+  }
+}
+
+export class ChatStreamParser {
+  private buffer = ""
+  private terminalEventReceived = false
+
+  push(chunk: string): ChatStreamEvent[] {
+    if (this.terminalEventReceived && chunk.trim()) {
+      throw new ChatStreamProtocolError(
+        "event_after_terminal",
+        "Received stream data after a terminal event.",
+      )
+    }
+
+    this.buffer += chunk
+    const events: ChatStreamEvent[] = []
+    let boundary = this.buffer.match(/\r?\n\r?\n/)
+
+    while (boundary?.index !== undefined) {
+      const eventBlock = this.buffer.slice(0, boundary.index)
+      this.buffer = this.buffer.slice(boundary.index + boundary[0].length)
+      const event = parseChatStreamEvent(eventBlock)
+      if (event) {
+        this.accept(event, events)
+      }
+      boundary = this.buffer.match(/\r?\n\r?\n/)
+    }
+
+    return events
+  }
+
+  finish(): ChatStreamEvent[] {
+    const events: ChatStreamEvent[] = []
+    if (this.buffer.trim()) {
+      const event = parseChatStreamEvent(this.buffer)
+      this.buffer = ""
+      if (event) {
+        this.accept(event, events)
+      }
+    }
+
+    if (!this.terminalEventReceived) {
+      throw new ChatStreamProtocolError(
+        "truncated_stream",
+        "Chat stream ended before a done or error event.",
+      )
+    }
+
+    return events
+  }
+
+  private accept(event: ChatStreamEvent, events: ChatStreamEvent[]) {
+    if (this.terminalEventReceived) {
+      throw new ChatStreamProtocolError(
+        "event_after_terminal",
+        "Received a stream event after a terminal event.",
+      )
+    }
+
+    events.push(event)
+    if (event.type === "done" || event.type === "error") {
+      this.terminalEventReceived = true
+    }
+  }
+}
