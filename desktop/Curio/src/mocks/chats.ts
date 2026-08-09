@@ -9,6 +9,7 @@ export type ChatMessage = {
   id: string;
   from: "user" | "assistant";
   value: string;
+  status?: "error";
 };
 
 export const mockChats: ChatListItem[] = [

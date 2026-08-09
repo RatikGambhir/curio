@@ -14,22 +14,28 @@ import { cn } from "@/lib/utils";
 
 type ChatPromptProps = {
   className?: string;
+  disabled?: boolean;
   placeholder?: string;
+  onSubmit?: (text: string) => void;
 };
 
 export function ChatPrompt({
   className,
+  disabled = false,
   placeholder = "How can I help you today?",
+  onSubmit,
 }: ChatPromptProps) {
   const [text, setText] = useState("");
   const [model, setModel] = useState("sonnet-4.5");
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!text.trim()) {
+    const nextText = text.trim();
+    if (!nextText || disabled) {
       return;
     }
 
+    onSubmit?.(nextText);
     setText("");
   };
 
@@ -57,6 +63,7 @@ export function ChatPrompt({
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={placeholder}
+            disabled={disabled}
             className="min-h-[64px] max-h-44 resize-none border-0 bg-transparent px-0 py-1 text-base leading-snug font-medium placeholder:text-sm placeholder:text-foreground/45 shadow-none outline-none ring-0 focus-visible:border-transparent focus-visible:ring-0 md:min-h-[72px] md:text-lg md:placeholder:text-base"
           />
 
@@ -87,7 +94,7 @@ export function ChatPrompt({
 
           <Button
             type="submit"
-            disabled={!text.trim()}
+            disabled={!text.trim() || disabled}
             className="size-10 rounded-lg bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md hover:from-primary/90 hover:to-accent/90"
           >
             <Send className="size-4.5" />
