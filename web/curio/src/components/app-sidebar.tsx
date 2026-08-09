@@ -45,8 +45,8 @@ const data = {
       icon: MessageSquare,
     },
     {
-      title: "Knowledge Atals",
-      url: "#",
+      title: "Atlas",
+      url: "/atlas",
       icon: Globe,
     },
     {

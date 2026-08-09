@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 
 import "./App.css";
+import Atlas from "./pages/Atlas";
 import Chat from "./pages/Chat";
 import DesktopConstruction from "./pages/DesktopConstruction";
 import Home from "./pages/Home";
@@ -21,6 +22,7 @@ function App() {
         <Route path="/desktop-construction" element={<DesktopConstruction />} />
         <Route path="/" element={<Landing />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/atlas" element={<Atlas />} />
         <Route path="/home" element={<Home />} />
         <Route path="/vault" element={<Vault />} />
         <Route path="/profile" element={<ProfileSettings />} />
