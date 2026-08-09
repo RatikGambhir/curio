@@ -2,6 +2,7 @@ export type ChatMessage = {
   id: string
   from: "user" | "assistant"
   value: string
+  status?: "error"
 }
 
 export const mockMessagesByChatId: Record<string, ChatMessage[]> = {

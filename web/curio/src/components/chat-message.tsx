@@ -1,4 +1,5 @@
 import { motion } from "framer-motion"
+import { AlertTriangle } from "lucide-react"
 import { useEffect, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 
@@ -74,11 +75,33 @@ export function UserMessage({ value }: Pick<ChatMessage, "value">) {
   )
 }
 
-export function AssistantMessage({ value }: Pick<ChatMessage, "value">) {
+function AssistantErrorMessage({ value }: Pick<ChatMessage, "value">) {
+  return (
+    <div className="flex items-start gap-2 text-red-900" role="alert">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600" aria-hidden="true" />
+      <div>
+        <p className="font-semibold">Response unavailable</p>
+        <p className="mt-1 text-red-800/90">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+export function AssistantMessage({ value, status }: Pick<ChatMessage, "value" | "status">) {
+  const isError = status === "error"
+
   return (
     <MessageRow className="justify-start">
-      <MessageBubble className="bg-primary/10 text-foreground">
-        {value.trim() ? (
+      <MessageBubble
+        className={
+          isError
+            ? "border border-red-300 bg-red-50 text-red-900 shadow-sm"
+            : "bg-primary/10 text-foreground"
+        }
+      >
+        {isError ? (
+          <AssistantErrorMessage value={value} />
+        ) : value.trim() ? (
           <ReactMarkdown
             components={{
               p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
@@ -126,5 +149,5 @@ export function ChatMessageItem(message: ChatMessage) {
     return <UserMessage value={message.value} />
   }
 
-  return <AssistantMessage value={message.value} />
+  return <AssistantMessage value={message.value} status={message.status} />
 }

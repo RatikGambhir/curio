@@ -19,6 +19,13 @@ type StreamChunk = {
   token: string
 }
 
+type StreamErrorObject = {
+  message?: unknown
+  error?: unknown
+  code?: unknown
+  status?: unknown
+}
+
 type WorkerRequestBody = {
   userId: string
   prompt: string
@@ -72,6 +79,7 @@ function setAssistantMessageValue(
   chatId: string,
   assistantMessageId: string,
   value: string,
+  status?: ChatMessage["status"],
 ) {
   setMessagesByChatId((currentMessages) => {
     const chatMessages = currentMessages[chatId] ?? []
@@ -83,6 +91,7 @@ function setAssistantMessageValue(
       return {
         ...message,
         value,
+        status,
       }
     })
 
@@ -91,6 +100,50 @@ function setAssistantMessageValue(
       [chatId]: nextChatMessages,
     }
   })
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string") {
+    const trimmedError = error.trim()
+    if (!trimmedError) {
+      return "Something went wrong while streaming the response."
+    }
+
+    try {
+      return extractErrorMessage(JSON.parse(trimmedError))
+    } catch {
+      return trimmedError
+    }
+  }
+
+  if (error && typeof error === "object") {
+    const streamError = error as StreamErrorObject
+
+    if (typeof streamError.message === "string") {
+      return extractErrorMessage(streamError.message)
+    }
+
+    if (streamError.error) {
+      return extractErrorMessage(streamError.error)
+    }
+  }
+
+  return "Something went wrong while streaming the response."
+}
+
+function setAssistantMessageError(
+  setMessagesByChatId: StreamParams["setMessagesByChatId"],
+  chatId: string,
+  assistantMessageId: string,
+  error: unknown,
+) {
+  setAssistantMessageValue(
+    setMessagesByChatId,
+    chatId,
+    assistantMessageId,
+    extractErrorMessage(error),
+    "error",
+  )
 }
 
 function parseStreamEvent(eventBlock: string): { token?: string; error?: string } {
@@ -108,11 +161,7 @@ function parseStreamEvent(eventBlock: string): { token?: string; error?: string 
   if (normalized.startsWith("ERROR:")) {
     const payload = normalized.slice(6).trim()
     const parsed = JSON.parse(payload) as { error?: unknown }
-    if (typeof parsed.error === "string") {
-      return { error: parsed.error }
-    }
-
-    return { error: "Unknown stream error" }
+    return { error: extractErrorMessage(parsed.error ?? parsed) }
   }
 
   return {}
@@ -159,8 +208,15 @@ export function useChat() {
 
         if (!response.ok) {
           const responseText = await response.text()
-          console.log(`HTTP ${response.status}: ${responseText}`)
-
+          const errorMessage = extractErrorMessage(responseText)
+          setStreamError(errorMessage)
+          setAssistantMessageError(
+            setMessagesByChatId,
+            chatId,
+            assistantMessage.id,
+            errorMessage || `HTTP ${response.status}`,
+          )
+          return
         }
 
         if (!response.body) {
@@ -184,7 +240,14 @@ export function useChat() {
           for (const eventBlock of events) {
             const parsedEvent = parseStreamEvent(eventBlock)
             if (parsedEvent.error) {
-             console.log("ERROR")
+              setStreamError(parsedEvent.error)
+              setAssistantMessageError(
+                setMessagesByChatId,
+                chatId,
+                assistantMessage.id,
+                parsedEvent.error,
+              )
+              return
             }
             if (parsedEvent.token) {
               appendTokenToAssistantMessage(
@@ -199,8 +262,14 @@ export function useChat() {
 
         const tailEvent = parseStreamEvent(streamBuffer)
         if (tailEvent.error) {
-          console.log("ERROR")
-
+          setStreamError(tailEvent.error)
+          setAssistantMessageError(
+            setMessagesByChatId,
+            chatId,
+            assistantMessage.id,
+            tailEvent.error,
+          )
+          return
         }
         if (tailEvent.token) {
           appendTokenToAssistantMessage(
@@ -213,11 +282,11 @@ export function useChat() {
       } catch (error) {
         const nextError = error instanceof Error ? error.message : "Unknown stream failure"
         setStreamError(nextError)
-        setAssistantMessageValue(
+        setAssistantMessageError(
           setMessagesByChatId,
           chatId,
           assistantMessage.id,
-          "Something went wrong while streaming the response.",
+          nextError,
         )
       } finally {
         setIsStreaming(false)
