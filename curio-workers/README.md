@@ -1,2 +1,3 @@
 # curio-workers
-Curio workers are edge functions utilized for streaming back LLM server responses and post processing of conversational content
+
+These legacy worker projects are retained for reference only. Interactive chat streaming now runs through `curio-service`.

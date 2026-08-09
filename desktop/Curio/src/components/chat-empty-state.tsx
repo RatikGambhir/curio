@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Clock3,
   Code2,
@@ -12,13 +12,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -28,28 +21,16 @@ type ChatEmptyStateProps = {
   onSubmit?: (text: string) => void;
 };
 
-const models = [
-  { value: "chatgpt-5.3", label: "ChatGPT-5.3" },
-  { value: "sonnet-3.5", label: "Sonnet-3.5" },
-  { value: "gemini-3.5", label: "Gemini-3.5" },
-];
-
 const promptShortcuts: Array<{ id: string; icon: LucideIcon; label: string }> = [
   { id: "write", icon: Pencil, label: "Write" },
   { id: "learn", icon: GraduationCap, label: "Learn" },
   { id: "code", icon: Code2, label: "Code" },
   { id: "life", icon: Lightbulb, label: "Life stuff" },
-  { id: "choice", icon: Sparkles, label: "Claude's choice" },
+  { id: "choice", icon: Sparkles, label: "Surprise me" },
 ];
 
 export function ChatEmptyState({ className, disabled = false, onSubmit }: ChatEmptyStateProps) {
   const [draft, setDraft] = useState("");
-  const [model, setModel] = useState(models[2]?.value ?? models[0].value);
-
-  const selectedModel = useMemo(
-    () => models.find((option) => option.value === model) ?? models[0],
-    [model],
-  );
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,22 +89,9 @@ export function ChatEmptyState({ className, disabled = false, onSubmit }: ChatEm
           <div className="mx-6 h-px bg-primary/14 md:mx-11" />
 
           <div className="flex items-center justify-between gap-4 px-2 py-2 md:px-4 md:py-4">
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger className="h-14 min-w-44 rounded-[1rem] border-primary/15 bg-white/40 px-4 text-lg font-sans font-semibold text-foreground shadow-none md:min-w-52">
-                <SelectValue placeholder="Select model">
-                  <span className="font-sans font-semibold text-foreground">
-                    {selectedModel.label}
-                  </span>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <span className="flex h-14 min-w-44 items-center rounded-[1rem] border border-primary/15 bg-white/40 px-4 text-lg font-sans font-semibold text-foreground md:min-w-52">
+              Curio
+            </span>
 
             <Button
               type="submit"

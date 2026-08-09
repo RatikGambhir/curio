@@ -1,11 +1,4 @@
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { Clock3, Plus, Send } from "lucide-react"
@@ -23,7 +16,6 @@ export function ChatPrompt({
   onSubmit,
 }: ChatPromptProps) {
   const [text, setText] = useState("")
-  const [model, setModel] = useState("sonnet-4.5")
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -76,16 +68,9 @@ export function ChatPrompt({
         <div className="h-px w-full bg-primary/20" />
 
         <div className="flex items-center justify-between gap-3">
-          <Select value={model} onValueChange={setModel}>
-            <SelectTrigger className="h-10 rounded-lg border-primary/25 bg-background/70 px-3 text-sm font-semibold text-foreground shadow-none md:min-w-44">
-              <SelectValue placeholder="Select model" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sonnet-4.5">Sonnet 4.5</SelectItem>
-              <SelectItem value="haiku-3.5">Haiku 3.5</SelectItem>
-              <SelectItem value="opus-4">Opus 4</SelectItem>
-            </SelectContent>
-          </Select>
+          <span className="flex h-10 items-center rounded-lg border border-primary/25 bg-background/70 px-3 text-sm font-semibold text-foreground md:min-w-44">
+            Curio
+          </span>
 
           <Button
             type="submit"
