@@ -1,17 +1,17 @@
 import { AppSidebar } from "@/components/app-sidebar";
+import { PageHeader } from "@/components/page-header";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 function HomePage() {
   return (
-    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
         <div className="flex h-full w-full flex-col bg-background">
-          <SidebarTrigger className="m-2" />
+          <PageHeader />
           <div className="flex flex-1 items-center justify-center px-8 pb-10">
             <div className="max-w-2xl space-y-4 text-center">
               <p

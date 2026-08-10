@@ -2,7 +2,7 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
-const DEFAULT_CURIO_SERVICE_URL: &str = "http://127.0.0.1:3000";
+const DEFAULT_CURIO_CHAT_WORKER_URL: &str = "http://127.0.0.1:8787";
 const STREAM_TOKEN_EVENT: &str = "chat-stream-token";
 const STREAM_ERROR_EVENT: &str = "chat-stream-error";
 const STREAM_DONE_EVENT: &str = "chat-stream-done";
@@ -10,6 +10,7 @@ const STREAM_DONE_EVENT: &str = "chat-stream-done";
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ChatStreamRequest {
+    user_id: String,
     conversation_id: String,
     user_message_id: String,
     assistant_message_id: String,
@@ -54,9 +55,9 @@ enum EventDisposition {
     Error(String),
 }
 
-fn service_endpoint() -> String {
-    let base_url =
-        std::env::var("CURIO_SERVICE_URL").unwrap_or_else(|_| DEFAULT_CURIO_SERVICE_URL.to_owned());
+fn worker_endpoint() -> String {
+    let base_url = std::env::var("CURIO_CHAT_WORKER_URL")
+        .unwrap_or_else(|_| DEFAULT_CURIO_CHAT_WORKER_URL.to_owned());
     format!("{}/v1/chat/stream", base_url.trim_end_matches('/'))
 }
 
@@ -93,7 +94,7 @@ fn forward_event(
         ServiceEvent::Done(payload) => (&payload.conversation_id, &payload.message_id),
     };
     if correlated.0 != &request.conversation_id || correlated.1 != &request.assistant_message_id {
-        return Err("Chat service returned mismatched stream identifiers.".to_owned());
+        return Err("Chat worker returned mismatched stream identifiers.".to_owned());
     }
 
     match event {
@@ -119,7 +120,7 @@ fn forward_event(
 #[tauri::command]
 async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), String> {
     let response = match reqwest::Client::new()
-        .post(service_endpoint())
+        .post(worker_endpoint())
         .json(&request)
         .send()
         .await
@@ -130,7 +131,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                 &app,
                 &request,
                 "service_unavailable",
-                "The Curio service is unavailable.",
+                "The Curio chat worker is unavailable.",
             );
         }
     };
@@ -140,7 +141,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
             &app,
             &request,
             "service_error",
-            &format!("The Curio service returned HTTP {}.", response.status()),
+            &format!("The Curio chat worker returned HTTP {}.", response.status()),
         );
     }
 
@@ -155,7 +156,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                     &app,
                     &request,
                     "service_unavailable",
-                    "The connection to the Curio service was interrupted.",
+                    "The connection to the Curio chat worker was interrupted.",
                 );
             }
         };
@@ -167,7 +168,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                     &app,
                     &request,
                     "malformed_service_stream",
-                    "The Curio service returned an invalid stream.",
+                    "The Curio chat worker returned an invalid stream.",
                 );
             }
         };
@@ -182,7 +183,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                         &app,
                         &request,
                         "malformed_service_stream",
-                        "The Curio service returned an invalid stream.",
+                        "The Curio chat worker returned an invalid stream.",
                     );
                 }
             }
@@ -196,7 +197,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                 &app,
                 &request,
                 "incomplete_service_stream",
-                "The Curio service stream ended unexpectedly.",
+                "The Curio chat worker stream ended unexpectedly.",
             );
         }
     };
@@ -211,7 +212,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
                     &app,
                     &request,
                     "malformed_service_stream",
-                    "The Curio service returned an invalid stream.",
+                    "The Curio chat worker returned an invalid stream.",
                 );
             }
         }
@@ -221,7 +222,7 @@ async fn stream_chat(app: AppHandle, request: ChatStreamRequest) -> Result<(), S
         &app,
         &request,
         "incomplete_service_stream",
-        "The Curio service stream ended unexpectedly.",
+        "The Curio chat worker stream ended unexpectedly.",
     )
 }
 

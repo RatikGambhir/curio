@@ -26,6 +26,7 @@ export type ChatStreamEvent =
   | ChatStreamDoneEvent
 
 export type ChatStreamRequest = {
+  userId: string
   conversationId: string
   userMessageId: string
   assistantMessageId: string
@@ -224,7 +225,7 @@ export class ChatStreamParser {
   }
 }
 
-function serviceErrorMessage(value: unknown): string | null {
+function workerErrorMessage(value: unknown): string | null {
   if (typeof value === "string") {
     const valueTrimmed = value.trim()
     if (!valueTrimmed) {
@@ -232,7 +233,7 @@ function serviceErrorMessage(value: unknown): string | null {
     }
 
     try {
-      return serviceErrorMessage(JSON.parse(valueTrimmed)) ?? valueTrimmed
+      return workerErrorMessage(JSON.parse(valueTrimmed)) ?? valueTrimmed
     } catch {
       return valueTrimmed
     }
@@ -240,7 +241,7 @@ function serviceErrorMessage(value: unknown): string | null {
 
   if (value && typeof value === "object") {
     const payload = value as { message?: unknown; error?: unknown }
-    return serviceErrorMessage(payload.message) ?? serviceErrorMessage(payload.error)
+    return workerErrorMessage(payload.message) ?? workerErrorMessage(payload.error)
   }
 
   return null
@@ -266,7 +267,7 @@ export async function readChatStream(
   if (!body) {
     throw new ChatStreamRequestError(
       "missing_response_body",
-      "The chat service returned an empty response.",
+      "The chat worker returned an empty response.",
     )
   }
 
@@ -318,12 +319,12 @@ export async function readChatStream(
 }
 
 export async function streamCurioChat(
-  serviceUrl: string,
+  workerUrl: string,
   request: ChatStreamRequest,
   signal: AbortSignal,
   onEvent: (event: ChatStreamEvent) => void,
 ) {
-  const endpoint = new URL("/v1/chat/stream", serviceUrl)
+  const endpoint = new URL("/v1/chat/stream", workerUrl)
   const response = await fetch(endpoint, {
     body: JSON.stringify(request),
     method: "POST",
@@ -335,7 +336,7 @@ export async function streamCurioChat(
     const responseText = await response.text()
     throw new ChatStreamRequestError(
       "http_error",
-      serviceErrorMessage(responseText) ?? `Chat service returned HTTP ${response.status}.`,
+      workerErrorMessage(responseText) ?? `Chat worker returned HTTP ${response.status}.`,
     )
   }
 

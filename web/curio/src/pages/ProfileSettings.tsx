@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { ApiKeysTab } from "@/components/settings/tabs/api-keys-tab"
 import { AttachmentsTab } from "@/components/settings/tabs/attachments-tab"
@@ -17,25 +17,23 @@ import {
 } from "@/components/settings/settings.types"
 import { Button } from "@/components/ui/button"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-import { supabaseAuth } from "@/lib/auth/supabase-auth"
 import { ArrowLeft, LogOut, MessageSquareText } from "lucide-react"
 
 function ProfileSettings() {
   const navigate = useNavigate()
   const { user, logoutUser } = useAuthenticatedUser()
-  const hasTriggeredSignOutRef = useRef(false)
 
   const [activeTab, setActiveTab] = useState<SettingsTabId>("attachments")
   const [selectedFilter, setSelectedFilter] = useState<AttachmentFilter>("all")
   const [sortDirection, setSortDirection] =
     useState<AttachmentSortDirection>("desc")
   const [attachments] = useState<AttachmentRecord[]>([])
-  const [isSigningOut, setIsSigningOut] = useState(false)
 
   const profileSummary = useMemo(
     () => ({
-      name: "Curio Member",
-      email: user ? `${user.slice(0, 8)}@curio.app` : "member@curio.app",
+      name: user?.name ?? "Curio Member",
+      email: user?.email ?? "member@curio.app",
+      avatarUrl: user?.avatar,
       planLabel: "Base plan",
     }),
     [user],
@@ -60,26 +58,9 @@ function ProfileSettings() {
     })
   }, [filteredAttachments, sortDirection])
 
-  const handleSignOut = async () => {
-    if (isSigningOut || hasTriggeredSignOutRef.current) {
-      return
-    }
-
-    hasTriggeredSignOutRef.current = true
-    setIsSigningOut(true)
-
-    try {
-      const { error } = await supabaseAuth.auth.signOut({ scope: "global" })
-      if (error) {
-        console.error("Failed to sign out from Supabase:", error.message)
-      }
-
-      logoutUser()
-      navigate("/login", { replace: true })
-    } finally {
-      setIsSigningOut(false)
-      hasTriggeredSignOutRef.current = false
-    }
+  const handleSignOut = () => {
+    logoutUser()
+    navigate("/login", { replace: true })
   }
 
   const renderTabContent = () => {
@@ -149,10 +130,9 @@ function ProfileSettings() {
               size="sm"
               className="rounded-full"
               onClick={handleSignOut}
-              disabled={isSigningOut}
             >
               <LogOut className="size-4" />
-              {isSigningOut ? "Signing out..." : "Sign out"}
+              Sign out
             </Button>
           </div>
         </header>

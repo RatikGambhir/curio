@@ -109,6 +109,7 @@ describe("streamCurioChat", () => {
       block("done", { ...ids, responseId: "response-1" })
     const fetchMock = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
       expect(JSON.parse(String(init?.body))).toEqual({
+        userId: "mock-user-1",
         conversationId: "conversation-1",
         userMessageId: "user-1",
         assistantMessageId: "assistant-1",
@@ -130,8 +131,9 @@ describe("streamCurioChat", () => {
     const received: string[] = []
 
     const terminal = await streamCurioChat(
-      "http://127.0.0.1:3000",
+      "http://127.0.0.1:8787",
       {
+        userId: "mock-user-1",
         conversationId: "conversation-1",
         userMessageId: "user-1",
         assistantMessageId: "assistant-1",
@@ -143,7 +145,7 @@ describe("streamCurioChat", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce()
     expect(String(fetchMock.mock.calls[0][0])).toBe(
-      "http://127.0.0.1:3000/v1/chat/stream",
+      "http://127.0.0.1:8787/v1/chat/stream",
     )
     expect(received).toEqual(["token", "done"])
     expect(terminal.type).toBe("done")
@@ -154,8 +156,9 @@ describe("streamCurioChat", () => {
 
     await expect(
       streamCurioChat(
-        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8787",
         {
+          userId: "mock-user-1",
           conversationId: "conversation-1",
           userMessageId: "user-1",
           assistantMessageId: "assistant-1",

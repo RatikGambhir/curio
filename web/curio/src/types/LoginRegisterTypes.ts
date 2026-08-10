@@ -1,18 +1,15 @@
-type RegisterData = {
-  firstName: string;
-  lastName: string;
+type AuthUser = {
+  id: string;
+  name: string;
   email: string;
-  password: string;
-  phone: string | null;
+  avatar: string;
 };
 
-
-
 type AuthContextValue = {
-  user: string | null; // you can type this as `User | null` later
+  user: AuthUser | null;
   isAuthenticated: boolean;
-  loginUser: (user: string | null) => void;
+  loginUser: (email: string) => void;
   logoutUser: () => void;
 };
 
-export type { RegisterData, AuthContextValue };
+export type { AuthContextValue, AuthUser };

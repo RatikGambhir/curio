@@ -28,7 +28,7 @@ export function EmailLoginForm({
       <CardHeader className="space-y-2 text-center">
         <CardTitle className="text-2xl">Login to Curio</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Enter your email to receive a verification code.
+          Enter your email to continue to your mock workspace.
         </p>
       </CardHeader>
       <CardContent>
@@ -53,7 +53,7 @@ export function EmailLoginForm({
             ) : null}
           </div>
           <Button type="submit" className="h-11 w-full rounded-xl" disabled={isSubmitting}>
-            {isSubmitting ? "Sending code..." : "Continue"}
+            {isSubmitting ? "Opening Curio..." : "Continue to home"}
           </Button>
         </form>
       </CardContent>

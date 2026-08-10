@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppSidebar } from "@/components/app-sidebar";
+import { PageHeader } from "@/components/page-header";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { AccountTab } from "@/components/settings/tabs/account-tab";
@@ -20,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 import { ArrowLeft, LogOut, MessageSquareText } from "lucide-react";
@@ -97,11 +97,11 @@ function SettingsPage() {
   };
 
   return (
-    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
         <div className="flex h-full w-full flex-col bg-background">
-          <SidebarTrigger className="m-2" />
+          <PageHeader />
 
           <main className="flex-1 px-4 pb-6 sm:px-6 sm:pb-8 lg:px-8">
             <div className="mx-auto w-full max-w-[90rem]">

@@ -3,14 +3,12 @@ import { useState } from "react";
 import { ChatEmptyState } from "@/components/chat-empty-state";
 import { ChatPrompt } from "@/components/chat-prompt";
 import { ChatSidebar } from "@/components/chat-sidebar";
+import { PageHeader } from "@/components/page-header";
 import { ChatView } from "@/components/chat-view";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { useChat } from "@/hooks/useChat";
 import { mockChats, mockMessagesByChatId } from "@/mocks/chats";
 import type { ChatListItem } from "@/mocks/chats";
-
-const linenNoise =
-  "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E\")";
 
 function buildChatTitle(text: string) {
   const normalized = text.trim().replace(/\s+/g, " ");
@@ -80,26 +78,23 @@ function ChatPage() {
         isNewChat={isNewChat}
         onSelectChat={setSelectedChatId}
         onStartNewChat={() => setSelectedChatId(null)}
-        className="bg-background"
       />
       <SidebarInset className="bg-background">
-        <div className="relative flex h-full w-full flex-col overflow-hidden bg-background px-4 py-6 md:px-8">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.03]"
-            style={{ backgroundImage: linenNoise, backgroundRepeat: "repeat" }}
-          />
+        <div className="flex h-full w-full flex-col bg-background">
+          <PageHeader />
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
           <div className="relative z-10 flex h-full w-full flex-col">
             {isNewChat ? (
               <ChatEmptyState disabled={isStreaming} onSubmit={handleCreateChat} />
             ) : (
-              <div className="mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3">
-                <div className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] border border-border bg-background">
+              <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-3">
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <ChatView messages={messages} />
                 </div>
                 <ChatPrompt disabled={isStreaming} onSubmit={handleSendMessage} />
               </div>
             )}
+          </div>
           </div>
         </div>
       </SidebarInset>

@@ -3,6 +3,7 @@ import { useState } from "react"
 import { ChatEmptyState } from "@/components/chat-empty-state"
 import { ChatPrompt } from "@/components/chat-prompt"
 import { ChatSidebar } from "@/components/chat-sidebar"
+import { PageHeader } from "@/components/page-header"
 import { ChatView } from "@/components/chat-view"
 import { mockMessagesByChatId } from "@/mocks/chats"
 import type { ChatListItem } from "@/components/ui/chat-nav"
@@ -114,15 +115,11 @@ const Chat = () => {
         isNewChat={isNewChat}
         onSelectChat={setSelectedChatId}
         onStartNewChat={handleStartNewChat}
-        className="bg-background"
       />
       <SidebarInset className="bg-background">
-        <div className="relative flex h-full w-full flex-col overflow-hidden bg-background px-4 py-6 md:px-8">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.03]"
-            style={{ backgroundRepeat: "repeat" }}
-          />
+        <div className="flex h-full w-full flex-col bg-background">
+          <PageHeader />
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
           <AnimatePresence mode="popLayout" initial={false}>
             {isNewChat ? (
               <motion.div
@@ -138,14 +135,14 @@ const Chat = () => {
             ) : (
               <motion.div
                 key={selectedChatId ?? "thread"}
-                className="relative z-10 mx-auto flex h-full w-full max-w-6xl flex-col gap-4 px-2 md:px-3"
+                className="relative z-10 mx-auto flex h-full w-full max-w-4xl flex-col gap-3"
                 initial={{ opacity: 0, y: 24, scale: 0.99 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -16, scale: 0.995 }}
                 transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
               >
                 <motion.div
-                  className="min-h-0 flex-1 overflow-hidden rounded-[1.75rem] bg-background"
+                  className="min-h-0 flex-1 overflow-hidden"
                 >
                   <ChatView messages={messages} />
                 </motion.div>
@@ -155,6 +152,7 @@ const Chat = () => {
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

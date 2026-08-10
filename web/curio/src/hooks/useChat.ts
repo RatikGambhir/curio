@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react"
 
 import { streamCurioChat } from "@/lib/chat-stream"
 import type { ChatMessage } from "@/mocks/chats"
+import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
 
 type MessagesByChatId = Record<string, ChatMessage[]>
 
@@ -14,7 +15,8 @@ type StreamParams = {
   assistantMessageId?: string
 }
 
-const serviceUrl = import.meta.env.VITE_CURIO_SERVICE_URL ?? "http://127.0.0.1:3000"
+const workerUrl =
+  import.meta.env.VITE_CURIO_CHAT_WORKER_URL ?? "http://127.0.0.1:8787"
 
 function createMessage(
   from: ChatMessage["from"],
@@ -64,6 +66,7 @@ function setAssistantError(
 }
 
 export function useChat() {
+  const userId = useAuthenticatedUser().user?.id
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
   const activeStreams = useRef(new Map<string, AbortController>())
@@ -97,6 +100,11 @@ export function useChat() {
       userMessageId,
       assistantMessageId,
     }: StreamParams) => {
+      if (!userId) {
+        setStreamError("Sign in with an email before starting a chat.")
+        return
+      }
+
       activeStreams.current.get(chatId)?.abort()
       const controller = new AbortController()
       activeStreams.current.set(chatId, controller)
@@ -113,8 +121,9 @@ export function useChat() {
 
       try {
         const terminal = await streamCurioChat(
-          serviceUrl,
+          workerUrl,
           {
+            userId,
             conversationId: chatId,
             userMessageId: userMessage.id,
             assistantMessageId: assistantMessage.id,
@@ -158,7 +167,7 @@ export function useChat() {
         }
       }
     },
-    [],
+    [userId],
   )
 
   return { cancelStream, isStreaming, sendMessage, streamError }

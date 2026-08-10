@@ -31,7 +31,7 @@ function MessageBubble({ children, className }: BaseMessageProps) {
   return (
     <div
       className={cn(
-        "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm",
+        "max-w-[80%] rounded-[1.15rem] px-4 py-2.5 text-sm font-normal leading-6 shadow-none",
         className,
       )}
     >
@@ -68,7 +68,7 @@ function AssistantThinkingIndicator() {
 export function UserMessage({ value }: Pick<ChatMessage, "value">) {
   return (
     <MessageRow className="justify-end">
-      <MessageBubble className="bg-secondary text-foreground">
+      <MessageBubble className="border border-foreground/[0.06] bg-muted/80 text-foreground">
         {value}
       </MessageBubble>
     </MessageRow>
@@ -96,7 +96,7 @@ export function AssistantMessage({ value, status }: Pick<ChatMessage, "value" | 
         className={
           isError
             ? "border border-red-300 bg-red-50 text-red-900 shadow-sm"
-            : "bg-primary/10 text-foreground"
+            : "max-w-[92%] rounded-none bg-transparent px-1 py-2 text-foreground"
         }
       >
         {isError ? (

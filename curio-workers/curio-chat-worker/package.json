@@ -4,22 +4,18 @@
 	"private": true,
 	"scripts": {
 		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
+		"dev": "wrangler dev --persist-to ../.wrangler-state",
+		"start": "wrangler dev --persist-to ../.wrangler-state",
 		"test": "vitest",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.13.5",
-		"@emnapi/core": "^1.10.0",
-		"@emnapi/runtime": "^1.10.0",
-		"typescript": "^5.5.2",
-		"vitest": "^4.1.0",
-		"wrangler": "^4.71.0"
+		"@cloudflare/vitest-pool-workers": "^0.20.3",
+		"typescript": "^7.0.2",
+		"vitest": "^4.1.10",
+		"wrangler": "^4.120.0"
 	},
 	"dependencies": {
-		"@google/genai": "^1.30.0",
-		"@supabase/supabase-js": "^2.99.1",
-		"jose": "^6.2.1"
+		"@google/genai": "^2.16.0"
 	}
 }

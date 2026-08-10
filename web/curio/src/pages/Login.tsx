@@ -2,22 +2,17 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { EmailLoginForm } from "@/components/auth/email-login-form";
-import { VerificationCodeForm } from "@/components/auth/verification-code-form";
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 import { validateEmail } from "@/lib/validators/auth";
-import { supabaseAuth } from "@/lib/auth/supabase-auth";
 import curioLogo from "../assets/curio-logo.png";
 
 function Login() {
   const navigate = useNavigate();
   const { loginUser } = useAuthenticatedUser();
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [otpError, setOtpError] = useState<string | null>(null);
-  const [isSendingCode, setIsSendingCode] = useState(false);
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
-  const handleEmailSubmit = async () => {
+
+  const handleEmailSubmit = () => {
     const trimmedEmail = email.trim().toLowerCase();
     const validationError = validateEmail(trimmedEmail);
     if (validationError) {
@@ -26,50 +21,8 @@ function Login() {
     }
 
     setEmailError(null);
-    setOtpError(null);
-    setIsSendingCode(true);
-
-    const { error } = await supabaseAuth.auth.signInWithOtp({
-      email: trimmedEmail,
-      options: {
-        shouldCreateUser: true,
-      },
-    });
-
-    setIsSendingCode(false);
-
-    if (error) {
-      const normalizedMessage =
-        error.message.includes("email") && error.message.includes("not")
-          ? "We couldn't send a code to that email right now. Please try again or create an account first."
-          : error.message;
-      setEmailError(normalizedMessage);
-      return;
-    }
-
-    setEmail(trimmedEmail);
-    setStep("otp");
-  };
-
-  const handleOtpComplete = async (code: string) => {
-    setOtpError(null);
-    setIsVerifyingCode(true);
-
-    const { data, error } = await supabaseAuth.auth.verifyOtp({
-      email,
-      token: code,
-      type: "email",
-    });
-
-    setIsVerifyingCode(false);
-
-    if (error) {
-      setOtpError(error.message);
-      return;
-    }
-
-    loginUser(data.user?.id ?? null);
-    navigate("/profile-setup");
+    loginUser(trimmedEmail);
+    navigate("/home", { replace: true });
   };
 
   return (
@@ -80,31 +33,17 @@ function Login() {
         className="mb-8 w-64 h-auto"
         style={{ mixBlendMode: "multiply" }}
       />
-      {step === "email" ? (
-        <EmailLoginForm
-          email={email}
-          error={emailError}
-          isSubmitting={isSendingCode}
-          onEmailChange={(nextEmail) => {
-            setEmail(nextEmail);
-            if (emailError) {
-              setEmailError(null);
-            }
-          }}
-          onSubmit={handleEmailSubmit}
-        />
-      ) : (
-        <VerificationCodeForm
-          email={email}
-          error={otpError ?? null}
-          isSubmitting={isVerifyingCode}
-          onBack={() => {
-            setOtpError(null);
-            setStep("email");
-          }}
-          onComplete={handleOtpComplete}
-        />
-      )}
+      <EmailLoginForm
+        email={email}
+        error={emailError}
+        onEmailChange={(nextEmail) => {
+          setEmail(nextEmail);
+          if (emailError) {
+            setEmailError(null);
+          }
+        }}
+        onSubmit={handleEmailSubmit}
+      />
     </div>
   );
 }

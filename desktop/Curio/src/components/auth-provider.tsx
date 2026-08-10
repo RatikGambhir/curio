@@ -1,7 +1,7 @@
 import {
   createContext,
+  useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -17,14 +17,11 @@ type AuthUser = {
 type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  pendingEmail: string;
-  setPendingEmail: (email: string) => void;
-  completeLogin: (email: string) => void;
+  loginUser: (email: string) => void;
   logoutUser: () => void;
 };
 
-const AUTH_STORAGE_KEY = "curio-desktop-auth-user";
-const PENDING_EMAIL_KEY = "curio-desktop-pending-email";
+const AUTH_STORAGE_KEY = "curio-desktop-mock-auth-user-v1";
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -44,56 +41,48 @@ function buildMockUser(email: string): AuthUser {
   };
 }
 
+function readStoredUser(): AuthUser | null {
+  const storedUser = window.localStorage.getItem(AUTH_STORAGE_KEY);
+  if (!storedUser) {
+    return null;
+  }
+
+  try {
+    const user = JSON.parse(storedUser) as Partial<AuthUser>;
+    if (typeof user.email !== "string" || !user.email) {
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
+      return null;
+    }
+    return buildMockUser(user.email);
+  } catch {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [pendingEmail, setPendingEmailState] = useState("");
+  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
 
-  useEffect(() => {
-    const storedUser = window.localStorage.getItem(AUTH_STORAGE_KEY);
-    const storedPendingEmail = window.localStorage.getItem(PENDING_EMAIL_KEY);
-
-    if (storedUser) {
-      setUser(JSON.parse(storedUser) as AuthUser);
-    }
-    if (storedPendingEmail) {
-      setPendingEmailState(storedPendingEmail);
-    }
-  }, []);
-
-  const setPendingEmail = (email: string) => {
-    const normalizedEmail = email.trim().toLowerCase();
-    setPendingEmailState(normalizedEmail);
-    if (normalizedEmail) {
-      window.localStorage.setItem(PENDING_EMAIL_KEY, normalizedEmail);
-      return;
-    }
-    window.localStorage.removeItem(PENDING_EMAIL_KEY);
-  };
-
-  const completeLogin = (email: string) => {
+  const loginUser = useCallback((email: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     const nextUser = buildMockUser(normalizedEmail);
     setUser(nextUser);
-    setPendingEmailState(normalizedEmail);
     window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(nextUser));
-    window.localStorage.setItem(PENDING_EMAIL_KEY, normalizedEmail);
-  };
+  }, []);
 
-  const logoutUser = () => {
+  const logoutUser = useCallback(() => {
     setUser(null);
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
-  };
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       isAuthenticated: Boolean(user),
-      pendingEmail,
-      setPendingEmail,
-      completeLogin,
+      loginUser,
       logoutUser,
     }),
-    [pendingEmail, user],
+    [loginUser, logoutUser, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

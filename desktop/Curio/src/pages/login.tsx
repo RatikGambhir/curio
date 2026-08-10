@@ -8,12 +8,11 @@ import { validateEmail } from "@/lib/validators/auth";
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { setPendingEmail } = useAuthenticatedUser();
+  const { loginUser } = useAuthenticatedUser();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [isSendingCode, setIsSendingCode] = useState(false);
 
-  const handleEmailSubmit = async () => {
+  const handleEmailSubmit = () => {
     const trimmedEmail = email.trim().toLowerCase();
     const validationError = validateEmail(trimmedEmail);
 
@@ -23,13 +22,8 @@ function LoginPage() {
     }
 
     setEmailError(null);
-    setIsSendingCode(true);
-
-    window.setTimeout(() => {
-      setPendingEmail(trimmedEmail);
-      setIsSendingCode(false);
-      navigate(`/verify-email?email=${encodeURIComponent(trimmedEmail)}`);
-    }, 450);
+    loginUser(trimmedEmail);
+    navigate("/home", { replace: true });
   };
 
   return (
@@ -43,7 +37,6 @@ function LoginPage() {
       <EmailLoginForm
         email={email}
         error={emailError}
-        isSubmitting={isSendingCode}
         onEmailChange={(nextEmail) => {
           setEmail(nextEmail);
           if (emailError) {

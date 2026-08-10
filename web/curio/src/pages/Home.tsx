@@ -1,20 +1,18 @@
 import { AppSidebar } from "@/components/app-sidebar";
+import { PageHeader } from "@/components/page-header";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 
 const Home = () => {
-  const user = useAuthenticatedUser();
-
-  console.log("USER:", user)
   return (
-    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <SidebarTrigger className="m-2" />
+        <div className="flex h-full w-full flex-col bg-background">
+          <PageHeader />
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

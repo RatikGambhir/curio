@@ -29,7 +29,14 @@
 				"binding": "CURIO_QUESTION_QUEUE"
 			}
 		]
-	}
+	},
+	"d1_databases": [
+		{
+			"binding": "CURIO_DB",
+			"database_name": "curio-worker-db",
+			"migrations_dir": "../migrations"
+		}
+	]
 }
 
 	/**

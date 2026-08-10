@@ -14,10 +14,10 @@ import "@xyflow/react/dist/style.css";
 import { useCallback } from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { PageHeader } from "@/components/page-header";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 const initialNodes: Node[] = [
@@ -80,11 +80,11 @@ function AtlasCanvas() {
 
 const Atlas = () => {
   return (
-    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
         <div className="flex h-screen w-full flex-col bg-background">
-          <SidebarTrigger className="m-2 shrink-0" />
+          <PageHeader />
           <main className="min-h-0 flex-1 px-4 pb-4">
             <div className="h-full w-full overflow-hidden rounded-lg border border-border bg-background">
               <ReactFlowProvider>

@@ -9,10 +9,10 @@ import { VaultFilterBar } from "@/components/vault/vault-filter-bar";
 import { VaultPagination } from "@/components/vault/vault-pagination";
 import { VaultResultsList } from "@/components/vault/vault-results-list";
 import { VaultSearchBar } from "@/components/vault/vault-search-bar";
+import { PageHeader } from "@/components/page-header";
 import {
   SidebarInset,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 function VaultPage() {
@@ -61,11 +61,11 @@ function VaultPage() {
   };
 
   return (
-    <SidebarProvider className="[--sidebar:var(--background)] [--sidebar-accent:var(--background)] [--sidebar-border:var(--border)]">
+    <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
         <div className="flex h-full w-full flex-col bg-background">
-          <SidebarTrigger className="m-2" />
+          <PageHeader />
 
           <main className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto w-full max-w-[1200px] px-6 pb-8 pt-2">

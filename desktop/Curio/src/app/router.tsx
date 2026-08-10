@@ -13,7 +13,6 @@ import HomePage from "@/pages/home";
 import LoginPage from "@/pages/login";
 import ProfileSetupPage from "@/pages/profile-setup";
 import SettingsPage from "@/pages/settings";
-import VerifyEmailPage from "@/pages/verify-email";
 import VaultPage from "@/pages/vault";
 
 function RequireAuth({ children }: { children: ReactElement }) {
@@ -28,7 +27,8 @@ function RequireAuth({ children }: { children: ReactElement }) {
 }
 
 function RedirectIfAuthenticated({ children }: { children: ReactElement }) {
-  return children;
+  const { isAuthenticated } = useAuthenticatedUser();
+  return isAuthenticated ? <Navigate replace to="/home" /> : children;
 }
 
 export function AppRouter() {
@@ -43,14 +43,7 @@ export function AppRouter() {
             </RedirectIfAuthenticated>
           }
         />
-        <Route
-          path="/verify-email"
-          element={
-            <RedirectIfAuthenticated>
-              <VerifyEmailPage />
-            </RedirectIfAuthenticated>
-          }
-        />
+        <Route path="/verify-email" element={<Navigate replace to="/login" />} />
         <Route
           path="/home"
           element={

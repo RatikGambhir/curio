@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { ChatMessage } from "@/mocks/chats";
+import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 
 type MessagesByChatId = Record<string, ChatMessage[]>;
 
@@ -156,6 +157,7 @@ async function registerStreamListeners({
 }
 
 export function useChat() {
+  const userId = useAuthenticatedUser().user?.id;
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamError, setStreamError] = useState<string | null>(null);
 
@@ -167,6 +169,11 @@ export function useChat() {
       userMessageId,
       assistantMessageId,
     }: StreamParams) => {
+      if (!userId) {
+        setStreamError("Sign in with an email before starting a chat.");
+        return;
+      }
+
       setStreamError(null);
       setIsStreaming(true);
 
@@ -193,6 +200,7 @@ export function useChat() {
 
         await invoke("stream_chat", {
           request: {
+            userId,
             conversationId: chatId,
             userMessageId: userMessage.id,
             assistantMessageId: assistantMessage.id,
@@ -210,7 +218,7 @@ export function useChat() {
         setIsStreaming(false);
       }
     },
-    [],
+    [userId],
   );
 
   return { isStreaming, sendMessage, streamError };

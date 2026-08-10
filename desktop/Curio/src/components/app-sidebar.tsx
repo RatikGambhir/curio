@@ -21,6 +21,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 const data = {
@@ -41,22 +42,28 @@ const data = {
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="px-2 pt-2 pb-0">
-        <Link to="/home" className="flex items-center gap-2 px-2 py-1">
-          <img
-            src={curioLogo}
-            alt="Curio Logo"
-            className="h-12 w-auto object-contain"
-            data-image="logo"
-            style={{ mixBlendMode: "multiply" }}
-          />
-          <span
-            className="truncate text-lg leading-none tracking-tight group-data-[collapsible=icon]:hidden"
-            style={{ fontFamily: "var(--font-serif)" }}
+      <SidebarHeader className="h-16 shrink-0 justify-center border-b border-sidebar-border p-2">
+        <div className="grid h-full grid-cols-[1fr_auto] items-center gap-2 group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center">
+          <Link
+            to="/home"
+            className="flex min-w-0 items-center gap-2 px-2 group-data-[collapsible=icon]:hidden"
           >
-            curio
-          </span>
-        </Link>
+            <img
+              src={curioLogo}
+              alt="Curio Logo"
+              className="h-10 w-auto object-contain"
+              data-image="logo"
+              style={{ mixBlendMode: "multiply" }}
+            />
+            <span
+              className="truncate text-lg leading-none tracking-tight"
+              style={{ fontFamily: "var(--font-serif)" }}
+            >
+              curio
+            </span>
+          </Link>
+          <SidebarTrigger className="rounded-full text-muted-foreground hover:bg-white/45 hover:text-foreground" />
+        </div>
       </SidebarHeader>
       <SidebarContent className="pt-0">
         <NavMain items={data.navMain} />
