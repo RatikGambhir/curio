@@ -23,11 +23,16 @@ npx wrangler d1 migrations apply curio-worker-db --local --persist-to ../.wrangl
 npm run dev
 ```
 
-The web and desktop clients default to `http://127.0.0.1:8787`. Override that with
-`VITE_CURIO_CHAT_WORKER_URL` for web or `CURIO_CHAT_WORKER_URL` for desktop.
+The shared frontend defaults to `http://127.0.0.1:8787` during development.
+Override it at build time with `VITE_CURIO_CHAT_WORKER_URL` for either target.
 
 ## Remote setup
 
 Create one D1 database, add its returned `database_id` to both `wrangler.jsonc`
 files, apply the migrations remotely, then deploy both workers. Both workers must
 bind `CURIO_DB` to the same database.
+
+Set `CURIO_ALLOWED_ORIGINS` on the chat worker to the exact, comma-separated web
+origins allowed to call it. The fallback allowlist contains only common local
+development origins. Native desktop traffic is bridged by Rust and does not
+depend on browser CORS headers.

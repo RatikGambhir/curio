@@ -9,13 +9,7 @@ import {
 } from "./sidebar"
 import { Button } from "./button"
 import { PencilLine } from "lucide-react"
-
-export type ChatListItem = {
-  id: string
-  title: string
-  updatedAt: string
-  preview?: string
-}
+import type { ChatListItem } from "@/features/chat/types"
 
 type ChatNavProps = {
   chats: ChatListItem[]

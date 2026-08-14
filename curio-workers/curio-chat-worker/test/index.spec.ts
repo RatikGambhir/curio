@@ -19,16 +19,38 @@ describe("chat worker", () => {
 	it("handles CORS preflight requests", async () => {
 		const request = new IncomingRequest(
 			"http://example.com/v1/chat/stream",
-			{ method: "OPTIONS" },
+			{
+				method: "OPTIONS",
+				headers: { Origin: "http://localhost:5173" },
+			},
 		);
 		const ctx = createExecutionContext();
 		const response = await worker.fetch(request, env, ctx);
 		await waitOnExecutionContext(ctx);
 
 		expect(response.status).toBe(204);
+		expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+			"http://localhost:5173",
+		);
 		expect(response.headers.get("Access-Control-Allow-Methods")).toBe(
 			"POST, OPTIONS",
 		);
+	});
+
+	it("rejects CORS preflight requests from origins outside the allowlist", async () => {
+		const request = new IncomingRequest(
+			"http://example.com/v1/chat/stream",
+			{
+				method: "OPTIONS",
+				headers: { Origin: "https://untrusted.example" },
+			},
+		);
+		const ctx = createExecutionContext();
+		const response = await worker.fetch(request, env, ctx);
+		await waitOnExecutionContext(ctx);
+
+		expect(response.status).toBe(403);
+		expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
 	});
 
 	it("rejects non-POST chat requests", async () => {

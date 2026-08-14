@@ -12,7 +12,8 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import ChatNav, { type ChatListItem } from "./ui/chat-nav"
+import type { ChatListItem } from "@/features/chat/types"
+import ChatNav from "./ui/chat-nav"
 
 type ChatSidebarProps = React.ComponentProps<typeof Sidebar> & {
   chats: ChatListItem[]

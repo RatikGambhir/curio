@@ -3,10 +3,15 @@ import { cn } from "@/lib/utils"
 
 type ChatEmptyStateProps = {
   className?: string
+  disabled?: boolean
   onSubmit?: (text: string) => void
 }
 
-export function ChatEmptyState({ className, onSubmit }: ChatEmptyStateProps) {
+export function ChatEmptyState({
+  className,
+  disabled = false,
+  onSubmit,
+}: ChatEmptyStateProps) {
   return (
     <div
       className={cn(
@@ -23,7 +28,7 @@ export function ChatEmptyState({ className, onSubmit }: ChatEmptyStateProps) {
             Start with a question, an idea, or something you want to make.
           </p>
         </div>
-        <ChatComposer showShortcuts onSubmit={onSubmit} />
+        <ChatComposer disabled={disabled} showShortcuts onSubmit={onSubmit} />
       </div>
     </div>
   )

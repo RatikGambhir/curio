@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { globalIgnores } from 'eslint/config'
 
 export default tseslint.config([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'src-tauri']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -18,6 +18,26 @@ export default tseslint.config([
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+    },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@tauri-apps/*'],
+              message:
+                'Tauri APIs belong only in src/platform/desktop.ts; shared code must use the platform contract.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/platform/desktop.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 ])

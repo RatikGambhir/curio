@@ -5,37 +5,10 @@ import { ChatPrompt } from "@/components/chat-prompt"
 import { ChatSidebar } from "@/components/chat-sidebar"
 import { PageHeader } from "@/components/page-header"
 import { ChatView } from "@/components/chat-view"
-import { mockMessagesByChatId } from "@/mocks/chats"
-import type { ChatListItem } from "@/components/ui/chat-nav"
+import { demoChats, demoMessagesByChatId } from "@/features/chat/demo-data"
+import type { ChatListItem } from "@/features/chat/types"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useChat } from "@/hooks/useChat"
-
-const initialChats: ChatListItem[] = [
-  {
-    id: "chat-1",
-    title: "Product brainstorming",
-    updatedAt: "2m ago",
-    preview: "Can you draft three launch headlines?",
-  },
-  {
-    id: "chat-2",
-    title: "Workout plan",
-    updatedAt: "1h ago",
-    preview: "Build a 4-day split for strength and mobility.",
-  },
-  {
-    id: "chat-3",
-    title: "Travel itinerary",
-    updatedAt: "Yesterday",
-    preview: "Weekend plan for Austin with coffee stops.",
-  },
-  {
-    id: "chat-4",
-    title: "Code review notes",
-    updatedAt: "Thu",
-    preview: "Summarize regression risks from the latest PR.",
-  },
-]
 
 function buildChatTitle(text: string) {
   const normalized = text.trim().replace(/\s+/g, " ")
@@ -52,11 +25,11 @@ function buildChatPreview(text: string) {
 }
 
 const Chat = () => {
-  const [chats, setChats] = useState<ChatListItem[]>(initialChats)
-  const [messagesByChatId, setMessagesByChatId] = useState(mockMessagesByChatId)
+  const [chats, setChats] = useState<ChatListItem[]>(demoChats)
+  const [messagesByChatId, setMessagesByChatId] = useState(demoMessagesByChatId)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
-  const { sendMessage } = useChat()
+  const { isStreaming, sendMessage } = useChat()
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
   const handleStartNewChat = () => {
     setSelectedChatId(null)
@@ -78,6 +51,10 @@ const Chat = () => {
   }
 
   const handleCreateChat = async (text: string) => {
+    if (isStreaming) {
+      return
+    }
+
     const threadId = crypto.randomUUID()
     const userMessageId = crypto.randomUUID()
     const assistantMessageId = crypto.randomUUID()
@@ -96,7 +73,7 @@ const Chat = () => {
   }
 
   const handleSendMessage = async (text: string) => {
-    if (!selectedChatId) {
+    if (!selectedChatId || isStreaming) {
       return
     }
 
@@ -130,7 +107,10 @@ const Chat = () => {
                 exit={{ opacity: 0, y: -16, scale: 0.99 }}
                 transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
               >
-                <ChatEmptyState onSubmit={handleCreateChat} />
+                <ChatEmptyState
+                  disabled={isStreaming}
+                  onSubmit={handleCreateChat}
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -147,7 +127,10 @@ const Chat = () => {
                   <ChatView messages={messages} />
                 </motion.div>
                 <motion.div>
-                  <ChatPrompt onSubmit={handleSendMessage} />
+                  <ChatPrompt
+                    disabled={isStreaming}
+                    onSubmit={handleSendMessage}
+                  />
                 </motion.div>
               </motion.div>
             )}

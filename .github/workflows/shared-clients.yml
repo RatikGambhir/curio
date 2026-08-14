@@ -1,0 +1,58 @@
+name: Shared clients
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    env:
+      # CI validates artifacts without contacting the worker. Release workflows
+      # must replace this with the actual deployed HTTPS endpoint.
+      VITE_CURIO_CHAT_WORKER_URL: https://chat-worker.example.com
+    defaults:
+      run:
+        working-directory: web/curio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/curio/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy,rustfmt
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - run: npm ci
+      - run: npm run check:architecture
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build:web
+      - run: npm run build:desktop-ui
+      - name: Check desktop Rust
+        working-directory: web/curio/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+  chat-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: curio-workers/curio-chat-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: curio-workers/curio-chat-worker/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test -- --run

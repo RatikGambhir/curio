@@ -24,6 +24,9 @@
 
     "baseUrl": ".",
     "paths": {
+      "@curio/platform-runtime": [
+        "./src/platform/web.ts"
+      ],
       "@/*": [
         "./src/*"
       ]

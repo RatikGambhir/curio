@@ -1,35 +1,33 @@
 # Curio
 
-Curio uses email-only mock authentication and a Cloudflare Worker chat backend:
+Curio has one React/Vite frontend in `web/curio`. It is built either as a web
+SPA or as the UI embedded in the Tauri desktop shell located at
+`web/curio/src-tauri`.
 
 ```text
-Web ───────────────┐
-                   ├─> chat worker ─> Gemini streaming ─> D1 (SQLite)
-Desktop ─> Tauri ──┘                         │
-                                             └─> queue ─> processor worker ─> D1
+                         web/curio/src
+                   shared React application
+                              │
+                   typed platform contract
+                    /                    \
+          browser fetch adapter     Tauri channel adapter
+                    \                    /
+                       Cloudflare chat worker
+                          Gemini + D1 + queue
 ```
 
-The chat worker stores conversations, messages, and attachment BLOBs. The
-processor worker reads those records, generates embeddings, and stores the
-embedding payloads in the same D1 database. Authentication remains local mock
-state; entering a valid email creates a mock user and opens Home.
+The chat worker is the active backend. `curio-service` is an optional
+OpenAI/SQLite reference implementation and is not used by either client.
+Authentication remains local mock state; it is shared by both builds but is not
+production authentication.
 
-## Worker configuration
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the code boundaries and streaming
+flow, and [docs/deployment.md](docs/deployment.md) for deployment, SPA fallback,
+CORS, and desktop signing notes.
 
-Both workers must bind `CURIO_DB` to the same D1 database and use the shared
-`curio-workers/migrations` directory. Before remote deployment:
+## Local development
 
-1. Create a D1 database named `curio-worker-db`.
-2. Put its `database_id` in both worker `wrangler.jsonc` files.
-3. Store `GEMINI_API_KEY` as a secret for both workers.
-4. Apply the D1 migrations remotely.
-5. Deploy the processor and chat workers.
-
-See `curio-workers/README.md` for the exact local and remote commands.
-
-## Run locally
-
-Start the chat worker after applying the local D1 migration:
+Start the chat worker after applying its local D1 migration:
 
 ```bash
 cd curio-workers/curio-chat-worker
@@ -37,50 +35,46 @@ npx wrangler d1 migrations apply curio-worker-db --local --persist-to ../.wrangl
 npm run dev
 ```
 
-Start the web client in another terminal:
+Install the canonical frontend once, then choose a target:
 
 ```bash
 cd web/curio
-cp .env.example .env
 npm install
-npm run dev
+npm run dev:web
 ```
 
-The web client defaults to `http://127.0.0.1:8787`. Set
-`VITE_CURIO_CHAT_WORKER_URL` to use a deployed chat worker.
-
-Start the desktop client with the same worker URL:
-
 ```bash
-cd desktop/Curio
-npm install
-CURIO_CHAT_WORKER_URL=http://127.0.0.1:8787 npm run tauri dev
+cd web/curio
+npm run dev:desktop
 ```
 
-## Optional local service
+Development defaults to `http://127.0.0.1:8787`. Override the public worker URL
+with `VITE_CURIO_CHAT_WORKER_URL`. Desktop configuration is compiled into its UI,
+so the packaged app does not require a runtime shell variable.
 
-`curio-service` remains available as a standalone OpenAI/SQLite reference
-implementation, but the web and desktop clients no longer use it by default.
+Production builds require that variable to be an explicit HTTPS URL. The worker
+has not been deployed from this repository yet, so no guessed Workers hostname
+is compiled as a fallback.
 
-## Verification
+## Builds and verification
+
+Set `VITE_CURIO_CHAT_WORKER_URL` to the deployed HTTPS worker (or place it in a
+mode-specific environment file) before running production builds:
 
 ```bash
-cd curio-workers/curio-chat-worker
-npx tsc --noEmit
-npm test -- --run
-
-cd ../curio-processor-worker
-npx tsc --noEmit
-npm test -- --run
-
-cd ../../web/curio
-npm test
+cd web/curio
+npm run check:architecture
 npm run lint
-npm run build
+npm test
+npm run build:web
+npm run build:desktop-ui
+npm run build:desktop
 
-cd ../../desktop/Curio
-npm run build
 cd src-tauri
 cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
+
+Worker checks remain in each worker package. Both workers must bind `CURIO_DB`
+to the same D1 database and use `curio-workers/migrations`.

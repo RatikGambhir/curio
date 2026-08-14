@@ -7,3 +7,5 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare const __CURIO_CHAT_WORKER_URL__: string;

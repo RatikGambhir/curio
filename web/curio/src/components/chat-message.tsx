@@ -4,7 +4,8 @@ import { useEffect, useState, type ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 
 import { cn } from "@/lib/utils"
-import { funnyThinkingTerms, type ChatMessage } from "@/mocks/chats"
+import { funnyThinkingTerms } from "@/features/chat/demo-data"
+import type { ChatMessage } from "@/features/chat/types"
 
 type BaseMessageProps = {
   children: ReactNode

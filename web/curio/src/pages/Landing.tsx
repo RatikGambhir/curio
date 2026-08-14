@@ -56,7 +56,7 @@ const Landing = () => {
           <LandingNavbar
             onContactClick={scrollToContact}
             onWebClick={() => navigate("/login")}
-            onDesktopClick={() => navigate("/desktop-construction")}
+            onDesktopClick={() => navigate("/login")}
           />
           <HeroSection className="min-h-[calc(100vh-88px)] py-0" />
         </div>

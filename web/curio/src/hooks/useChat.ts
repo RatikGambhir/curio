@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 
-import { streamCurioChat } from "@/lib/chat-stream"
-import type { ChatMessage } from "@/mocks/chats"
+import type { ChatMessage, MessagesByChatId } from "@/features/chat/types"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-
-type MessagesByChatId = Record<string, ChatMessage[]>
+import { usePlatform } from "@/platform/use-platform"
+import type { ChatTransport } from "@/platform/contracts"
 
 type StreamParams = {
   chatId: string
@@ -14,9 +13,6 @@ type StreamParams = {
   userMessageId?: string
   assistantMessageId?: string
 }
-
-const workerUrl =
-  import.meta.env.VITE_CURIO_CHAT_WORKER_URL ?? "http://127.0.0.1:8787"
 
 function createMessage(
   from: ChatMessage["from"],
@@ -65,21 +61,26 @@ function setAssistantError(
   }))
 }
 
-export function useChat() {
+export function useChat(injectedTransport?: ChatTransport) {
   const userId = useAuthenticatedUser().user?.id
+  const platform = usePlatform()
+  const transport = injectedTransport ?? platform.chat
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
   const activeStreams = useRef(new Map<string, AbortController>())
+  const mounted = useRef(true)
 
-  useEffect(
-    () => () => {
-      for (const controller of activeStreams.current.values()) {
+  useEffect(() => {
+    const streams = activeStreams.current
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      for (const controller of streams.values()) {
         controller.abort()
       }
-      activeStreams.current.clear()
-    },
-    [],
-  )
+      streams.clear()
+    }
+  }, [])
 
   const cancelStream = useCallback((chatId?: string) => {
     if (chatId) {
@@ -120,8 +121,7 @@ export function useChat() {
       }))
 
       try {
-        const terminal = await streamCurioChat(
-          workerUrl,
+        const terminal = await transport.stream(
           {
             userId,
             conversationId: chatId,
@@ -129,16 +129,18 @@ export function useChat() {
             assistantMessageId: assistantMessage.id,
             prompt: text,
           },
-          controller.signal,
-          (event) => {
-            if (event.type === "token") {
-              appendAssistantToken(
-                setMessagesByChatId,
-                chatId,
-                assistantMessage.id,
-                event.token,
-              )
-            }
+          {
+            signal: controller.signal,
+            onEvent: (event) => {
+              if (event.type === "token") {
+                appendAssistantToken(
+                  setMessagesByChatId,
+                  chatId,
+                  assistantMessage.id,
+                  event.token,
+                )
+              }
+            },
           },
         )
 
@@ -152,6 +154,9 @@ export function useChat() {
           )
         }
       } catch (error) {
+        if (!mounted.current) {
+          return
+        }
         const message =
           error instanceof DOMException && error.name === "AbortError"
             ? "Response canceled."
@@ -163,11 +168,13 @@ export function useChat() {
       } finally {
         if (activeStreams.current.get(chatId) === controller) {
           activeStreams.current.delete(chatId)
-          setIsStreaming(false)
+          if (mounted.current) {
+            setIsStreaming(false)
+          }
         }
       }
     },
-    [userId],
+    [transport, userId],
   )
 
   return { cancelStream, isStreaming, sendMessage, streamError }

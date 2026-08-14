@@ -2,7 +2,7 @@ import { AnimatePresence } from "framer-motion"
 import { MessageSquare } from "lucide-react"
 
 import { ChatMessageItem } from "@/components/chat-message"
-import type { ChatMessage } from "@/mocks/chats"
+import type { ChatMessage } from "@/features/chat/types"
 
 type ChatViewProps = {
   messages: ChatMessage[]

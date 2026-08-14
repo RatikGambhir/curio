@@ -5,6 +5,7 @@ import { persistChat, type ChatPersistenceInput } from "./database";
 interface Env {
 	GEMINI_API_KEY: string;
 	CURIO_DB: D1Database;
+	CURIO_ALLOWED_ORIGINS?: string;
 	readonly CURIO_QUESTION_QUEUE?: Queue<QueueBody>;
 }
 
@@ -18,16 +19,43 @@ interface QueueBody {
 	assetPath: string[];
 }
 
-const cors = {
-	"Access-Control-Allow-Origin": "*",
+const baseCors = {
 	"Access-Control-Allow-Headers": "Content-Type",
 	"Access-Control-Allow-Methods": "POST, OPTIONS",
 	"Access-Control-Max-Age": "86400",
 };
 
+const localDevelopmentOrigins = [
+	"http://localhost:1420",
+	"http://127.0.0.1:1420",
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+];
+
+const allowedOrigins = (env: Env) =>
+	new Set(
+		(env.CURIO_ALLOWED_ORIGINS?.split(",") ?? localDevelopmentOrigins)
+			.map((origin) => origin.trim())
+			.filter(Boolean),
+	);
+
+const corsHeaders = (request: Request, env: Env): Record<string, string> => {
+	const origin = request.headers.get("Origin");
+	if (!origin || !allowedOrigins(env).has(origin)) {
+		return baseCors;
+	}
+
+	return {
+		...baseCors,
+		"Access-Control-Allow-Origin": origin,
+		Vary: "Origin",
+	};
+};
+
 const textResponse = (
 	body: string | null,
 	status: number,
+	cors: HeadersInit,
 	headers: HeadersInit = {},
 ) =>
 	new Response(body, {
@@ -77,22 +105,33 @@ const validateRequest = (request: ChatWorkerRequest): string | null => {
 
 export default {
 	async fetch(request, env: Env, ctx): Promise<Response> {
+		const cors = corsHeaders(request, env);
+		const respondText = (
+			body: string | null,
+			status: number,
+			headers: HeadersInit = {},
+		) => textResponse(body, status, cors, headers);
+
 		try {
 			const url = new URL(request.url);
 			if (request.method === "OPTIONS") {
+				const origin = request.headers.get("Origin");
+				if (origin && !allowedOrigins(env).has(origin)) {
+					return respondText("Origin not allowed", 403);
+				}
 				return new Response(null, { status: 204, headers: cors });
 			}
 
 			if (url.pathname !== "/v1/chat/stream" && url.pathname !== "/chat") {
-				return textResponse("Not found", 404);
+				return respondText("Not found", 404);
 			}
 
 			if (request.method !== "POST") {
-				return textResponse("Method not allowed", 405);
+				return respondText("Method not allowed", 405);
 			}
 
 			if (!env.GEMINI_API_KEY) {
-				return textResponse(
+				return respondText(
 					"GEMINI_API_KEY is not configured for this worker.",
 					500,
 				);
@@ -102,12 +141,12 @@ export default {
 			try {
 				data = await extractRequestData(request);
 			} catch {
-				return textResponse("Invalid request body", 400);
+				return respondText("Invalid request body", 400);
 			}
 
 			const validationError = validateRequest(data);
 			if (validationError) {
-				return textResponse(validationError, 400);
+				return respondText(validationError, 400);
 			}
 
 			const gemini = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
@@ -189,7 +228,7 @@ export default {
 			});
 		} catch (error) {
 			console.error("[chat] Unhandled request failure", error);
-			return textResponse("Internal server error", 500);
+			return respondText("Internal server error", 500);
 		}
 	},
 } satisfies ExportedHandler<Env>;
