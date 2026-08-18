@@ -11,7 +11,7 @@ Curio should have **one React/Vite application that is built in two modes**:
 1. A normal static web SPA for browsers.
 2. The same SPA bundled into a Tauri desktop shell.
 
-The existing `web/curio` application should become the canonical frontend because it is the more complete client: it contains the landing page, Atlas, React Query, the tested browser SSE parser, cancellation support, and the larger UI dependency set. The Tauri `src-tauri` shell should move beside that frontend. Once feature parity is proven, the duplicate React source under `desktop/Curio/src` should be removed.
+The existing `web` application should become the canonical frontend because it is the more complete client: it contains the landing page, Atlas, React Query, the tested browser SSE parser, cancellation support, and the larger UI dependency set. The Tauri `src-tauri` shell should move beside that frontend. Once feature parity is proven, the duplicate React source under `desktop/Curio/src` should be removed.
 
 Rust should remain behind a platform adapter. Browser code cannot call Tauri commands, so the shared React application must depend on a TypeScript interface rather than importing `@tauri-apps/api` throughout the app. The browser implementation uses standard web APIs; the desktop implementation uses Tauri commands/channels where native behavior is useful.
 
@@ -21,7 +21,7 @@ For the current chat flow, preserve the active Cloudflare Worker/D1 architecture
 
 The current worktree already has both product targets, but not a shared application:
 
-- `web/curio/src` and `desktop/Curio/src` are independent React trees.
+- `web/src` and `desktop/Curio/src` are independent React trees.
 - They have 62 files at matching relative paths, and most of those files have already drifted.
 - The dependency versions have also drifted, including React, React Router, Tailwind, Radix packages, and Lucide.
 - The web chat path parses `/v1/chat/stream` in TypeScript and supports `AbortController` cancellation.
@@ -34,11 +34,11 @@ The main problem is therefore code ownership and platform boundaries, not the la
 
 ## Target architecture
 
-Keep the first migration mechanically small by using `web/curio` as the unified app instead of renaming the whole repository at the same time:
+Keep the first migration mechanically small by using `web` as the unified app instead of renaming the whole repository at the same time:
 
 ```text
 curio/
-├── web/curio/                         # The one frontend application
+├── web/                         # The one frontend application
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── src/
@@ -59,7 +59,7 @@ curio/
 └── plans/
 ```
 
-A later cleanup may rename `web/curio` to `apps/curio`, but that rename should not be mixed into the functional consolidation.
+A later cleanup may rename `web` to `apps/curio`, but that rename should not be mixed into the functional consolidation.
 
 The runtime flow becomes:
 
@@ -78,7 +78,7 @@ The runtime flow becomes:
 
 ## Platform contract
 
-Create a small contract in `web/curio/src/platform/contracts.ts`. Shared components and hooks may import this contract, but they must not import a concrete platform module.
+Create a small contract in `web/src/platform/contracts.ts`. Shared components and hooks may import this contract, but they must not import a concrete platform module.
 
 The initial surface should be intentionally narrow:
 
@@ -127,8 +127,8 @@ If a future feature has substantial deterministic logic—such as local ranking,
 crates/curio-core/       # No tauri, reqwest, tokio, sqlx, or OS APIs
   src/lib.rs
   tests/
-web/curio/src-tauri/     # Native consumer of curio-core
-web/curio/src/wasm/      # Browser wrapper around curio-core's WASM build
+web/src-tauri/     # Native consumer of curio-core
+web/src/wasm/      # Browser wrapper around curio-core's WASM build
 ```
 
 Treat WASM as a later, evidence-based optimization. It is not required to achieve one shared application.
@@ -142,7 +142,7 @@ Chat is the only meaningful native boundary today and should be migrated first b
 Make the following code target-independent and keep it in the canonical frontend:
 
 - Request and event types.
-- SSE framing/parser logic from `web/curio/src/lib/chat-stream.ts`.
+- SSE framing/parser logic from `web/src/lib/chat-stream.ts`.
 - Correlation validation.
 - Message creation and state transitions.
 - Error normalization.
@@ -201,7 +201,7 @@ Represent availability as route metadata or a platform capability. Do not fork t
 
 ## Build and package changes
 
-Merge the Tauri dependencies and scripts into `web/curio/package.json`. Use separate script names so Tauri hooks do not recurse:
+Merge the Tauri dependencies and scripts into `web/package.json`. Use separate script names so Tauri hooks do not recurse:
 
 ```json
 {
@@ -218,7 +218,7 @@ Merge the Tauri dependencies and scripts into `web/curio/package.json`. Use sepa
 }
 ```
 
-After moving `src-tauri` into `web/curio`, configure Tauri with:
+After moving `src-tauri` into `web`, configure Tauri with:
 
 - `beforeDevCommand`: `npm run dev:desktop-ui`
 - `beforeBuildCommand`: `npm run build:desktop-ui`
@@ -231,7 +231,7 @@ The worker URL is public configuration, not a secret. Give both modes an explici
 
 ## Source consolidation rules
 
-Do not bulk-copy one source tree over the other. The worktree contains active, uncommitted changes in both trees. Merge feature by feature and use `web/curio` as the default winner while preserving intentional desktop behavior.
+Do not bulk-copy one source tree over the other. The worktree contains active, uncommitted changes in both trees. Merge feature by feature and use `web` as the default winner while preserving intentional desktop behavior.
 
 Recommended ownership decisions:
 
@@ -287,7 +287,7 @@ Exit criteria: the same React chat page and hook stream successfully in browser 
 5. Encode only real product differences as target capabilities.
 6. Remove the temporary desktop-construction route once the real desktop build uses the shared app.
 
-Exit criteria: all supported routes render from `web/curio/src` in both targets with the expected access rules.
+Exit criteria: all supported routes render from `web/src` in both targets with the expected access rules.
 
 ### Phase 4 — Consolidate UI and feature code
 
@@ -314,15 +314,15 @@ Exit criteria: no product component is maintained in both source trees.
 
 ### Phase 5 — Move the Tauri shell and cut over
 
-1. Move `desktop/Curio/src-tauri` to `web/curio/src-tauri`.
+1. Move `desktop/Curio/src-tauri` to `web/src-tauri`.
 2. Merge Tauri npm dependencies into the canonical package.
 3. Update Tauri build hooks, `frontendDist`, dev URL, and Vite settings.
-4. Run a development desktop build from `web/curio`.
+4. Run a development desktop build from `web`.
 5. Produce a packaged desktop build and verify it uses the production worker URL.
 6. Remove `desktop/Curio/src` and the obsolete desktop package only after parity checks pass.
 7. Add temporary CI checks that fail if a second React source tree or unauthorized Tauri import reappears.
 
-Exit criteria: `web/curio` is the only frontend package and is the input to both web and desktop artifacts.
+Exit criteria: `web` is the only frontend package and is the input to both web and desktop artifacts.
 
 ### Phase 6 — Security, deployment, and documentation
 
@@ -403,7 +403,7 @@ The consolidation is complete when all of the following are true:
 
 ### Active uncommitted work is overwritten
 
-Mitigation: checkpoint before moving files and merge by feature. Never replace `desktop/Curio/src` wholesale with `web/curio/src` or vice versa.
+Mitigation: checkpoint before moving files and merge by feature. Never replace `desktop/Curio/src` wholesale with `web/src` or vice versa.
 
 ### The web UI silently becomes the desktop UI without preserving desktop fixes
 

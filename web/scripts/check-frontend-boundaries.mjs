@@ -3,8 +3,7 @@ import { resolve } from "node:path"
 
 const appRoot = process.cwd()
 const legacyReactRoots = [
-  resolve(appRoot, "../../desktop/Curio/src"),
-  resolve(appRoot, "../src"),
+  resolve(appRoot, "../desktop/Curio/src"),
 ]
 for (const legacyReactRoot of legacyReactRoots) {
   if (existsSync(legacyReactRoot)) {

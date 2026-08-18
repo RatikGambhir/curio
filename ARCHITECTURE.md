@@ -2,7 +2,7 @@
 
 ## One frontend, two artifacts
 
-`web/curio/src` is the only maintained product UI. Vite resolves the stable
+`web/src` is the only maintained product UI. Vite resolves the stable
 `@curio/platform-runtime` import to `src/platform/web.ts` in web mode and to
 `src/platform/desktop.ts` in desktop mode. Shared hooks and components never
 import Tauri APIs directly; they consume `PlatformServices` through the platform

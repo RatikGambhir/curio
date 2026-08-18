@@ -1,11 +1,11 @@
 # Curio
 
-Curio has one React/Vite frontend in `web/curio`. It is built either as a web
+Curio has one React/Vite frontend in `web`. It is built either as a web
 SPA or as the UI embedded in the Tauri desktop shell located at
-`web/curio/src-tauri`.
+`web/src-tauri`.
 
 ```text
-                         web/curio/src
+                            web/src
                    shared React application
                               │
                    typed platform contract
@@ -38,13 +38,13 @@ npm run dev
 Install the canonical frontend once, then choose a target:
 
 ```bash
-cd web/curio
+cd web
 npm install
 npm run dev:web
 ```
 
 ```bash
-cd web/curio
+cd web
 npm run dev:desktop
 ```
 
@@ -62,7 +62,7 @@ Set `VITE_CURIO_CHAT_WORKER_URL` to the deployed HTTPS worker (or place it in a
 mode-specific environment file) before running production builds:
 
 ```bash
-cd web/curio
+cd web
 npm run check:architecture
 npm run lint
 npm test

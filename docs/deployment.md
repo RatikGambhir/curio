@@ -2,8 +2,8 @@
 
 ## Web
 
-Build the static SPA with `npm run build:web` from `web/curio` and publish
-`web/curio/dist`. The host must rewrite unknown application paths such as
+Build the static SPA with `npm run build:web` from `web` and publish
+`web/dist`. The host must rewrite unknown application paths such as
 `/chat`, `/vault`, and `/settings` to `index.html`; asset requests should still
 return normal 404 responses.
 
