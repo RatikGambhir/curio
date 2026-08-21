@@ -1,7 +1,5 @@
 import { lazy, Suspense, type ReactElement } from "react"
 import {
-  BrowserRouter,
-  HashRouter,
   Navigate,
   Route,
   Routes,
@@ -15,7 +13,7 @@ import {
   type RouteId,
 } from "@/app/route-manifest"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-import { usePlatform } from "@/platform/use-platform"
+import type { AppTarget } from "@/platform/contracts"
 
 const Atlas = lazy(() => import("@/pages/Atlas"))
 const Chat = lazy(() => import("@/pages/Chat"))
@@ -41,17 +39,16 @@ function RedirectIfAuthenticated({ children }: { children: ReactElement }) {
   return isAuthenticated ? <Navigate replace to="/home" /> : children
 }
 
-function RootRoute() {
-  const { target } = usePlatform()
+function RootRoute({ target }: { target: AppTarget }) {
   const { isAuthenticated } = useAuthenticatedUser()
   const destination = rootDestination(target, isAuthenticated)
   return destination === "landing" ? <Landing /> : <Navigate replace to={destination} />
 }
 
-function pageForRoute(id: RouteId): ReactElement {
+function pageForRoute(id: RouteId, target: AppTarget): ReactElement {
   switch (id) {
     case "root":
-      return <RootRoute />
+      return <RootRoute target={target} />
     case "login":
       return <Login />
     case "verify-email":
@@ -72,8 +69,8 @@ function pageForRoute(id: RouteId): ReactElement {
   }
 }
 
-function routeElement(route: AppRoute): ReactElement {
-  const page = pageForRoute(route.id)
+function routeElement(route: AppRoute, target: AppTarget): ReactElement {
+  const page = pageForRoute(route.id, target)
   if (route.access === "authenticated") {
     return <RequireAuth>{page}</RequireAuth>
   }
@@ -91,25 +88,21 @@ function RouteLoadingState() {
   )
 }
 
-export function AppRouter() {
-  const { target } = usePlatform()
-  const Router = target === "desktop" ? HashRouter : BrowserRouter
+export function AppRoutes({ target }: { target: AppTarget }) {
   const routes = routesForTarget(target)
 
   return (
-    <Router>
-      <Suspense fallback={<RouteLoadingState />}>
-        <Routes>
-          {routes.map((route) => (
-            <Route
-              key={route.id}
-              path={route.path}
-              element={routeElement(route)}
-            />
-          ))}
-          <Route path="*" element={<Navigate replace to="/" />} />
-        </Routes>
-      </Suspense>
-    </Router>
+    <Suspense fallback={<RouteLoadingState />}>
+      <Routes>
+        {routes.map((route) => (
+          <Route
+            key={route.id}
+            path={route.path}
+            element={routeElement(route, target)}
+          />
+        ))}
+        <Route path="*" element={<Navigate replace to="/" />} />
+      </Routes>
+    </Suspense>
   )
 }

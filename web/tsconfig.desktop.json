@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.desktop.tsbuildinfo",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@curio/platform-runtime": ["./src/platform/desktop.ts"],
+      "@curio/router-runtime": ["./src/app/router.desktop.tsx"]
+    }
+  }
+}

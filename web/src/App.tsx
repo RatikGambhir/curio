@@ -1,6 +1,6 @@
 import "./App.css"
 
-import { AppRouter } from "@/app/router"
+import { AppRouter } from "@curio/router-runtime"
 
 function App() {
   return <AppRouter />

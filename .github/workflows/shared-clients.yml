@@ -8,9 +8,9 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     env:
-      # CI validates artifacts without contacting the worker. Release workflows
+      # CI validates artifacts without contacting the service. Release workflows
       # must replace this with the actual deployed HTTPS endpoint.
-      VITE_CURIO_CHAT_WORKER_URL: https://chat-worker.example.com
+      VITE_CURIO_SERVICE_URL: https://service.example.com
     defaults:
       run:
         working-directory: web
@@ -41,18 +41,16 @@ jobs:
           cargo clippy --all-targets -- -D warnings
           cargo test
 
-  chat-worker:
+  curio-service:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: curio-workers/curio-chat-worker
+        working-directory: curio-service
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: curio-workers/curio-chat-worker/package-lock.json
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm test -- --run
+          components: clippy,rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test

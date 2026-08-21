@@ -42,7 +42,10 @@ impl ServiceConfig {
             database_url: env::var("CURIO_DATABASE_URL")
                 .unwrap_or_else(|_| "sqlite://curio.db".to_owned()),
             cors_allowed_origins: env::var("CURIO_CORS_ALLOWED_ORIGINS")
-                .unwrap_or_else(|_| "http://localhost:5173,http://127.0.0.1:5173".to_owned())
+                .unwrap_or_else(|_| {
+                    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:1420,http://127.0.0.1:1420"
+                        .to_owned()
+                })
                 .split(',')
                 .map(str::trim)
                 .filter(|origin| !origin.is_empty())

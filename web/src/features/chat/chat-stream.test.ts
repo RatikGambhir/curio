@@ -1,11 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 
 import {
   ChatStreamParser,
   ChatStreamProtocolError,
   ChatStreamSession,
   parseChatStreamEvent,
-  streamCurioChat,
 } from "./chat-stream"
 
 const ids = {
@@ -141,79 +140,5 @@ describe("parseChatStreamEvent", () => {
     expect(() =>
       parseChatStreamEvent('event: done\ndata: {"conversationId":"conversation-1"}'),
     ).toThrowError(/messageId/)
-  })
-})
-
-describe("streamCurioChat", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it("posts the service contract and consumes a chunked normalized response", async () => {
-    const encoder = new TextEncoder()
-    const responseBody =
-      block("token", { ...ids, token: "Hello" }) +
-      block("done", { ...ids, responseId: "response-1" })
-    const fetchMock = vi.fn(async (_input: URL | RequestInfo, init?: RequestInit) => {
-      expect(JSON.parse(String(init?.body))).toEqual({
-        userId: "mock-user-1",
-        conversationId: "conversation-1",
-        userMessageId: "user-1",
-        assistantMessageId: "assistant-1",
-        prompt: "Hello",
-      })
-
-      return new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(encoder.encode(responseBody.slice(0, 29)))
-            controller.enqueue(encoder.encode(responseBody.slice(29)))
-            controller.close()
-          },
-        }),
-        { headers: { "Content-Type": "text/event-stream" } },
-      )
-    })
-    vi.stubGlobal("fetch", fetchMock)
-    const received: string[] = []
-
-    const terminal = await streamCurioChat(
-      "http://127.0.0.1:8787",
-      {
-        userId: "mock-user-1",
-        conversationId: "conversation-1",
-        userMessageId: "user-1",
-        assistantMessageId: "assistant-1",
-        prompt: "Hello",
-      },
-      new AbortController().signal,
-      (event) => received.push(event.type),
-    )
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    expect(String(fetchMock.mock.calls[0][0])).toBe(
-      "http://127.0.0.1:8787/v1/chat/stream",
-    )
-    expect(received).toEqual(["token", "done"])
-    expect(terminal.type).toBe("done")
-  })
-
-  it("rejects a successful response without a body", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(null)))
-
-    await expect(
-      streamCurioChat(
-        "http://127.0.0.1:8787",
-        {
-          userId: "mock-user-1",
-          conversationId: "conversation-1",
-          userMessageId: "user-1",
-          assistantMessageId: "assistant-1",
-          prompt: "Hello",
-        },
-        new AbortController().signal,
-        () => undefined,
-      ),
-    ).rejects.toMatchObject({ code: "missing_response_body" })
   })
 })

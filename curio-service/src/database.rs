@@ -23,6 +23,17 @@ pub struct ConversationRecord {
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct UserRecord {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    pub avatar_url: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageRecord {
     pub id: String,
     pub conversation_id: String,
@@ -161,6 +172,48 @@ impl Database {
             .await?;
 
         transaction.commit().await
+    }
+
+    pub async fn save_user(
+        &self,
+        id: &str,
+        name: &str,
+        email: &str,
+        avatar_url: Option<&str>,
+    ) -> Result<UserRecord, sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO users (id, name, email, avatar_url)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                email = excluded.email,
+                avatar_url = excluded.avatar_url,
+                updated_at = CURRENT_TIMESTAMP
+            "#,
+        )
+        .bind(id)
+        .bind(name)
+        .bind(email)
+        .bind(avatar_url)
+        .execute(&self.pool)
+        .await?;
+
+        let row = sqlx::query(
+            "SELECT id, name, email, avatar_url, created_at, updated_at FROM users WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(UserRecord {
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            email: row.try_get("email")?,
+            avatar_url: row.try_get("avatar_url")?,
+            created_at: row.try_get("created_at")?,
+            updated_at: row.try_get("updated_at")?,
+        })
     }
 
     pub async fn list_conversations(&self) -> Result<Vec<ConversationRecord>, sqlx::Error> {

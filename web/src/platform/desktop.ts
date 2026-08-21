@@ -1,157 +1,116 @@
 import { Channel, invoke } from "@tauri-apps/api/core"
-import { openUrl } from "@tauri-apps/plugin-opener"
 
 import {
-  ChatStreamRequestError,
-  ChatStreamSession,
-  workerErrorMessage,
-  type ChatStreamDoneEvent,
-  type ChatStreamErrorEvent,
-  type ChatStreamRequest,
-} from "@/features/chat/chat-stream"
-import {
-  parseExternalHttpUrl,
-  type ChatStreamOptions,
+  ServiceTransportError,
   type PlatformServices,
+  type ServiceRequestInit,
+  type ServiceStreamHandlers,
 } from "@/platform/contracts"
 
-type DesktopStreamPacket =
+type DesktopServicePacket =
   | { type: "started"; status: number }
-  | { type: "chunk"; bytes: number[] }
+  | { type: "chunk"; bytes: string }
   | { type: "end" }
   | { type: "error"; code: string; message: string }
 
-function abortError(): DOMException {
-  return new DOMException("The chat response was canceled.", "AbortError")
+function decodeBase64Chunk(value: string): Uint8Array {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  return bytes
 }
 
-async function streamDesktopChat(
-  request: ChatStreamRequest,
-  { signal, onEvent }: ChatStreamOptions,
-): Promise<ChatStreamDoneEvent | ChatStreamErrorEvent> {
-  if (signal.aborted) {
+function abortError(): DOMException {
+  return new DOMException("The service request was canceled.", "AbortError")
+}
+
+async function streamService(
+  init: ServiceRequestInit,
+  handlers: ServiceStreamHandlers,
+): Promise<void> {
+  const { signal } = init
+  if (signal?.aborted) {
     throw abortError()
   }
 
   const requestId = crypto.randomUUID()
-  const session = new ChatStreamSession(
-    {
-      conversationId: request.conversationId,
-      messageId: request.assistantMessageId,
-    },
-    onEvent,
-  )
-  const errorChunks: Uint8Array[] = []
-  const channel = new Channel<DesktopStreamPacket>()
-  let status: number | null = null
+  const channel = new Channel<DesktopServicePacket>()
   let ended = false
-  let packetError: Error | null = null
+  let failure: Error | null = null
 
   channel.onmessage = (packet) => {
-    if (packetError) {
+    if (failure) {
       return
     }
 
     try {
       if (packet.type === "started") {
-        status = packet.status
+        handlers.onStatus(packet.status)
       } else if (packet.type === "chunk") {
-        const bytes = Uint8Array.from(packet.bytes)
-        if (status !== null && status >= 200 && status < 300) {
-          session.push(bytes)
-        } else {
-          errorChunks.push(bytes)
-        }
+        handlers.onChunk(decodeBase64Chunk(packet.bytes))
       } else if (packet.type === "end") {
         ended = true
       } else {
-        packetError = new ChatStreamRequestError(packet.code, packet.message)
+        failure = new ServiceTransportError(packet.code, packet.message)
       }
     } catch (error) {
-      packetError = error instanceof Error ? error : new Error(String(error))
-      void invoke("cancel_chat", { requestId })
+      failure = error instanceof Error ? error : new Error(String(error))
+      void invoke("cancel_request", { requestId })
     }
   }
 
   const handleAbort = () => {
-    void invoke("cancel_chat", { requestId })
+    void invoke("cancel_request", { requestId })
   }
-  signal.addEventListener("abort", handleAbort, { once: true })
+  signal?.addEventListener("abort", handleAbort, { once: true })
 
   try {
-    await invoke("stream_chat", {
+    await invoke("service_request", {
       requestId,
-      workerUrl: __CURIO_CHAT_WORKER_URL__,
-      request,
+      method: init.method,
+      path: init.path,
+      payload: (init.method === "GET" ? init.query : init.body) ?? null,
+      bearerToken: init.bearerToken ?? null,
       onPacket: channel,
     })
 
-    if (signal.aborted) {
+    if (signal?.aborted) {
       throw abortError()
     }
-    if (packetError) {
-      throw packetError
-    }
-    if (status === null) {
-      throw new ChatStreamRequestError(
-        "missing_status",
-        "The desktop bridge did not report the chat worker status.",
-      )
+    if (failure) {
+      throw failure
     }
     if (!ended) {
-      throw new ChatStreamRequestError(
+      throw new ServiceTransportError(
         "incomplete_transport",
-        "The desktop bridge ended before the chat response was complete.",
+        "The desktop bridge ended before the service response was complete.",
       )
     }
-    if (status < 200 || status >= 300) {
-      const responseText = new TextDecoder().decode(concatBytes(errorChunks))
-      throw new ChatStreamRequestError(
-        "http_error",
-        workerErrorMessage(responseText) ??
-          `Chat worker returned HTTP ${status}.`,
-      )
-    }
-
-    return session.finish()
   } catch (error) {
-    if (signal.aborted) {
+    if (signal?.aborted) {
       throw abortError()
     }
     if (error instanceof Error) {
       throw error
     }
-    throw new ChatStreamRequestError(
+    throw new ServiceTransportError(
       "desktop_bridge_error",
       typeof error === "string"
         ? error
-        : "The desktop chat bridge could not complete the request.",
+        : "The desktop bridge could not complete the service request.",
     )
   } finally {
-    signal.removeEventListener("abort", handleAbort)
+    signal?.removeEventListener("abort", handleAbort)
     channel.onmessage = () => undefined
   }
 }
 
-function concatBytes(chunks: Uint8Array[]): Uint8Array {
-  const length = chunks.reduce((total, chunk) => total + chunk.byteLength, 0)
-  const combined = new Uint8Array(length)
-  let offset = 0
-  for (const chunk of chunks) {
-    combined.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return combined
-}
-
 export const platformServices: PlatformServices = {
   target: "desktop",
-  chat: { stream: streamDesktopChat },
+  service: { stream: streamService },
   async openExternalUrl(value) {
-    const url = parseExternalHttpUrl(value)
-    if (url.protocol !== "https:") {
-      throw new Error("The desktop app can only open secure HTTPS links.")
-    }
-    await openUrl(url.href)
+    await invoke("open_external_url", { url: value })
   },
 }

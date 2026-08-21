@@ -225,28 +225,6 @@ export class ChatStreamParser {
   }
 }
 
-export function workerErrorMessage(value: unknown): string | null {
-  if (typeof value === "string") {
-    const valueTrimmed = value.trim()
-    if (!valueTrimmed) {
-      return null
-    }
-
-    try {
-      return workerErrorMessage(JSON.parse(valueTrimmed)) ?? valueTrimmed
-    } catch {
-      return valueTrimmed
-    }
-  }
-
-  if (value && typeof value === "object") {
-    const payload = value as { message?: unknown; error?: unknown }
-    return workerErrorMessage(payload.message) ?? workerErrorMessage(payload.error)
-  }
-
-  return null
-}
-
 function validateCorrelation(event: ChatStreamEvent, expected: ExpectedChatStream) {
   if (
     event.conversationId !== expected.conversationId ||
@@ -298,59 +276,4 @@ export class ChatStreamSession {
       }
     }
   }
-}
-
-export async function readChatStream(
-  body: ReadableStream<Uint8Array> | null,
-  expected: ExpectedChatStream,
-  onEvent: (event: ChatStreamEvent) => void,
-): Promise<ChatStreamDoneEvent | ChatStreamErrorEvent> {
-  if (!body) {
-    throw new ChatStreamRequestError(
-      "missing_response_body",
-      "The chat worker returned an empty response.",
-    )
-  }
-
-  const reader = body.getReader()
-  const session = new ChatStreamSession(expected, onEvent)
-
-  while (true) {
-    const { value, done } = await reader.read()
-    if (done) {
-      break
-    }
-
-    session.push(value)
-  }
-  return session.finish()
-}
-
-export async function streamCurioChat(
-  workerUrl: string,
-  request: ChatStreamRequest,
-  signal: AbortSignal,
-  onEvent: (event: ChatStreamEvent) => void,
-) {
-  const endpoint = new URL("/v1/chat/stream", workerUrl)
-  const response = await fetch(endpoint, {
-    body: JSON.stringify(request),
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    signal,
-  })
-
-  if (!response.ok) {
-    const responseText = await response.text()
-    throw new ChatStreamRequestError(
-      "http_error",
-      workerErrorMessage(responseText) ?? `Chat worker returned HTTP ${response.status}.`,
-    )
-  }
-
-  return readChatStream(
-    response.body,
-    { conversationId: request.conversationId, messageId: request.assistantMessageId },
-    onEvent,
-  )
 }

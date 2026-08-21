@@ -1,6 +1,10 @@
-# Curio workers
+# Curio workers (legacy)
 
-The chat worker is the active streaming backend. It writes conversations, messages,
+These workers are no longer referenced by the Curio clients, which now target
+the Axum `curio-service`. They are kept for reference until their embedding
+pipeline is ported.
+
+The chat worker was the previous streaming backend. It writes conversations, messages,
 attachment BLOBs, and embeddings to Cloudflare D1, which uses SQLite semantics. The
 processor worker consumes the chat queue, reads the saved records, generates
 embeddings, and writes those embeddings back to the same D1 database.
@@ -23,8 +27,8 @@ npx wrangler d1 migrations apply curio-worker-db --local --persist-to ../.wrangl
 npm run dev
 ```
 
-The shared frontend defaults to `http://127.0.0.1:8787` during development.
-Override it at build time with `VITE_CURIO_CHAT_WORKER_URL` for either target.
+The shared frontend no longer targets the workers; it is built against
+`VITE_CURIO_SERVICE_URL` (the Axum `curio-service`).
 
 ## Remote setup
 

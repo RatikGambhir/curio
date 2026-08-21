@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Dispatch, SetStateAction } from "react"
 
+import { streamChat, type ChatStreamFn } from "@/features/chat/transport"
 import type { ChatMessage, MessagesByChatId } from "@/features/chat/types"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
-import { usePlatform } from "@/platform/use-platform"
-import type { ChatTransport } from "@/platform/contracts"
 
 type StreamParams = {
   chatId: string
@@ -61,10 +60,9 @@ function setAssistantError(
   }))
 }
 
-export function useChat(injectedTransport?: ChatTransport) {
+export function useChat(injectedStream?: ChatStreamFn) {
   const userId = useAuthenticatedUser().user?.id
-  const platform = usePlatform()
-  const transport = injectedTransport ?? platform.chat
+  const stream = injectedStream ?? streamChat
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamError, setStreamError] = useState<string | null>(null)
   const activeStreams = useRef(new Map<string, AbortController>())
@@ -121,7 +119,7 @@ export function useChat(injectedTransport?: ChatTransport) {
       }))
 
       try {
-        const terminal = await transport.stream(
+        const terminal = await stream(
           {
             userId,
             conversationId: chatId,
@@ -174,7 +172,7 @@ export function useChat(injectedTransport?: ChatTransport) {
         }
       }
     },
-    [transport, userId],
+    [stream, userId],
   )
 
   return { cancelStream, isStreaming, sendMessage, streamError }

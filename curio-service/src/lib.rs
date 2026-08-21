@@ -38,9 +38,15 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
         .collect::<Vec<_>>();
     let cors = CorsLayer::new()
         .allow_origin(allowed_origins)
-        .allow_methods([http::Method::GET, http::Method::POST])
-        .allow_headers([header::CONTENT_TYPE]);
+        .allow_methods([
+            http::Method::GET,
+            http::Method::POST,
+            http::Method::PATCH,
+            http::Method::DELETE,
+        ])
+        .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
     let database = Database::connect(&config.database_url).await?;
+    let user_api_routes = user::api_routes(database.clone());
     let chat_state = ChatState::new(
         config.openai_api_key,
         config.openai_model,
@@ -57,7 +63,10 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
         )
         .with_state(chat_state);
 
-    Ok(base_router().merge(chat_routes).layer(cors))
+    Ok(base_router()
+        .merge(chat_routes)
+        .merge(user_api_routes)
+        .layer(cors))
 }
 
 fn base_router() -> Router {
@@ -79,7 +88,7 @@ async fn health() -> Json<HealthResponse> {
     Json(HealthResponse { status: "ok" })
 }
 
-async fn auth(mut request: Request, next: Next) -> Result<Response, StatusCode> {
+pub(crate) async fn auth(mut request: Request, next: Next) -> Result<Response, StatusCode> {
     let auth_header = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -224,6 +233,85 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    #[tokio::test]
+    async fn saving_a_user_requires_authentication() {
+        let app = app_with_config(test_config("http://127.0.0.1:1".to_owned()))
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/users")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(
+                        r#"{"id":"user-1","name":"Curio","email":"curio@example.com"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn saving_a_user_upserts_the_profile() {
+        let app = app_with_config(test_config("http://127.0.0.1:1".to_owned()))
+            .await
+            .unwrap();
+
+        let save = |name: &str| {
+            Request::post("/v1/users")
+                .header(header::AUTHORIZATION, "Bearer development-token")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({
+                        "id": "user-1",
+                        "name": name,
+                        "email": "curio@example.com",
+                        "avatarUrl": "https://example.com/avatar.png"
+                    })
+                    .to_string(),
+                ))
+                .unwrap()
+        };
+
+        let created = app.clone().oneshot(save("Curio")).await.unwrap();
+        assert_eq!(created.status(), StatusCode::OK);
+        let created = created.into_body().collect().await.unwrap().to_bytes();
+        let created: Value = serde_json::from_slice(&created).unwrap();
+        assert_eq!(created["id"], "user-1");
+        assert_eq!(created["name"], "Curio");
+        assert_eq!(created["email"], "curio@example.com");
+        assert_eq!(created["avatarUrl"], "https://example.com/avatar.png");
+
+        let updated = app.oneshot(save("Curio Renamed")).await.unwrap();
+        assert_eq!(updated.status(), StatusCode::OK);
+        let updated = updated.into_body().collect().await.unwrap().to_bytes();
+        let updated: Value = serde_json::from_slice(&updated).unwrap();
+        assert_eq!(updated["name"], "Curio Renamed");
+    }
+
+    #[tokio::test]
+    async fn saving_a_user_rejects_blank_profiles() {
+        let app = app_with_config(test_config("http://127.0.0.1:1".to_owned()))
+            .await
+            .unwrap();
+
+        let response = app
+            .oneshot(
+                Request::post("/v1/users")
+                    .header(header::AUTHORIZATION, "Bearer development-token")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"id":"user-1","name":"  ","email":""}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     #[tokio::test]
