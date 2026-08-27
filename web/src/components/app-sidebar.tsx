@@ -6,6 +6,7 @@ import {
   House,
   Map,
   MessageSquare,
+  NotebookPen,
   PieChart,
   Settings2,
 } from "lucide-react";
@@ -39,6 +40,11 @@ const data = {
       title: "Chat",
       url: "/chat",
       icon: MessageSquare,
+    },
+    {
+      title: "Notes",
+      url: "/notes",
+      icon: NotebookPen,
     },
     {
       title: "Atlas",
