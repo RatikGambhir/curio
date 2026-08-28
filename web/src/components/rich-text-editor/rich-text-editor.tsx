@@ -106,11 +106,12 @@ export function RichTextEditor({
             placeholder={placeholder}
             className={cn(
               "curio-rich-text min-h-full w-full text-[15px] text-foreground outline-none",
-              // Flush mode centres the measure with padding rather than a
-              // max-width, so the editable spans the whole surface and a click
-              // in the margin still lands in the document.
+              // Flush mode fills the pane rather than centring a column, so the
+              // editor reads as the whole surface next to the sidebar. Padding
+              // rather than a max-width also keeps the editable full width, so
+              // a click in the margin still lands in the document.
               flush
-                ? "px-[max(2rem,calc((100%-48rem)/2))] py-10"
+                ? "px-[1.75rem] py-[2.25rem] md:px-[2.75rem] lg:px-[3.5rem]"
                 : "mx-auto max-w-3xl px-6 py-8",
             )}
           />
