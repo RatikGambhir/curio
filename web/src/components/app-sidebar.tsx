@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   BookOpen,
+  CalendarDays,
   Frame,
   Globe,
   House,
@@ -40,6 +41,11 @@ const data = {
       title: "Chat",
       url: "/chat",
       icon: MessageSquare,
+    },
+    {
+      title: "Calendar",
+      url: "/calendar",
+      icon: CalendarDays,
     },
     {
       title: "Notes",

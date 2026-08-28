@@ -8,6 +8,7 @@ export type RouteId =
   | "profile-setup"
   | "home"
   | "chat"
+  | "calendar"
   | "notes"
   | "vault"
   | "atlas"
@@ -40,6 +41,12 @@ export const routeManifest: readonly AppRoute[] = [
   },
   { id: "home", path: "/home", access: "authenticated", targets: allTargets },
   { id: "chat", path: "/chat", access: "authenticated", targets: allTargets },
+  {
+    id: "calendar",
+    path: "/calendar",
+    access: "authenticated",
+    targets: allTargets,
+  },
   { id: "notes", path: "/notes", access: "authenticated", targets: allTargets },
   { id: "vault", path: "/vault", access: "authenticated", targets: allTargets },
   { id: "atlas", path: "/atlas", access: "authenticated", targets: allTargets },

@@ -16,6 +16,7 @@ import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
 import type { AppTarget } from "@/platform/contracts"
 
 const Atlas = lazy(() => import("@/pages/Atlas"))
+const Calendar = lazy(() => import("@/pages/Calendar"))
 const Chat = lazy(() => import("@/pages/Chat"))
 const Home = lazy(() => import("@/pages/Home"))
 const Landing = lazy(() => import("@/pages/Landing"))
@@ -60,6 +61,8 @@ function pageForRoute(id: RouteId, target: AppTarget): ReactElement {
       return <Home />
     case "chat":
       return <Chat />
+    case "calendar":
+      return <Calendar />
     case "notes":
       return <Notes />
     case "vault":
