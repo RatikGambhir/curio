@@ -21,6 +21,9 @@ export function RichTextEditor({
   autoFocus = false,
   className,
   defaultValue,
+  flush = false,
+  header,
+  headerTrailing,
   onChange,
   onImageUpload,
   onSave,
@@ -82,16 +85,34 @@ export function RichTextEditor({
         ref={containerRef}
         onKeyDown={handleKeyDown}
         className={cn(
-          "flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xs",
+          "flex min-h-0 w-full flex-1 flex-col overflow-hidden",
+          flush
+            ? "bg-background"
+            : "rounded-lg border border-border bg-card shadow-xs",
           className,
         )}
       >
-        <RichTextToolbar onImageUpload={onImageUpload} />
+        <RichTextToolbar
+          flush={flush}
+          header={header}
+          headerTrailing={headerTrailing}
+          onImageUpload={onImageUpload}
+        />
         <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* The surface fills the inset; the text column stays measured so
+              long lines remain readable on a wide window. */}
           <PlateContent
             readOnly={readOnly}
             placeholder={placeholder}
-            className="curio-rich-text mx-auto min-h-full w-full max-w-3xl px-6 py-8 text-[15px] text-foreground outline-none"
+            className={cn(
+              "curio-rich-text min-h-full w-full text-[15px] text-foreground outline-none",
+              // Flush mode centres the measure with padding rather than a
+              // max-width, so the editable spans the whole surface and a click
+              // in the margin still lands in the document.
+              flush
+                ? "px-[max(2rem,calc((100%-48rem)/2))] py-10"
+                : "mx-auto max-w-3xl px-6 py-8",
+            )}
           />
         </div>
         <FloatingToolbar containerRef={containerRef} />

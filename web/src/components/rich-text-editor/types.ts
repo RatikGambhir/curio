@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { Value } from "platejs"
 
 /**
@@ -24,6 +25,18 @@ export type RichTextEditorProps = {
   readOnly?: boolean
   placeholder?: string
   className?: string
+  /**
+   * Rendered at the start of the toolbar row. It sits inside the editor's
+   * context, which is what lets a page put its own title beside the controls.
+   */
+  header?: ReactNode
+  /** Rendered at the end of the toolbar row. */
+  headerTrailing?: ReactNode
+  /**
+   * Drop the card chrome and fill the parent instead, turning the toolbar row
+   * into the surrounding page's header bar.
+   */
+  flush?: boolean
 }
 
 export const emptyRichTextValue = (): RichTextValue => [

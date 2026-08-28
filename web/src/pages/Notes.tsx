@@ -6,7 +6,10 @@ import { mockNoteFolders } from "@/components/notes/notes.mock-data"
 import { findNote } from "@/components/notes/notes.types"
 import type { NoteFolder, RichTextValue } from "@/components/notes/notes.types"
 import { PageHeader } from "@/components/page-header"
-import { RichTextEditor, emptyRichTextValue } from "@/components/rich-text-editor"
+import {
+  RichTextEditor,
+  emptyRichTextValue,
+} from "@/components/rich-text-editor"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
 const Notes = () => {
@@ -63,45 +66,50 @@ const Notes = () => {
       />
       <SidebarInset className="bg-background">
         <div className="flex h-full w-full flex-col bg-background">
-          <PageHeader />
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
-            {selectedNote ? (
-              <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-3">
-                <div className="flex shrink-0 items-baseline justify-between gap-3">
-                  <h1 className="truncate text-lg font-semibold text-foreground">
-                    {selectedNote.title}
-                  </h1>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    Edited {selectedNote.updatedAt}
-                  </span>
-                </div>
-                <RichTextEditor
-                  // A fresh editor instance per note: selection, undo history
-                  // and content stay isolated instead of relying on the
-                  // controlled-value echo guard alone.
-                  key={selectedNote.id}
-                  value={selectedNote.body}
-                  onChange={(body) => patchNote(selectedNote.id, { body })}
-                  onSave={(body) =>
-                    patchNote(selectedNote.id, { body, updatedAt: "Just now" })
-                  }
-                />
-              </div>
-            ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-                  <NotebookPen className="size-5" />
-                </div>
-                <h1 className="text-lg font-semibold text-foreground">
-                  Pick a note to start writing
+          {selectedNote ? (
+            // The editor owns the whole inset: its toolbar stands in for the
+            // page header rather than sitting in a card below one.
+            <RichTextEditor
+              // A fresh editor instance per note: selection, undo history
+              // and content stay isolated instead of relying on the
+              // controlled-value echo guard alone.
+              key={selectedNote.id}
+              flush
+              header={
+                <h1 className="max-w-[16rem] truncate text-sm font-semibold text-foreground">
+                  {selectedNote.title}
                 </h1>
-                <p className="max-w-md text-sm text-muted-foreground">
-                  Choose a note from a folder on the left, or create a new one.
-                  Notes are kept in memory for now and reset on reload.
-                </p>
+              }
+              headerTrailing={
+                <span className="text-xs whitespace-nowrap text-muted-foreground">
+                  Edited {selectedNote.updatedAt}
+                </span>
+              }
+              value={selectedNote.body}
+              onChange={(body) => patchNote(selectedNote.id, { body })}
+              onSave={(body) =>
+                patchNote(selectedNote.id, { body, updatedAt: "Just now" })
+              }
+            />
+          ) : (
+            <>
+              <PageHeader />
+              <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
+                <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
+                  <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+                    <NotebookPen className="size-5" />
+                  </div>
+                  <h1 className="text-lg font-semibold text-foreground">
+                    Pick a note to start writing
+                  </h1>
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    Choose a note from a folder on the left, or create a new
+                    one. Notes are kept in memory for now and reset on reload.
+                  </p>
+                </div>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </SidebarInset>
     </SidebarProvider>

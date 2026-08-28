@@ -1,8 +1,11 @@
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { ReactNode } from "react"
 import { toggleCodeBlock } from "@platejs/code-block"
 import { upsertLink } from "@platejs/link"
-import { useListToolbarButton, useListToolbarButtonState } from "@platejs/list/react"
+import {
+  useListToolbarButton,
+  useListToolbarButtonState,
+} from "@platejs/list/react"
 import { insertTable } from "@platejs/table"
 import {
   Baseline,
@@ -47,6 +50,39 @@ const fontFamilies = [
 ]
 
 const fontSizes = ["12px", "14px", "16px", "18px", "24px", "32px"]
+
+/**
+ * Tracks whether the control strip is scrolled out of view, so a narrow window
+ * can show that there is more toolbar rather than silently clipping it.
+ */
+function useOverflowing(ref: React.RefObject<HTMLDivElement | null>) {
+  const [isOverflowing, setIsOverflowing] = useState(false)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element) {
+      return
+    }
+
+    const update = () =>
+      setIsOverflowing(element.scrollWidth > element.clientWidth + 1)
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+
+    return () => observer.disconnect()
+  }, [ref])
+
+  return isOverflowing
+}
+
+/** Matches PageHeader so the toolbar can stand in for the inset's header bar. */
+const flushHeaderClassName =
+  "h-16 shrink-0 gap-3 border-border bg-background px-4"
+
+const headerRowClassName =
+  "flex items-center gap-0.5 border-b border-border bg-card/60 px-2 py-1.5"
 
 const controlClassName =
   "h-8 rounded-md border border-transparent bg-transparent px-2 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
@@ -271,7 +307,11 @@ export function LinkButton() {
   )
 }
 
-export function ImageButton({ onImageUpload }: { onImageUpload?: ImageUploader }) {
+export function ImageButton({
+  onImageUpload,
+}: {
+  onImageUpload?: ImageUploader
+}) {
   const editor = useEditorRef()
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -391,7 +431,10 @@ export function FontColorInput() {
     >
       {/* With no colour mark the swatch inherits the toolbar's foreground, so
           it stays visible in both themes. */}
-      <Baseline className="size-4" style={value ? { color: value } : undefined} />
+      <Baseline
+        className="size-4"
+        style={value ? { color: value } : undefined}
+      />
       <input
         type="color"
         aria-label="Text color"
@@ -403,77 +446,135 @@ export function FontColorInput() {
   )
 }
 
-export function RichTextToolbar({ onImageUpload }: { onImageUpload?: ImageUploader }) {
+export function RichTextToolbar({
+  flush = false,
+  header,
+  headerTrailing,
+  onImageUpload,
+}: {
+  flush?: boolean
+  header?: ReactNode
+  headerTrailing?: ReactNode
+  onImageUpload?: ImageUploader
+}) {
   const readOnly = useEditorReadOnly()
+  const controlsRef = useRef<HTMLDivElement>(null)
+  const isOverflowing = useOverflowing(controlsRef)
 
   if (readOnly) {
-    return null
+    return header || headerTrailing ? (
+      <div className={cn(headerRowClassName, flush && flushHeaderClassName)}>
+        {header}
+        <div className="flex-1" />
+        {headerTrailing}
+      </div>
+    ) : null
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-card/60 px-2 py-1.5">
-      <MarkButton icon={<Bold className="size-4" />} label="Bold" markKey={KEYS.bold} />
-      <MarkButton icon={<Italic className="size-4" />} label="Italic" markKey={KEYS.italic} />
-      <MarkButton
-        icon={<Underline className="size-4" />}
-        label="Underline"
-        markKey={KEYS.underline}
-      />
-      <MarkButton
-        icon={<Strikethrough className="size-4" />}
-        label="Strikethrough"
-        markKey={KEYS.strikethrough}
-      />
-      <MarkButton icon={<Code className="size-4" />} label="Inline code" markKey={KEYS.code} />
-      <MarkButton
-        icon={<Subscript className="size-4" />}
-        label="Subscript"
-        markKey={KEYS.sub}
-      />
-      <MarkButton
-        icon={<Superscript className="size-4" />}
-        label="Superscript"
-        markKey={KEYS.sup}
-      />
+    <div className={cn(headerRowClassName, flush && flushHeaderClassName)}>
+      {header ? (
+        <div className="flex shrink-0 items-center">{header}</div>
+      ) : null}
+      <div
+        ref={controlsRef}
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto",
+          !flush && "flex-wrap",
+          isOverflowing &&
+            "[mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)]",
+        )}
+      >
+        <MarkButton
+          icon={<Bold className="size-4" />}
+          label="Bold"
+          markKey={KEYS.bold}
+        />
+        <MarkButton
+          icon={<Italic className="size-4" />}
+          label="Italic"
+          markKey={KEYS.italic}
+        />
+        <MarkButton
+          icon={<Underline className="size-4" />}
+          label="Underline"
+          markKey={KEYS.underline}
+        />
+        <MarkButton
+          icon={<Strikethrough className="size-4" />}
+          label="Strikethrough"
+          markKey={KEYS.strikethrough}
+        />
+        <MarkButton
+          icon={<Code className="size-4" />}
+          label="Inline code"
+          markKey={KEYS.code}
+        />
+        <MarkButton
+          icon={<Subscript className="size-4" />}
+          label="Subscript"
+          markKey={KEYS.sub}
+        />
+        <MarkButton
+          icon={<Superscript className="size-4" />}
+          label="Superscript"
+          markKey={KEYS.sup}
+        />
 
-      <ToolbarSeparator />
+        <ToolbarSeparator />
 
-      <BlockButton icon={<Heading1 className="size-4" />} label="Heading 1" type={KEYS.h1} />
-      <BlockButton icon={<Heading2 className="size-4" />} label="Heading 2" type={KEYS.h2} />
-      <BlockButton icon={<Heading3 className="size-4" />} label="Heading 3" type={KEYS.h3} />
-      <BlockButton
-        icon={<Quote className="size-4" />}
-        label="Blockquote"
-        type={KEYS.blockquote}
-      />
-      <CodeBlockButton />
-      <HorizontalRuleButton />
+        <BlockButton
+          icon={<Heading1 className="size-4" />}
+          label="Heading 1"
+          type={KEYS.h1}
+        />
+        <BlockButton
+          icon={<Heading2 className="size-4" />}
+          label="Heading 2"
+          type={KEYS.h2}
+        />
+        <BlockButton
+          icon={<Heading3 className="size-4" />}
+          label="Heading 3"
+          type={KEYS.h3}
+        />
+        <BlockButton
+          icon={<Quote className="size-4" />}
+          label="Blockquote"
+          type={KEYS.blockquote}
+        />
+        <CodeBlockButton />
+        <HorizontalRuleButton />
 
-      <ToolbarSeparator />
+        <ToolbarSeparator />
 
-      <ListButton
-        icon={<List className="size-4" />}
-        label="Bulleted list"
-        listStyleType={KEYS.ul}
-      />
-      <ListButton
-        icon={<ListOrdered className="size-4" />}
-        label="Numbered list"
-        listStyleType={KEYS.ol}
-      />
+        <ListButton
+          icon={<List className="size-4" />}
+          label="Bulleted list"
+          listStyleType={KEYS.ul}
+        />
+        <ListButton
+          icon={<ListOrdered className="size-4" />}
+          label="Numbered list"
+          listStyleType={KEYS.ol}
+        />
 
-      <ToolbarSeparator />
+        <ToolbarSeparator />
 
-      <LinkButton />
-      <ImageButton onImageUpload={onImageUpload} />
-      <TableButton />
+        <LinkButton />
+        <ImageButton onImageUpload={onImageUpload} />
+        <TableButton />
 
-      <ToolbarSeparator />
+        <ToolbarSeparator />
 
-      <FontFamilySelect />
-      <FontSizeSelect />
-      <FontColorInput />
-      <CodeBlockLanguageSelect />
+        <FontFamilySelect />
+        <FontSizeSelect />
+        <FontColorInput />
+        <CodeBlockLanguageSelect />
+      </div>
+      {headerTrailing ? (
+        <div className="flex shrink-0 items-center">{headerTrailing}</div>
+      ) : null}
     </div>
   )
 }
