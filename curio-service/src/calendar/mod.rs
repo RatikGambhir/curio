@@ -17,6 +17,8 @@ mod handlers;
 mod models;
 mod repository;
 mod service;
+#[cfg(test)]
+mod tests;
 mod time;
 
 use axum::{Router, middleware, routing::post};
