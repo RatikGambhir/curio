@@ -48,7 +48,9 @@ pub struct MessageRecord {
 
 impl Database {
     pub async fn connect(database_url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
+        let options = SqliteConnectOptions::from_str(database_url)?
+            .create_if_missing(true)
+            .foreign_keys(true);
         let max_connections = if database_url.contains(":memory:") {
             1
         } else {
@@ -61,6 +63,10 @@ impl Database {
 
         sqlx::migrate!().run(&pool).await?;
         Ok(Self { pool })
+    }
+
+    pub(crate) fn pool(&self) -> &SqlitePool {
+        &self.pool
     }
 
     pub async fn begin_chat(&self, request: &ChatStreamRequest) -> Result<(), sqlx::Error> {

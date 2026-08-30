@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { CalendarView } from "@/api/calendar";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   calendarPermissions,
@@ -8,13 +9,26 @@ import {
   statusColors,
   statusOptions,
 } from "@/components/calendar/calendar.config";
-import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data";
-import type { CurioCalendarEvent } from "@/components/calendar/calendar.types";
-import type { TaskItem } from "@/components/event-calendar";
+import type {
+  CalendarPriority,
+  CalendarStatus,
+  CurioCalendarEvent,
+} from "@/components/calendar/calendar.types";
+import type {
+  TaskItem,
+  TaskItemAddedEvent,
+} from "@/components/event-calendar";
 import { EventCalendar } from "@/components/event-calendar";
 import { calendarEditing } from "@/components/event-calendar/features/editing";
 import { PageHeader } from "@/components/page-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  useCalendarEvents,
+  useCreateCalendarEvent,
+  type VisibleCalendarRange,
+} from "@/hooks/useCalendarEvents";
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 function findEvent(
   items: readonly TaskItem[],
@@ -38,15 +52,36 @@ function findEvent(
 }
 
 const isHighPriority = (item: TaskItem) => item.priority === "high";
+const isCalendarStatus = (value: string): value is CalendarStatus =>
+  statusOptions.some((option) => option.value === value);
+const isCalendarPriority = (
+  value: string | undefined,
+): value is CalendarPriority =>
+  value !== undefined &&
+  priorityOptions.some((option) => option.value === value);
 
 const Calendar = () => {
   // Stable identity: an inline `new Date()` would take a fresh identity every
   // render and drive onRangeChange into a loop.
   const [now] = useState(() => new Date());
-  const [events, setEvents] = useState<CurioCalendarEvent[]>(() =>
-    buildMockCalendarEvents(now),
-  );
+  const [visibleRange, setVisibleRange] =
+    useState<VisibleCalendarRange | null>(null);
+  const calendarQuery = useCalendarEvents(visibleRange);
+  const { mutate: createEvent, error: createError } =
+    useCreateCalendarEvent(visibleRange);
+  const [events, setEvents] = useState<CurioCalendarEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const loadedEvents = calendarQuery.data?.events;
+  useEffect(() => {
+    if (!loadedEvents) {
+      return;
+    }
+    setEvents(loadedEvents);
+    setSelectedEventId((currentId) =>
+      findEvent(loadedEvents, currentId) ? currentId : null,
+    );
+  }, [loadedEvents]);
 
   const selectedEvent = useMemo(
     () => findEvent(events, selectedEventId),
@@ -64,11 +99,56 @@ const Calendar = () => {
     setSelectedEventId(task.id);
   }, []);
 
-  const handleRangeChange = useCallback(() => {
-    // Phase 1 renders every event from memory. When `GET /v1/events?start=&end=`
-    // exists this is where the visible range drives the query — through
-    // src/api/, never a network call from page code.
-  }, []);
+  const handleRangeChange = useCallback(
+    (range: { view: CalendarView; start: Date; end: Date }) => {
+      setVisibleRange({
+        view: range.view,
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+      });
+    },
+    [],
+  );
+
+  const handleItemAdded = useCallback(
+    ({ item }: TaskItemAddedEvent) => {
+      const startDate = item.startAt ?? item.setAt;
+      createEvent({
+        id: item.id,
+        title: item.name,
+        description: item.description ?? null,
+        status: isCalendarStatus(item.status) ? item.status : null,
+        priority: isCalendarPriority(item.priority) ? item.priority : null,
+        allDay: DATE_ONLY.test(startDate),
+        startDate,
+        endDate: item.expireAt ?? null,
+      });
+    },
+    [createEvent],
+  );
+
+  const serviceMessage = useMemo(() => {
+    if (createError instanceof Error) {
+      return createError.message;
+    }
+    if (calendarQuery.error instanceof Error) {
+      return calendarQuery.error.message;
+    }
+    if (calendarQuery.isPending && visibleRange) {
+      return "Loading events…";
+    }
+    return null;
+  }, [calendarQuery.error, calendarQuery.isPending, createError, visibleRange]);
+
+  const selectionLabel = useMemo(() => {
+    if (serviceMessage) {
+      return serviceMessage;
+    }
+    if (!selectedEvent) {
+      return "Select an event to see it here";
+    }
+    return `${selectedEvent.name} · ${selectedEvent.status}`;
+  }, [selectedEvent, serviceMessage]);
 
   const renderTooltip = useCallback(
     (task: TaskItem) => (
@@ -86,13 +166,6 @@ const Calendar = () => {
     [],
   );
 
-  const selectionLabel = useMemo(() => {
-    if (!selectedEvent) {
-      return "Select an event to see it here";
-    }
-    return `${selectedEvent.name} · ${selectedEvent.status}`;
-  }, [selectedEvent]);
-
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -109,6 +182,7 @@ const Calendar = () => {
             <EventCalendar
               data={events}
               onChange={handleEventsChange}
+              onItemAdded={handleItemAdded}
               statusOptions={statusOptions}
               priorityOptions={priorityOptions}
               labelOptions={labelOptions}

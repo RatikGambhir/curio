@@ -1,3 +1,4 @@
+mod calendar;
 pub mod chat;
 pub mod config;
 pub mod database;
@@ -46,6 +47,7 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
         ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
     let database = Database::connect(&config.database_url).await?;
+    let calendar_api_routes = calendar::api_routes(database.clone());
     let user_api_routes = user::api_routes(database.clone());
     let chat_state = ChatState::new(
         config.openai_api_key,
@@ -65,6 +67,7 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
 
     Ok(base_router()
         .merge(chat_routes)
+        .merge(calendar_api_routes)
         .merge(user_api_routes)
         .layer(cors))
 }
