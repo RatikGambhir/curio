@@ -64,10 +64,20 @@ On top of the transport, shared code provides two clients:
 `curio-service` (Axum + SQLite) is the backend for both targets. It serves the
 chat stream (`POST /v1/chat/stream`, normalized SSE `token`/`done`/`error`
 events backed by the OpenAI Responses API), conversation history
-(`GET /v1/conversations`, `GET /v1/conversations/{id}/messages`), and the
-authenticated user API (`POST /v1/users`, bearer-protected upsert). CORS allows
-only configured web origins; the desktop client needs no CORS because requests
-originate from the Rust process.
+(`GET /v1/conversations`, `GET /v1/conversations/{id}/messages`), the
+authenticated user API (`POST /v1/users`, bearer-protected upsert), and the
+calendar events API (`POST /v1/calendar/events`, `GET /v1/calendar/events`,
+both bearer-protected). CORS allows only configured web origins; the desktop
+client needs no CORS because requests originate from the Rust process.
+
+`src/calendar` is split by responsibility, and new service modules should
+follow it: `handlers.rs` owns extractors and status codes, `service.rs` owns
+validation and what a failure means, `repository.rs` owns SQL and row mapping,
+and `models.rs` holds the types crossing those seams. Dependencies point one
+way — the service never names an HTTP type, and the repository never decides
+what a constraint violation means to a client — so the rules stay readable and
+testable without a router in front of them. `src/chat` and `src/user` predate
+this shape and still reach into the shared `Database` struct directly.
 
 The Cloudflare workers under `curio-workers` are legacy: the clients no longer
 reference them.

@@ -5,9 +5,12 @@ use axum::{
 };
 use serde::Serialize;
 
-/// The calendar module does enough validation that returning
-/// `(StatusCode, Json<...>)` tuples from every call site gets noisy, so the
-/// mapping to HTTP lives here once and handlers use `?`.
+/// The one error the calendar's layers speak.
+///
+/// The service raises these; the `IntoResponse` impl is the single place they
+/// become HTTP. Doing it once means handlers use `?` instead of building a
+/// `(StatusCode, Json<...>)` tuple at each call site, and the body stays
+/// `{"error": "…"}` for every failure.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalendarError {
     Invalid(&'static str),
@@ -37,27 +40,5 @@ impl IntoResponse for CalendarError {
         };
 
         (status, Json(ErrorBody { error })).into_response()
-    }
-}
-
-impl CalendarError {
-    /// Collapses a storage failure into a client-facing error. The unique and
-    /// foreign key violations are the two the caller can actually act on;
-    /// everything else is logged here and sanitized to `Internal`, because the
-    /// cause belongs to operators and the message belongs to the client.
-    pub fn from_storage(context: &str, error: sqlx::Error) -> Self {
-        if let sqlx::Error::Database(ref database_error) = error {
-            if database_error.is_unique_violation() {
-                return CalendarError::Conflict("An event with that id already exists.");
-            }
-            if database_error.is_foreign_key_violation() {
-                return CalendarError::UnknownUser;
-            }
-        }
-
-        // The service has no logging crate yet and main.rs uses println!, so
-        // this matches rather than dropping the cause silently.
-        eprintln!("curio-service: {context} failed: {error}");
-        CalendarError::Internal
     }
 }
