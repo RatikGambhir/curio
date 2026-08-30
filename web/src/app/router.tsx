@@ -16,10 +16,12 @@ import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
 import type { AppTarget } from "@/platform/contracts"
 
 const Atlas = lazy(() => import("@/pages/Atlas"))
+const Calendar = lazy(() => import("@/pages/Calendar"))
 const Chat = lazy(() => import("@/pages/Chat"))
 const Home = lazy(() => import("@/pages/Home"))
 const Landing = lazy(() => import("@/pages/Landing"))
 const Login = lazy(() => import("@/pages/Login"))
+const Notes = lazy(() => import("@/pages/Notes"))
 const ProfileSetupWizard = lazy(() => import("@/pages/ProfileSetupWizard"))
 const ProfileSettings = lazy(() => import("@/pages/ProfileSettings"))
 const Vault = lazy(() => import("@/pages/Vault"))
@@ -59,6 +61,10 @@ function pageForRoute(id: RouteId, target: AppTarget): ReactElement {
       return <Home />
     case "chat":
       return <Chat />
+    case "calendar":
+      return <Calendar />
+    case "notes":
+      return <Notes />
     case "vault":
       return <Vault />
     case "atlas":

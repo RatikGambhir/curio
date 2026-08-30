@@ -1,11 +1,13 @@
 import * as React from "react";
 import {
   BookOpen,
+  CalendarDays,
   Frame,
   Globe,
   House,
   Map,
   MessageSquare,
+  NotebookPen,
   PieChart,
   Settings2,
 } from "lucide-react";
@@ -39,6 +41,16 @@ const data = {
       title: "Chat",
       url: "/chat",
       icon: MessageSquare,
+    },
+    {
+      title: "Calendar",
+      url: "/calendar",
+      icon: CalendarDays,
+    },
+    {
+      title: "Notes",
+      url: "/notes",
+      icon: NotebookPen,
     },
     {
       title: "Atlas",
