@@ -26,6 +26,7 @@
       }
     },
     "@magicui": "https://magicui.design/r/{name}",
-    "@moleculeui": "https://www.moleculeui.design/r/{name}.json"
+    "@moleculeui": "https://www.moleculeui.design/r/{name}.json",
+    "@ilinxa": "https://ui.ilinxa.com/r/{name}.json"
   }
 }

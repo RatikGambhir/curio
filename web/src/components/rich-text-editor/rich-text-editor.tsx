@@ -1,123 +1,165 @@
-import { useEffect, useRef } from "react"
-import type { KeyboardEvent } from "react"
-import { Plate, PlateContent, usePlateEditor } from "platejs/react"
+"use client";
 
-import { cn } from "@/lib/utils"
+import { useCallback, useEffect, useRef } from "react";
+import { Plate, PlateContent, usePlateEditor } from "platejs/react";
+import { cn } from "@/lib/utils";
+import { richTextPlugins } from "./plugins/editor-kit";
+import { EditorToolbar } from "./parts/editor-toolbar";
+import { FloatingToolbar } from "./parts/floating-toolbar";
+import {
+  RICH_TEXT_DEFAULT_PLACEHOLDER,
+  RICH_TEXT_EMPTY_VALUE,
+  type RichTextEditorProps,
+  type RichTextValue,
+} from "./types";
 
-import { FloatingToolbar } from "./floating-toolbar"
-import { richTextPlugins } from "./plugins"
-import { RichTextToolbar } from "./toolbar"
-import { emptyRichTextValue } from "./types"
-import type { RichTextEditorProps, RichTextValue } from "./types"
+const SAVE_KEY_DESCRIPTOR =
+  typeof navigator !== "undefined" && /Mac/i.test(navigator.platform)
+    ? "Cmd+S"
+    : "Ctrl+S";
 
-/**
- * Plate-backed WYSIWYG surface.
- *
- * The document is JSON (`RichTextValue`), never HTML. Callers own persistence:
- * `onChange` fires on every edit and `onSave` on Cmd/Ctrl+S, and neither one
- * performs any network work of its own.
- */
-export function RichTextEditor({
-  autoFocus = false,
-  className,
-  defaultValue,
-  flush = false,
-  header,
-  headerTrailing,
-  onChange,
-  onImageUpload,
-  onSave,
-  placeholder = "Start writing…",
-  readOnly = false,
-  value,
-}: RichTextEditorProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const initialValue = useRef(value ?? defaultValue ?? emptyRichTextValue())
+export function RichTextEditor(props: RichTextEditorProps) {
+  const {
+    value: controlledValue,
+    defaultValue,
+    onChange,
+    onSave,
+    readOnly = false,
+    placeholder = RICH_TEXT_DEFAULT_PLACEHOLDER,
+    onImageUpload,
+    className,
+    toolbarClassName,
+    contentClassName,
+    containerClassName,
+    hideToolbar = false,
+    autoFocus = false,
+  } = props;
+
+  const initialValue =
+    controlledValue ?? defaultValue ?? RICH_TEXT_EMPTY_VALUE;
+
   const editor = usePlateEditor({
     plugins: richTextPlugins,
-    value: initialValue.current,
-    autoSelect: autoFocus ? "end" : false,
-  })
+    value: initialValue,
+    autoSelect: autoFocus ? "end" : undefined,
+  });
 
-  // Echo guard: a `value` update that came from outside must not be re-emitted
-  // through `onChange`, or a caller storing that value round-trips its own
-  // write back into whichever document is mounted now.
-  const lastValue = useRef<RichTextValue | undefined>(value)
-  const isApplyingExternalValue = useRef(false)
-
+  // v0.2.2 — echo-guarded sync, now content-keyed. When `controlledValue`
+  // prop changes by REFERENCE only (e.g., RHF-controlled forms emit a fresh
+  // reference on every state change even when content is identical), the
+  // previous ref-equality check would fire `editor.tf.setValue` on every
+  // render. That re-applies the editor's current content as a "new" value,
+  // which resets Slate's selection — the user's cursor disappears
+  // immediately after every click, and typing can't land because each
+  // keystroke is followed by a setValue that wipes selection. Worse, on
+  // RHF + React 19, the rapid setValue → onChange → setState cascade
+  // tripped React error #185 (Maximum update depth exceeded). The fix is
+  // to gate the sync on the content key (cheap stringify of the Plate
+  // tree) — fire setValue only when the content actually differs from
+  // what the editor last emitted or accepted, regardless of how many fresh
+  // references the consumer pipes through `value`.
+  const lastSyncedKeyRef = useRef<string>(serializeValueKey(initialValue));
   useEffect(() => {
-    if (value === undefined || value === lastValue.current) {
-      return
-    }
+    if (!controlledValue) return;
+    const nextKey = serializeValueKey(controlledValue);
+    if (nextKey === lastSyncedKeyRef.current) return;
+    editor.tf.setValue(controlledValue);
+    lastSyncedKeyRef.current = nextKey;
+  }, [controlledValue, editor]);
 
-    lastValue.current = value
-    isApplyingExternalValue.current = true
-    editor.tf.setValue(value)
-    isApplyingExternalValue.current = false
-  }, [editor, value])
+  const handleChange = useCallback(
+    ({ value }: { value: RichTextValue }) => {
+      lastSyncedKeyRef.current = serializeValueKey(value);
+      onChange?.(value);
+    },
+    [onChange]
+  );
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") {
-      return
-    }
-
-    // Keep the browser's own save dialog from opening over the editor.
-    event.preventDefault()
-    onSave?.(editor.children as RichTextValue)
-  }
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s" && onSave) {
+        e.preventDefault();
+        const current = editor.children as RichTextValue;
+        Promise.resolve(onSave(current)).catch((err) => {
+          console.error("onSave failed", err);
+        });
+      }
+    },
+    [editor, onSave]
+  );
 
   return (
-    <Plate
-      editor={editor}
-      readOnly={readOnly}
-      onValueChange={({ value: nextValue }) => {
-        const previousValue = lastValue.current
-        lastValue.current = nextValue as RichTextValue
-
-        if (isApplyingExternalValue.current || nextValue === previousValue) {
-          return
-        }
-
-        onChange?.(nextValue as RichTextValue)
-      }}
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card overflow-hidden",
+        className
+      )}
     >
-      <div
-        ref={containerRef}
-        onKeyDown={handleKeyDown}
-        className={cn(
-          "flex min-h-0 w-full flex-1 flex-col overflow-hidden",
-          flush
-            ? "bg-background"
-            : "rounded-lg border border-border bg-card shadow-xs",
-          className,
-        )}
-      >
-        <RichTextToolbar
-          flush={flush}
-          header={header}
-          headerTrailing={headerTrailing}
-          onImageUpload={onImageUpload}
-        />
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {/* The surface fills the inset; the text column stays measured so
-              long lines remain readable on a wide window. */}
+      <Plate editor={editor} onChange={handleChange} readOnly={readOnly}>
+        {!hideToolbar && !readOnly ? (
+          <EditorToolbar
+            className={toolbarClassName}
+            onImageUpload={onImageUpload}
+          />
+        ) : null}
+
+        <div
+          className={cn(
+            "max-h-150 overflow-y-auto px-6 py-4",
+            containerClassName
+          )}
+        >
           <PlateContent
-            readOnly={readOnly}
             placeholder={placeholder}
             className={cn(
-              "curio-rich-text min-h-full w-full text-[15px] text-foreground outline-none",
-              // Flush mode fills the pane rather than centring a column, so the
-              // editor reads as the whole surface next to the sidebar. Padding
-              // rather than a max-width also keeps the editable full width, so
-              // a click in the margin still lands in the document.
-              flush
-                ? "px-[1.75rem] py-[2.25rem] md:px-[2.75rem] lg:px-[3.5rem]"
-                : "mx-auto max-w-3xl px-6 py-8",
+              "min-h-50 focus:outline-none",
+              "prose prose-sm dark:prose-invert max-w-none",
+              "[&_:where(p,h1,h2,h3,h4)]:my-0",
+              contentClassName
             )}
+            onKeyDown={handleKeyDown}
+            spellCheck
           />
         </div>
-        <FloatingToolbar containerRef={containerRef} />
-      </div>
-    </Plate>
-  )
+
+        {!readOnly ? <FloatingToolbar /> : null}
+
+        {!readOnly && onSave ? (
+          <div className="border-t border-border bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
+            Press{" "}
+            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
+              {SAVE_KEY_DESCRIPTOR}
+            </kbd>{" "}
+            to save
+          </div>
+        ) : null}
+      </Plate>
+    </div>
+  );
 }
+
+/**
+ * v0.2.2 — content key for the echo-guarded controlled-value sync.
+ * Stringify is adequate for Plate JSON (no functions, no cycles) and
+ * cheap relative to a keystroke's frame budget for documents that fit on
+ * one screen. Returns a random hash on circular-ref edge cases so the
+ * effect still fires (defensive — we'd rather over-sync than skip a real
+ * external update). */
+function serializeValueKey(value: RichTextValue): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(Math.random());
+  }
+}
+
+// Re-exports for cross-procomp consumers (e.g. json-form's `richtext` field
+// renderer). Imports targeting `./types` from another procomp's shipped
+// source get rewritten by shadcn 4.6.0 to `./types` of the CURRENT slug
+// (F-S1 cross-procomp `/types` bug), so cross-procomp imports must come from
+// this component file instead — its path the rewriter handles correctly.
+export {
+  RICH_TEXT_EMPTY_VALUE,
+  type RichTextValue,
+  type ImageUploader,
+} from "./types";

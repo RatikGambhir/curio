@@ -1,40 +1,79 @@
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react";
 
-import { AppSidebar } from "@/components/app-sidebar"
+import { AppSidebar } from "@/components/app-sidebar";
 import {
   calendarPermissions,
   labelOptions,
   priorityOptions,
   statusColors,
   statusOptions,
-} from "@/components/calendar/calendar.config"
-import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data"
-import type { CurioCalendarEvent } from "@/components/calendar/calendar.types"
-import { EventCalendar, calendarEditing } from "@/components/event-calendar"
-import { PageHeader } from "@/components/page-header"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+} from "@/components/calendar/calendar.config";
+import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data";
+import type { CurioCalendarEvent } from "@/components/calendar/calendar.types";
+import type { TaskItem } from "@/components/event-calendar";
+import { EventCalendar } from "@/components/event-calendar";
+import { calendarEditing } from "@/components/event-calendar/features/editing";
+import { PageHeader } from "@/components/page-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+
+function findEvent(
+  items: readonly TaskItem[],
+  eventId: string | null,
+): TaskItem | undefined {
+  if (!eventId) {
+    return undefined;
+  }
+
+  for (const item of items) {
+    if (item.id === eventId) {
+      return item;
+    }
+    const child = findEvent(item.children ?? [], eventId);
+    if (child) {
+      return child;
+    }
+  }
+
+  return undefined;
+}
+
+const isHighPriority = (item: TaskItem) => item.priority === "high";
 
 const Calendar = () => {
   // Stable identity: an inline `new Date()` would take a fresh identity every
   // render and drive onRangeChange into a loop.
-  const [now] = useState(() => new Date())
+  const [now] = useState(() => new Date());
   const [events, setEvents] = useState<CurioCalendarEvent[]>(() =>
     buildMockCalendarEvents(now),
-  )
-  const [selectedEvent, setSelectedEvent] = useState<CurioCalendarEvent | null>(
-    null,
-  )
+  );
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+
+  const selectedEvent = useMemo(
+    () => findEvent(events, selectedEventId),
+    [events, selectedEventId],
+  );
+
+  const handleEventsChange = useCallback((nextEvents: TaskItem[]) => {
+    setEvents(nextEvents);
+    setSelectedEventId((currentId) =>
+      findEvent(nextEvents, currentId) ? currentId : null,
+    );
+  }, []);
+
+  const handleTaskClick = useCallback((task: TaskItem) => {
+    setSelectedEventId(task.id);
+  }, []);
 
   const handleRangeChange = useCallback(() => {
     // Phase 1 renders every event from memory. When `GET /v1/events?start=&end=`
     // exists this is where the visible range drives the query — through
     // src/api/, never a network call from page code.
-  }, [])
+  }, []);
 
   const renderTooltip = useCallback(
-    (task: CurioCalendarEvent) => (
+    (task: TaskItem) => (
       <div className="flex flex-col gap-1">
-        <span className="font-medium">{task.title}</span>
+        <span className="font-medium">{task.name}</span>
         {task.description ? (
           <span className="text-muted-foreground">{task.description}</span>
         ) : null}
@@ -45,14 +84,14 @@ const Calendar = () => {
       </div>
     ),
     [],
-  )
+  );
 
   const selectionLabel = useMemo(() => {
     if (!selectedEvent) {
-      return "Select an event to see it here"
+      return "Select an event to see it here";
     }
-    return `${selectedEvent.title} · ${selectedEvent.status ?? "unscheduled"}`
-  }, [selectedEvent])
+    return `${selectedEvent.name} · ${selectedEvent.status}`;
+  }, [selectedEvent]);
 
   return (
     <SidebarProvider>
@@ -69,18 +108,21 @@ const Calendar = () => {
           <main className="min-h-0 flex-1 px-4 pb-4">
             <EventCalendar
               data={events}
-              onChange={setEvents}
+              onChange={handleEventsChange}
               statusOptions={statusOptions}
               priorityOptions={priorityOptions}
               labelOptions={labelOptions}
               statusColors={statusColors}
+              flagPriority={isHighPriority}
               defaultView="month"
               now={now}
               showMiniNav
               editable
               editing={calendarEditing}
               permissions={calendarPermissions}
-              onTaskClick={setSelectedEvent}
+              selectedId={selectedEventId}
+              onSelect={setSelectedEventId}
+              onTaskClick={handleTaskClick}
               onRangeChange={handleRangeChange}
               renderTooltip={renderTooltip}
               className="h-full"
@@ -89,7 +131,7 @@ const Calendar = () => {
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
-}
+  );
+};
 
-export default Calendar
+export default Calendar;
