@@ -32,6 +32,45 @@ pub struct UserRecord {
     pub updated_at: String,
 }
 
+/// A stored calendar event as the client sees it.
+///
+/// Deliberately exposes only the wire fields. The normalized `starts_at` /
+/// `ends_at` instants exist to make range queries correct and are never
+/// returned: the frontend classifies events by the *format* of `startDate`, so
+/// handing it a normalized instant would turn every all-day event into a
+/// midnight block.
+#[derive(Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEventRecord {
+    pub id: String,
+    pub user_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub all_day: bool,
+    pub start_date: String,
+    pub end_date: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// The write-side shape of an event, with the wire strings and the normalized
+/// instants derived from them travelling together.
+pub struct NewCalendarEvent<'a> {
+    pub id: &'a str,
+    pub user_id: &'a str,
+    pub title: &'a str,
+    pub description: Option<&'a str>,
+    pub status: Option<&'a str>,
+    pub priority: Option<&'a str>,
+    pub all_day: bool,
+    pub start_date: &'a str,
+    pub end_date: Option<&'a str>,
+    pub starts_at: &'a str,
+    pub ends_at: &'a str,
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageRecord {
@@ -48,7 +87,12 @@ pub struct MessageRecord {
 
 impl Database {
     pub async fn connect(database_url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(database_url)?.create_if_missing(true);
+        // SQLite ignores foreign keys unless the pragma is on. sqlx enables it
+        // by default, but the calendar's ON DELETE CASCADE and its unknown-user
+        // check both depend on it, so state it rather than inherit it.
+        let options = SqliteConnectOptions::from_str(database_url)?
+            .create_if_missing(true)
+            .foreign_keys(true);
         let max_connections = if database_url.contains(":memory:") {
             1
         } else {
@@ -216,6 +260,78 @@ impl Database {
         })
     }
 
+    pub async fn create_calendar_event(
+        &self,
+        event: NewCalendarEvent<'_>,
+    ) -> Result<CalendarEventRecord, sqlx::Error> {
+        sqlx::query(
+            r#"
+            INSERT INTO calendar_events (
+                id, user_id, title, description, status, priority,
+                all_day, start_date, end_date, starts_at, ends_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "#,
+        )
+        .bind(event.id)
+        .bind(event.user_id)
+        .bind(event.title)
+        .bind(event.description)
+        .bind(event.status)
+        .bind(event.priority)
+        .bind(i64::from(event.all_day))
+        .bind(event.start_date)
+        .bind(event.end_date)
+        .bind(event.starts_at)
+        .bind(event.ends_at)
+        .execute(&self.pool)
+        .await?;
+
+        let row = sqlx::query(
+            r#"
+            SELECT id, user_id, title, description, status, priority, all_day,
+                   start_date, end_date, created_at, updated_at
+            FROM calendar_events
+            WHERE id = ?1
+            "#,
+        )
+        .bind(event.id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        calendar_event(&row)
+    }
+
+    /// Every event overlapping the half-open range `[start, end)`.
+    ///
+    /// The predicate is a single expression with no special cases because every
+    /// stored row satisfies `ends_at > starts_at`, which is what the nominal
+    /// milestone duration buys. An event ending exactly at `start` and one
+    /// starting exactly at `end` are both outside the range.
+    pub async fn calendar_events_in_range(
+        &self,
+        user_id: &str,
+        start: &str,
+        end: &str,
+    ) -> Result<Vec<CalendarEventRecord>, sqlx::Error> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, user_id, title, description, status, priority, all_day,
+                   start_date, end_date, created_at, updated_at
+            FROM calendar_events
+            WHERE user_id = ?1 AND starts_at < ?3 AND ends_at > ?2
+            ORDER BY starts_at, id
+            "#,
+        )
+        .bind(user_id)
+        .bind(start)
+        .bind(end)
+        .fetch_all(&self.pool)
+        .await?;
+
+        rows.iter().map(calendar_event).collect()
+    }
+
     pub async fn list_conversations(&self) -> Result<Vec<ConversationRecord>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, created_at, updated_at FROM conversations ORDER BY updated_at DESC, id",
@@ -267,6 +383,22 @@ impl Database {
             })
             .collect()
     }
+}
+
+fn calendar_event(row: &sqlx::sqlite::SqliteRow) -> Result<CalendarEventRecord, sqlx::Error> {
+    Ok(CalendarEventRecord {
+        id: row.try_get("id")?,
+        user_id: row.try_get("user_id")?,
+        title: row.try_get("title")?,
+        description: row.try_get("description")?,
+        status: row.try_get("status")?,
+        priority: row.try_get("priority")?,
+        all_day: row.try_get::<i64, _>("all_day")? != 0,
+        start_date: row.try_get("start_date")?,
+        end_date: row.try_get("end_date")?,
+        created_at: row.try_get("created_at")?,
+        updated_at: row.try_get("updated_at")?,
+    })
 }
 
 #[cfg(test)]
