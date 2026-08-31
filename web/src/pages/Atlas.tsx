@@ -82,8 +82,8 @@ const Atlas = () => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <div className="flex h-screen w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full flex-col">
           <PageHeader />
           <main className="min-h-0 flex-1 px-4 pb-4">
             <div className="h-full w-full overflow-hidden rounded-lg border border-border bg-background">

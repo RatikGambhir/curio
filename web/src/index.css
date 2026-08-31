@@ -3,45 +3,49 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Colour is defined in three layers, and only the middle one decides how the
+   app looks.
+
+   1. The seed. One hue plus one chroma, which ThemeProvider writes onto <html>
+      as `--theme-hue` and `--theme-chroma`. Adding a theme is adding a colour,
+      not a block of CSS; see features/theme/theme.ts.
+
+   2. The scale — `--scale-50` through `--scale-950`. Eleven steps generated
+      from the seed, with lightness pinned per step and chroma held as a
+      multiple of the seed's, so every theme gets the same tonal ladder and text
+      contrast does not depend on which colour was picked. Sage Green, Cool Sky
+      Blue, Cool Steel and Charcoal Blue are all just seeds on this one ladder; see
+      features/theme/palette.ts, which holds the same numbers for tests.
+
+   3. Semantic roles — `--background-page`, `--text-primary`, `--primary` and
+      friends. These name what a colour is *for*, and are the only layer that
+      differs between light and dark: dark mode remaps the roles onto the far
+      end of the same scale rather than generating new colours. Components read
+      roles, never scale steps, so they never know whether they are green or
+      blue. The shadcn token names below are aliases onto these roles.
+
+   The palette lives on `.curio-theme` rather than `:root` because a custom
+   property inherits the value it already resolved to. Tokens defined on `:root`
+   could not be re-derived further down the tree, which is exactly what the
+   settings picker needs in order to preview a theme that is not selected: a
+   subtree restates the seed on its own `.curio-theme` element and recomputes
+   the whole palette. `.dark` on the same element selects the dark roles. */
+
 :root {
-  --background: #f4f3f4;
-  --foreground: oklch(0.2417 0.0298 269.8827);
-  --card: oklch(1.0000 0 0);
-  --card-foreground: oklch(0.2417 0.0298 269.8827);
-  --popover: oklch(1.0000 0 0);
-  --popover-foreground: oklch(0.2417 0.0298 269.8827);
-  --primary: oklch(0.6333 0.0309 154.9039);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.8596 0.0291 119.9919);
-  --secondary-foreground: oklch(0.2417 0.0298 269.8827);
-  --muted: oklch(0.9251 0.0071 88.6450);
-  --muted-foreground: oklch(0.5510 0.0234 264.3637);
-  --accent: oklch(0.8242 0.0221 136.6092);
-  --accent-foreground: oklch(0.2417 0.0298 269.8827);
-  --destructive: oklch(0.5624 0.1743 26.1433);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.9251 0.0071 88.6450);
-  --input: oklch(1.0000 0 0);
-  --ring: oklch(0.6333 0.0309 154.9039);
-  --chart-1: oklch(0.6333 0.0309 154.9039);
-  --chart-2: oklch(0.7209 0.0489 120.9474);
-  --chart-3: oklch(0.6744 0.0427 136.0110);
-  --chart-4: oklch(0.5510 0.0234 264.3637);
-  --chart-5: oklch(0.9251 0.0071 88.6450);
-  --sidebar: #e2e3e5;
-  --sidebar-foreground: oklch(0.2417 0.0298 269.8827);
-  --sidebar-primary: oklch(0.6333 0.0309 154.9039);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.9251 0.0071 88.6450);
-  --sidebar-accent-foreground: oklch(0.2417 0.0298 269.8827);
-  --sidebar-border: oklch(0.9251 0.0071 88.6450);
-  --sidebar-ring: oklch(0.6333 0.0309 154.9039);
+  /* Mirrors the default entry in the theme registry — Cool Steel — so the first
+     paint is correct before any JS runs. ThemeProvider overwrites both on mount,
+     and palette.test.ts fails if these drift from the registry. */
+  --theme-hue: 239.12;
+  --theme-chroma: 0.0338;
+
   --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-serif: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: JetBrains Mono, Courier New, monospace;
   --radius: 0.35rem;
+  --tracking-normal: 0em;
+  --spacing: 0.23rem;
   --shadow-x: 0px;
   --shadow-y: 1px;
   --shadow-blur: 2px;
@@ -56,12 +60,10 @@
   --shadow-lg: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 4px 6px -1px hsl(225 27.7778% 14.1176% / 0.04);
   --shadow-xl: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 8px 10px -1px hsl(225 27.7778% 14.1176% / 0.04);
   --shadow-2xl: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.10);
-  --tracking-normal: 0em;
-  --spacing: 0.23rem;
 
-  /* Code syntax tokens. The chart ramp is five near-neighbour greens chosen
-     for charts, so it cannot separate keywords from strings from numbers;
-     these hues stay in the same muted register while staying legible. */
+  /* Code syntax tokens. Six well-separated hues are needed to tell keywords
+     from strings from numbers, which a single-seed palette cannot supply, so
+     these are fixed and shared by every theme. */
   --code-keyword: oklch(0.4800 0.1200 285.0000);
   --code-string: oklch(0.4900 0.0900 152.0000);
   --code-number: oklch(0.5100 0.1100 62.0000);
@@ -71,50 +73,141 @@
   --code-punctuation: oklch(0.4400 0.0200 264.0000);
 }
 
-.dark {
-  --background: oklch(0.1448 0 0);
-  --foreground: oklch(0.9702 0 0);
-  --card: oklch(0.1822 0 0);
-  --card-foreground: oklch(0.9702 0 0);
-  --popover: oklch(0.1822 0 0);
-  --popover-foreground: oklch(0.9702 0 0);
-  --primary: oklch(0.6333 0.0309 154.9039);
-  --primary-foreground: oklch(0 0 0);
-  --secondary: oklch(0.2178 0 0);
-  --secondary-foreground: oklch(0.9702 0 0);
-  --muted: oklch(0.2178 0 0);
-  --muted-foreground: oklch(0.7058 0 0);
-  --accent: oklch(0.3709 0.0248 153.9823);
-  --accent-foreground: oklch(0.9702 0 0);
+/* Layer 2: the scale. Shared by light and dark — appearance changes which steps
+   the roles point at, not what the steps are. */
+.curio-theme {
+  --scale-50: oklch(0.9618 calc(var(--theme-chroma) * 0.114) var(--theme-hue));
+  --scale-100: oklch(0.9242 calc(var(--theme-chroma) * 0.244) var(--theme-hue));
+  --scale-200: oklch(0.8471 calc(var(--theme-chroma) * 0.468) var(--theme-hue));
+  --scale-300: oklch(0.7722 calc(var(--theme-chroma) * 0.721) var(--theme-hue));
+  --scale-400: oklch(0.6974 calc(var(--theme-chroma) * 0.952) var(--theme-hue));
+  --scale-500: oklch(0.6272 calc(var(--theme-chroma) * 1.181) var(--theme-hue));
+  --scale-600: oklch(0.5332 calc(var(--theme-chroma) * 0.982) var(--theme-hue));
+  --scale-700: oklch(0.4368 calc(var(--theme-chroma) * 0.787) var(--theme-hue));
+  --scale-800: oklch(0.3324 calc(var(--theme-chroma) * 0.557) var(--theme-hue));
+  --scale-900: oklch(0.2218 calc(var(--theme-chroma) * 0.332) var(--theme-hue));
+  --scale-950: oklch(0.1832 calc(var(--theme-chroma) * 0.237) var(--theme-hue));
+}
+
+/* Layer 3: semantic roles, light. Large surfaces take the palest steps so the
+   interface reads as tinted rather than painted; cards stay pure white to give
+   the tint something neutral to sit against. */
+.curio-theme {
+  --background-page: var(--scale-50);
+  --background-sidebar: var(--scale-100);
+  --background-card: oklch(1.0000 0 0);
+  --background-secondary: var(--scale-100);
+  --background-hover: var(--scale-200);
+  --background-pressed: var(--scale-300);
+  --background-selected: var(--scale-200);
+
+  --text-primary: var(--scale-950);
+  --text-secondary: var(--scale-800);
+  /* Step 700, not 600: muted text also has to survive the sidebar, which is a
+     step darker than the page, and 600 falls to 4.1:1 there. */
+  --text-muted: var(--scale-700);
+  --text-on-primary: oklch(1.0000 0 0);
+
+  --border-subtle: var(--scale-200);
+  --border-strong: var(--scale-300);
+
+  /* Step 600 rather than the brand step 500: white text on 500 measures about
+     3.5:1 in every palette, short of the 4.5:1 needed for a button label, while
+     600 clears it at about 5:1. The brand step stays available as
+     `--accent-brand`. */
+  --primary: var(--scale-600);
+  --primary-hover: var(--scale-700);
+  --primary-pressed: var(--scale-800);
+
+  --accent-brand: var(--scale-500);
+  --accent-subtle: var(--scale-100);
+
+  /* shadcn aliases. Everything below restates a role under the name the
+     existing components already use, so a remapping above moves the whole app. */
+  --background: var(--background-page);
+  --foreground: var(--text-primary);
+  --card: var(--background-card);
+  --card-foreground: var(--text-primary);
+  --popover: var(--background-card);
+  --popover-foreground: var(--text-primary);
+  --primary-foreground: var(--text-on-primary);
+  /* shadcn's `--primary-active`, kept because `active:bg-primary-active` is
+     spelled that way across the component library. */
+  --primary-active: var(--primary-pressed);
+  --secondary: var(--background-secondary);
+  --secondary-foreground: var(--text-secondary);
+  --secondary-hover: var(--background-hover);
+  --secondary-active: var(--background-pressed);
+  --muted: var(--background-secondary);
+  --muted-foreground: var(--text-muted);
+  /* shadcn's `--accent` is the hover/selected surface, not a brand colour —
+     `hover:bg-accent` appears on most controls — so it aliases the selected
+     background. The vivid brand step is `--accent-brand`. */
+  --accent: var(--background-selected);
+  --accent-foreground: var(--text-secondary);
+  --destructive: oklch(0.5624 0.1743 26.1433);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: var(--border-subtle);
+  /* Shares the border tone rather than the surface tone: `--input` is spent as
+     `border-input` on every field, plus the switch's off-track and the
+     button-group divider, all of which vanish when it matches the card. */
+  --input: var(--border-subtle);
+  --ring: var(--primary);
+  --chart-1: var(--scale-700);
+  --chart-2: var(--scale-600);
+  --chart-3: var(--scale-500);
+  --chart-4: var(--scale-400);
+  --chart-5: var(--scale-300);
+  --sidebar: var(--background-sidebar);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--text-on-primary);
+  --sidebar-accent: var(--background-selected);
+  --sidebar-accent-foreground: var(--text-secondary);
+  --sidebar-border: var(--border-subtle);
+  --sidebar-ring: var(--primary);
+}
+
+/* The same roles against the dark end of the same scale. Only the mappings
+   change; the scale itself is untouched. The sidebar stays on the page tone
+   while cards — including the main inset — lift by one step, preserving the
+   same chrome/content hierarchy as light mode. The action steps run the other
+   way: hover and pressed get lighter, because on a dark surface that is what
+   reads as closer. */
+.curio-theme.dark {
+  --background-page: var(--scale-950);
+  --background-sidebar: var(--scale-950);
+  --background-card: var(--scale-900);
+  --background-secondary: var(--scale-800);
+  --background-hover: var(--scale-700);
+  --background-pressed: var(--scale-600);
+  --background-selected: var(--scale-800);
+
+  --text-primary: var(--scale-50);
+  --text-secondary: var(--scale-100);
+  --text-muted: var(--scale-300);
+  --text-on-primary: var(--scale-950);
+
+  --border-subtle: var(--scale-800);
+  --border-strong: var(--scale-700);
+
+  --primary: var(--scale-400);
+  --primary-hover: var(--scale-300);
+  --primary-pressed: var(--scale-200);
+
+  --accent-brand: var(--scale-400);
+  --accent-subtle: var(--scale-800);
+
   --destructive: oklch(0.6368 0.2078 25.3313);
   --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.2850 0 0);
-  --input: oklch(0.1822 0 0);
-  --ring: oklch(0.6333 0.0309 154.9039);
-  --chart-1: oklch(0.6333 0.0309 154.9039);
-  --chart-2: oklch(0.7209 0.0489 120.9474);
-  --chart-3: oklch(0.6744 0.0427 136.0110);
-  --chart-4: oklch(0.5510 0.0234 264.3637);
-  --chart-5: oklch(0.5096 0.0289 152.3460);
-  --sidebar: oklch(0.1684 0 0);
-  --sidebar-foreground: oklch(0.9702 0 0);
-  --sidebar-primary: oklch(0.6333 0.0309 154.9039);
-  --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.2178 0 0);
-  --sidebar-accent-foreground: oklch(0.9702 0 0);
-  --sidebar-border: oklch(0.2850 0 0);
-  --sidebar-ring: oklch(0.6333 0.0309 154.9039);
-  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-serif: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: JetBrains Mono, Courier New, monospace;
-  --radius: 0.35rem;
-  --shadow-x: 0px;
-  --shadow-y: 1px;
-  --shadow-blur: 2px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.04;
+  --chart-1: var(--scale-500);
+  --chart-2: var(--scale-400);
+  --chart-3: var(--scale-300);
+  --chart-4: var(--scale-200);
+  --chart-5: var(--scale-100);
+}
+
+.dark {
   --shadow-color: #000000;
   --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.02);
   --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.02);
@@ -135,6 +228,25 @@
 }
 
 @theme inline {
+  /* The raw scale, so a surface that genuinely needs a named step — the palette
+     swatches in settings, say — can reach one without inventing a role. Prefer
+     the role tokens below for anything the themes should be able to remap. */
+  --color-scale-50: var(--scale-50);
+  --color-scale-100: var(--scale-100);
+  --color-scale-200: var(--scale-200);
+  --color-scale-300: var(--scale-300);
+  --color-scale-400: var(--scale-400);
+  --color-scale-500: var(--scale-500);
+  --color-scale-600: var(--scale-600);
+  --color-scale-700: var(--scale-700);
+  --color-scale-800: var(--scale-800);
+  --color-scale-900: var(--scale-900);
+  --color-scale-950: var(--scale-950);
+
+  --color-border-strong: var(--border-strong);
+  --color-accent-brand: var(--accent-brand);
+  --color-accent-subtle: var(--accent-subtle);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -143,8 +255,12 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-hover: var(--secondary-hover);
+  --color-secondary-active: var(--secondary-active);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);

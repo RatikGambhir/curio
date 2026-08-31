@@ -4,6 +4,7 @@ mod models;
 mod repository;
 mod service;
 #[cfg(test)]
+#[path = "../../tests/unit/calendar/mod.rs"]
 mod tests;
 mod time;
 

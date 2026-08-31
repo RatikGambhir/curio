@@ -5,7 +5,7 @@ import {
   ChatStreamProtocolError,
   ChatStreamSession,
   parseChatStreamEvent,
-} from "./chat-stream"
+} from "@/features/chat/chat-stream"
 
 const ids = {
   conversationId: "conversation-1",

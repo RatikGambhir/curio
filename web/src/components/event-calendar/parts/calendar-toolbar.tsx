@@ -46,11 +46,11 @@ export function CalendarToolbar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-2 border-b border-border p-2",
+        "flex min-w-0 flex-col items-stretch gap-2 border-b border-border p-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between",
         className,
       )}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex min-w-0 items-center gap-1">
         <Button variant="outline" size="sm" onClick={goToToday}>
           Today
         </Button>
@@ -70,7 +70,7 @@ export function CalendarToolbar({ className }: { className?: string }) {
         >
           <ChevronRight className="size-4" />
         </Button>
-        <span className="ml-1 text-sm font-semibold text-foreground">
+        <span className="ml-1 min-w-0 truncate text-sm font-semibold text-foreground">
           {periodLabel(view, focusDate, visibleRange)}
         </span>
       </div>
@@ -85,7 +85,7 @@ export function CalendarToolbar({ className }: { className?: string }) {
         <div
           role="group"
           aria-label="Calendar view"
-          className="inline-flex overflow-hidden rounded-md border border-border"
+          className="grid w-full min-w-0 grid-cols-4 overflow-hidden rounded-md border border-border sm:inline-flex sm:w-auto"
         >
           {availableViews.map((v) => (
             <button
@@ -95,7 +95,7 @@ export function CalendarToolbar({ className }: { className?: string }) {
               aria-label={VIEW_LABELS[v]}
               onClick={() => setView(v)}
               className={cn(
-                "h-8 px-3 text-sm font-medium transition-colors",
+                "h-8 min-w-0 px-2 text-sm font-medium transition-colors sm:px-3",
                 view === v
                   ? "bg-primary text-primary-foreground"
                   : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",

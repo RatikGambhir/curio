@@ -78,11 +78,11 @@ export function UserMessage({ value }: Pick<ChatMessage, "value">) {
 
 function AssistantErrorMessage({ value }: Pick<ChatMessage, "value">) {
   return (
-    <div className="flex items-start gap-2 text-red-900" role="alert">
-      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-600" aria-hidden="true" />
+    <div className="flex items-start gap-2 text-destructive" role="alert">
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden="true" />
       <div>
         <p className="font-semibold">Response unavailable</p>
-        <p className="mt-1 text-red-800/90">{value}</p>
+        <p className="mt-1 text-destructive/90">{value}</p>
       </div>
     </div>
   )
@@ -96,7 +96,7 @@ export function AssistantMessage({ value, status }: Pick<ChatMessage, "value" | 
       <MessageBubble
         className={
           isError
-            ? "border border-red-300 bg-red-50 text-red-900 shadow-sm"
+            ? "border border-destructive/30 bg-destructive/10 text-destructive shadow-sm"
             : "max-w-[92%] rounded-none bg-transparent px-1 py-2 text-foreground"
         }
       >

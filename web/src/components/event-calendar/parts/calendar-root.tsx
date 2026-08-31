@@ -185,7 +185,7 @@ const RootShell = forwardRef<CalendarHandle, RootShellProps>(
         onKeyDown={handleKeyDown}
         aria-label={ariaLabel ?? "Calendar"}
         className={cn(
-          "flex flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "flex min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
           className,
         )}
       >

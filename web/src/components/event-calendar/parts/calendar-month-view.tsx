@@ -215,7 +215,7 @@ export function CalendarMonthView({ className }: { className?: string }) {
   };
 
   return (
-    <div role="grid" className={cn("flex h-full flex-col", className)}>
+    <div role="grid" className={cn("flex h-full min-w-0 flex-col", className)}>
       {/* weekday header */}
       <div role="row" className="grid grid-cols-7 border-b border-border">
         {weeks[0].map((d) => (

@@ -169,8 +169,8 @@ const Calendar = () => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <div className="flex h-screen w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full min-w-0 flex-col">
           <PageHeader />
           <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3 pb-2">
             <h1 className="text-lg font-semibold text-foreground">Calendar</h1>
@@ -178,7 +178,7 @@ const Calendar = () => {
               {selectionLabel}
             </span>
           </div>
-          <main className="min-h-0 flex-1 px-4 pb-4">
+          <main className="min-h-0 min-w-0 flex-1 overflow-hidden px-4 pb-4">
             <EventCalendar
               data={events}
               onChange={handleEventsChange}

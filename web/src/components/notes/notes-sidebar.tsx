@@ -11,7 +11,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  SidebarTrigger,
 } from "@/components/ui/sidebar"
 
 import { NotesNav } from "./notes-nav"
@@ -36,14 +35,14 @@ export function NotesSidebar({
 }: NotesSidebarProps) {
   return (
     <Sidebar collapsible="icon" {...props} className={className}>
-      <SidebarHeader className="h-16 shrink-0 justify-center border-b border-sidebar-border p-3">
-        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center">
+      <SidebarHeader className="h-(--app-header-height) shrink-0 justify-center p-2">
+        <div className="flex items-center gap-1 group-data-[collapsible=icon]:justify-center">
           <Button
             asChild
             type="button"
             variant="ghost"
             size="icon"
-            className="rounded-full text-muted-foreground hover:bg-white/45 hover:text-foreground group-data-[collapsible=icon]:hidden"
+            className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground group-data-[collapsible=icon]:hidden"
           >
             <Link to="/home" aria-label="Go to home">
               <ArrowLeft className="size-5" />
@@ -53,16 +52,14 @@ export function NotesSidebar({
           <Link
             to="/home"
             aria-label="Go to home"
-            className="flex items-center justify-center rounded-md px-2 py-1 outline-hidden ring-sidebar-ring focus-visible:ring-2 group-data-[collapsible=icon]:hidden"
+            className="flex items-center justify-center rounded-md px-2 py-1 outline-hidden ring-sidebar-ring focus-visible:ring-2"
           >
             <img
               src={curioLogo}
               alt="Curio"
-              className="h-8 w-auto object-contain transition-all group-data-[collapsible=icon]:h-6"
+              className="h-7 w-auto object-contain"
             />
           </Link>
-
-          <SidebarTrigger className="rounded-full text-muted-foreground hover:bg-white/45 hover:text-foreground" />
         </div>
       </SidebarHeader>
       <SidebarContent>

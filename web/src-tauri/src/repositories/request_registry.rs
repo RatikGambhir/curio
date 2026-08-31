@@ -43,34 +43,8 @@ impl RequestRegistry {
             .map_err(|_| "Desktop service cancellation state is unavailable.".to_owned())
     }
 
-    #[cfg(test)]
-    fn len(&self) -> usize {
-        self.requests.lock().expect("in-flight lock").len()
-    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cancellation_removes_every_in_flight_request() {
-        let registry = RequestRegistry::default();
-        let first = CancellationToken::new();
-        let second = CancellationToken::new();
-        registry
-            .register("first".to_owned(), first.clone())
-            .expect("register first");
-        registry
-            .register("second".to_owned(), second.clone())
-            .expect("register second");
-
-        assert_eq!(registry.len(), 2);
-        assert!(registry.cancel("first").expect("cancel first"));
-        assert!(first.is_cancelled());
-        assert_eq!(registry.len(), 1);
-        registry.remove("second").expect("remove second");
-        assert_eq!(registry.len(), 0);
-        assert!(!registry.cancel("missing").expect("cancel missing"));
-    }
-}
+#[path = "../../tests/unit/repositories/request_registry.rs"]
+mod tests;

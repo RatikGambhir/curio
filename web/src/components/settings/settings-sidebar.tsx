@@ -36,8 +36,8 @@ export function SettingsSidebar({
     .join("")
 
   return (
-    <aside className={cn("flex flex-col gap-4", className)}>
-      <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
+    <aside className={cn("divide-y divide-border lg:border-r lg:border-border", className)}>
+      <section className="p-5">
         <div className="flex items-center gap-3">
           <Avatar className="size-14 border border-border">
             <AvatarImage src={profile.avatarUrl} alt={profile.name} />
@@ -52,27 +52,27 @@ export function SettingsSidebar({
             <p className="truncate text-sm text-muted-foreground">{profile.email}</p>
           </div>
         </div>
-        <div className="mt-4 inline-flex rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+        <div className="mt-4 inline-flex rounded-md bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
           {profile.planLabel}
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
+      <section className="p-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-card-foreground">Usage limits</h3>
           <Info className="size-4 text-muted-foreground" />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">Plan: Base</p>
-        <div className="mt-4 h-2 rounded-full bg-secondary">
+        <div className="mt-4 h-2 bg-secondary">
           <div
-            className="h-2 rounded-full bg-primary"
+            className="h-2 bg-primary"
             style={{ width: `${Math.min(Math.max(usagePercent, 0), 100)}%` }}
           />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{usagePercent}% used</p>
       </section>
 
-      <section className="rounded-[1.75rem] border border-border bg-card p-5 shadow-sm">
+      <section className="p-5">
         <h3 className="text-sm font-semibold text-card-foreground">Keyboard shortcuts</h3>
         <ul className="mt-4 space-y-2">
           {shortcuts.map((shortcut) => (
