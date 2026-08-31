@@ -100,11 +100,7 @@ impl CalendarService {
         }
 
         self.repository
-            .in_range(
-                user_id,
-                &time::format_instant(start),
-                &time::format_instant(end),
-            )
+            .in_range(user_id, &start, &end)
             .await
             .map_err(|error| storage_error("listing calendar events", error))
     }
@@ -131,7 +127,7 @@ fn storage_error(context: &str, error: sqlx::Error) -> CalendarError {
         }
     }
 
-    eprintln!("curio-service: {context} failed: {error}");
+    eprintln!("curio-service: {context} failed");
     CalendarError::Internal
 }
 

@@ -4,21 +4,28 @@ use axum::{
     http::{Request, StatusCode, header},
     response::Response,
 };
-use curio_service::{app_with_config, config::ServiceConfig};
+use curio_service::{app_with_database, config::ServiceConfig};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-async fn calendar_app() -> Router {
-    let app = app_with_config(ServiceConfig {
-        openai_api_key: "local-test-value".to_owned(),
-        openai_model: "configured-test-value".to_owned(),
-        openai_base_url: "http://127.0.0.1:1".to_owned(),
-        database_url: "sqlite::memory:".to_owned(),
-        cors_allowed_origins: vec!["http://localhost:5173".to_owned()],
-    })
-    .await
-    .unwrap();
+use crate::postgres::PostgresFixture;
+
+async fn calendar_app(test_name: &str) -> Option<(Router, PostgresFixture)> {
+    let postgres = PostgresFixture::provision(test_name).await?;
+    let app = app_with_database(
+        ServiceConfig {
+            openai_api_key: "local-test-value".to_owned(),
+            openai_model: "configured-test-value".to_owned(),
+            openai_base_url: "http://127.0.0.1:1".to_owned(),
+            database_url: postgres.database_url().to_owned(),
+            database_schema: postgres.schema().to_owned(),
+            database_max_connections: 5,
+            database_acquire_timeout_seconds: 5,
+            cors_allowed_origins: vec!["http://localhost:5173".to_owned()],
+        },
+        postgres.database().clone(),
+    );
 
     for id in ["user-a", "user-b"] {
         let response = app
@@ -37,7 +44,7 @@ async fn calendar_app() -> Router {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    app
+    Some((app, postgres))
 }
 
 fn authenticated_json(
@@ -110,6 +117,18 @@ async fn json_body(response: Response) -> Value {
     serde_json::from_slice(&bytes).unwrap()
 }
 
+fn assert_millisecond_utc(timestamp: &Value) {
+    let timestamp = timestamp.as_str().expect("timestamp must be a string");
+    chrono::DateTime::parse_from_rfc3339(timestamp).expect("timestamp must be RFC 3339");
+    assert_eq!(
+        timestamp.len(),
+        24,
+        "timestamp must have millisecond precision"
+    );
+    assert_eq!(&timestamp[19..20], ".");
+    assert_eq!(&timestamp[23..], "Z");
+}
+
 fn timed_event(id: &str, user_id: &str, start: &str, end: Option<&str>) -> Value {
     json!({
         "id": id,
@@ -126,7 +145,11 @@ mod authentication {
 
     #[tokio::test]
     async fn create_and_list_require_a_bearer_token() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_create_and_list_require_a_bearer_token").await
+        else {
+            return;
+        };
         let create = app
             .clone()
             .oneshot(
@@ -154,11 +177,16 @@ mod authentication {
 
         assert_eq!(create.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(list.status(), StatusCode::UNAUTHORIZED);
+        postgres.cleanup().await;
     }
 
     #[tokio::test]
     async fn bearer_identity_cannot_access_another_users_calendar() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_bearer_identity_cannot_access_another_users_calendar").await
+        else {
+            return;
+        };
         let create = app
             .clone()
             .oneshot(create_request_as(
@@ -187,6 +215,7 @@ mod authentication {
         assert_eq!(list.status(), StatusCode::FORBIDDEN);
         assert!(json_body(create).await["error"].is_string());
         assert!(json_body(list).await["error"].is_string());
+        postgres.cleanup().await;
     }
 }
 
@@ -195,7 +224,11 @@ mod events {
 
     #[tokio::test]
     async fn records_round_trip_without_exposing_normalized_instants() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_records_round_trip_without_exposing_normalized_instants").await
+        else {
+            return;
+        };
         let created = create_event(
             &app,
             json!({
@@ -216,11 +249,17 @@ mod events {
         assert_eq!(created["endDate"], "2026-06-25");
         assert!(created.get("startsAt").is_none());
         assert!(created.get("endsAt").is_none());
+        assert_millisecond_utc(&created["createdAt"]);
+        assert_millisecond_utc(&created["updatedAt"]);
+        postgres.cleanup().await;
     }
 
     #[tokio::test]
     async fn generated_ids_and_user_scoping() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) = calendar_app("calendar_generated_ids_and_user_scoping").await
+        else {
+            return;
+        };
         let created = create_event(
             &app,
             json!({
@@ -252,6 +291,36 @@ mod events {
 
         assert_eq!(mine.len(), 1);
         assert!(theirs.is_empty());
+        postgres.cleanup().await;
+    }
+
+    #[tokio::test]
+    async fn deleting_a_user_cascades_to_calendar_events() {
+        let Some((app, postgres)) =
+            calendar_app("calendar_deleting_a_user_cascades_to_calendar_events").await
+        else {
+            return;
+        };
+        create_event(
+            &app,
+            timed_event("cascade-event", "user-a", "2026-06-22T14:00:00.000Z", None),
+        )
+        .await;
+
+        sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind("user-a")
+            .execute(postgres.database().pool())
+            .await
+            .unwrap();
+        let remaining: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM calendar_events WHERE user_id = $1")
+                .bind("user-a")
+                .fetch_one(postgres.database().pool())
+                .await
+                .unwrap();
+        assert_eq!(remaining, 0);
+
+        postgres.cleanup().await;
     }
 }
 
@@ -260,7 +329,11 @@ mod ranges {
 
     #[tokio::test]
     async fn month_week_and_day_include_overlapping_events() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_month_week_and_day_include_overlapping_events").await
+        else {
+            return;
+        };
         create_event(
             &app,
             json!({
@@ -310,11 +383,16 @@ mod ranges {
         )
         .await;
         assert!(events.is_empty());
+        postgres.cleanup().await;
     }
 
     #[tokio::test]
     async fn ranges_are_half_open_and_include_milestones() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_ranges_are_half_open_and_include_milestones").await
+        else {
+            return;
+        };
         for event in [
             timed_event(
                 "ends-at-start",
@@ -345,6 +423,7 @@ mod ranges {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0]["id"], "milestone");
         assert!(events[0]["endDate"].is_null());
+        postgres.cleanup().await;
     }
 }
 
@@ -353,7 +432,10 @@ mod validation {
 
     #[tokio::test]
     async fn create_failures_are_structured() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) = calendar_app("calendar_create_failures_are_structured").await
+        else {
+            return;
+        };
         let valid = timed_event("event-1", "user-a", "2026-06-22T14:00:00.000Z", None);
         create_event(&app, valid.clone()).await;
 
@@ -412,11 +494,16 @@ mod validation {
         );
         assert!(json_body(bad_status).await["error"].is_string());
         assert!(json_body(zero_length).await["error"].is_string());
+        postgres.cleanup().await;
     }
 
     #[tokio::test]
     async fn list_failures_use_the_expected_statuses() {
-        let app = calendar_app().await;
+        let Some((app, postgres)) =
+            calendar_app("calendar_list_failures_use_the_expected_statuses").await
+        else {
+            return;
+        };
         let too_wide = app
             .clone()
             .oneshot(list_request(
@@ -440,5 +527,6 @@ mod validation {
         assert_eq!(too_wide.status(), StatusCode::UNPROCESSABLE_ENTITY);
         assert!(json_body(too_wide).await["error"].is_string());
         assert_eq!(unknown_view.status(), StatusCode::BAD_REQUEST);
+        postgres.cleanup().await;
     }
 }

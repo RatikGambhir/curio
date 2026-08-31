@@ -1,5 +1,6 @@
 mod openai;
 pub mod protocol;
+pub(crate) mod repository;
 
 use std::convert::Infallible;
 
@@ -17,13 +18,13 @@ use tokio_stream::wrappers::ReceiverStream;
 use self::{
     openai::{OpenAiClient, OpenAiEvent},
     protocol::{ChatStreamEvent, ChatStreamRequest},
+    repository::{ChatRepository, ConversationRecord, MessageRecord},
 };
-use crate::database::{ConversationRecord, Database, MessageRecord};
 
 #[derive(Clone)]
 pub struct ChatState {
     openai: OpenAiClient,
-    database: Database,
+    repository: ChatRepository,
 }
 
 impl ChatState {
@@ -31,11 +32,11 @@ impl ChatState {
         openai_api_key: String,
         openai_model: String,
         openai_base_url: String,
-        database: Database,
+        repository: ChatRepository,
     ) -> Self {
         Self {
             openai: OpenAiClient::new(openai_api_key, openai_model, openai_base_url),
-            database,
+            repository,
         }
     }
 }
@@ -59,7 +60,7 @@ pub async fn stream_chat(
 ) -> impl IntoResponse {
     let (client_sender, client_receiver) = mpsc::channel::<Result<Event, Infallible>>(32);
 
-    if state.database.begin_chat(&request).await.is_err() {
+    if state.repository.begin_chat(&request).await.is_err() {
         let event = ChatStreamEvent::error(
             &request,
             "storage_error",
@@ -84,7 +85,7 @@ pub async fn stream_chat(
                 }
                 OpenAiEvent::Done(response_id) => {
                     if state
-                        .database
+                        .repository
                         .complete_assistant(&request, &assistant_content, &response_id)
                         .await
                         .is_err()
@@ -100,7 +101,7 @@ pub async fn stream_chat(
                 }
                 OpenAiEvent::Error { code, message } => {
                     if state
-                        .database
+                        .repository
                         .fail_assistant(&request, &assistant_content, code)
                         .await
                         .is_err()
@@ -119,7 +120,7 @@ pub async fn stream_chat(
             let terminal = matches!(event, ChatStreamEvent::Done(_) | ChatStreamEvent::Error(_));
             let Ok(event) = event.into_axum_event() else {
                 let _ = state
-                    .database
+                    .repository
                     .interrupt_assistant(&request, &assistant_content, "serialization_error")
                     .await;
                 return;
@@ -127,7 +128,7 @@ pub async fn stream_chat(
             if client_sender.send(Ok(event)).await.is_err() {
                 if !terminal {
                     let _ = state
-                        .database
+                        .repository
                         .interrupt_assistant(&request, &assistant_content, "client_disconnected")
                         .await;
                 }
@@ -139,7 +140,7 @@ pub async fn stream_chat(
         }
 
         let _ = state
-            .database
+            .repository
             .interrupt_assistant(&request, &assistant_content, "stream_ended")
             .await;
         let event = ChatStreamEvent::error(
@@ -159,7 +160,7 @@ pub async fn list_conversations(
     State(state): State<ChatState>,
 ) -> Result<Json<ConversationsResponse>, axum::http::StatusCode> {
     state
-        .database
+        .repository
         .list_conversations()
         .await
         .map(|conversations| Json(ConversationsResponse { conversations }))
@@ -171,7 +172,7 @@ pub async fn conversation_messages(
     Path(conversation_id): Path<String>,
 ) -> Result<Json<ConversationMessagesResponse>, axum::http::StatusCode> {
     state
-        .database
+        .repository
         .conversation_messages(&conversation_id)
         .await
         .map(|messages| {

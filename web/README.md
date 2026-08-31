@@ -30,5 +30,5 @@ for JSON endpoints and `src/features/chat/transport.ts` for chat streaming. Run
 and only `src/api` and `src/features/chat` may import
 `@curio/platform-runtime`.
 
-See the root [architecture guide](../ARCHITECTURE.md) and
+See the canonical [architecture guide](../docs/ARCHITECTURE.md) and
 [deployment notes](../docs/deployment.md).

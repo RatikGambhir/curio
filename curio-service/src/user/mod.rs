@@ -1,12 +1,13 @@
 mod commands;
 mod queries;
+pub(crate) mod repository;
 
 use axum::{
     Router, middleware,
     routing::{get, post},
 };
 
-use crate::database::Database;
+use self::repository::UserRepository;
 
 pub fn routes() -> Router {
     Router::new()
@@ -18,9 +19,9 @@ pub fn routes() -> Router {
 }
 
 /// Authenticated user API routes backed by the database.
-pub fn api_routes(database: Database) -> Router {
+pub fn api_routes(repository: UserRepository) -> Router {
     Router::new()
         .route("/v1/users", post(commands::save_user))
         .route_layer(middleware::from_fn(crate::auth))
-        .with_state(database)
+        .with_state(repository)
 }

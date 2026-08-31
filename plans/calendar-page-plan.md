@@ -300,7 +300,7 @@ either adopt the tree as app-owned or narrow the gates with an explicit, reviewe
 exemption.
 
 Do not add a blanket vendor exemption to `check-frontend-boundaries.mjs` — it is
-a security boundary described in `ARCHITECTURE.md`, and a wildcard under
+a security boundary described in `docs/ARCHITECTURE.md`, and a wildcard under
 `src/components/` would neutralize it for far more than the calendar.
 
 ## Phase 6 — Editing slice (opt-in)

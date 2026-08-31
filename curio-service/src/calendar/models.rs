@@ -1,4 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 
 pub const EVENT_STATUSES: [&str; 5] = ["scheduled", "in-progress", "blocked", "done", "cancelled"];
 pub const EVENT_PRIORITIES: [&str; 3] = ["low", "medium", "high"];
@@ -12,7 +14,7 @@ pub enum CalendarView {
     Agenda,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq)]
+#[derive(Debug, FromRow, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarEvent {
     pub id: String,
@@ -24,8 +26,10 @@ pub struct CalendarEvent {
     pub all_day: bool,
     pub start_date: String,
     pub end_date: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    #[serde(serialize_with = "crate::database::serialize_timestamp")]
+    pub created_at: DateTime<Utc>,
+    #[serde(serialize_with = "crate::database::serialize_timestamp")]
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,6 +66,6 @@ pub struct NewCalendarEvent<'a> {
     pub all_day: bool,
     pub start_date: &'a str,
     pub end_date: Option<&'a str>,
-    pub starts_at: &'a str,
-    pub ends_at: &'a str,
+    pub starts_at: &'a DateTime<Utc>,
+    pub ends_at: &'a DateTime<Utc>,
 }

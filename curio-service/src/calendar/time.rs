@@ -10,10 +10,11 @@ pub(super) enum WireFormat {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedInterval {
-    pub starts_at: String,
-    pub ends_at: String,
+    pub starts_at: DateTime<Utc>,
+    pub ends_at: DateTime<Utc>,
 }
 
+#[cfg(test)]
 pub fn format_instant(instant: DateTime<Utc>) -> String {
     instant.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string()
 }
@@ -81,8 +82,8 @@ fn normalize_all_day(
     };
 
     Ok(NormalizedInterval {
-        starts_at: format_instant(start_of_day(start)),
-        ends_at: format_instant(start_of_day(exclusive_end)),
+        starts_at: start_of_day(start),
+        ends_at: start_of_day(exclusive_end),
     })
 }
 
@@ -105,10 +106,7 @@ fn normalize_timed(
             .ok_or("That start date is out of range.")?,
     };
 
-    Ok(NormalizedInterval {
-        starts_at: format_instant(starts_at),
-        ends_at: format_instant(ends_at),
-    })
+    Ok(NormalizedInterval { starts_at, ends_at })
 }
 
 fn start_of_day(date: NaiveDate) -> DateTime<Utc> {

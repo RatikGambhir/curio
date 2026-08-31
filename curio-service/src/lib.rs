@@ -4,9 +4,17 @@ pub mod config;
 pub mod database;
 mod user;
 
+#[cfg(test)]
+extern crate self as curio_service;
+#[cfg(test)]
+#[path = "../tests/support/postgres.rs"]
+pub(crate) mod postgres_test_support;
+
+use std::time::Duration;
+
 use axum::{
     Json, Router,
-    extract::Request,
+    extract::{Request, State},
     http::{StatusCode, header},
     middleware::{self, Next},
     response::Response,
@@ -16,7 +24,12 @@ use http::HeaderValue;
 use serde::Serialize;
 use tower_http::cors::CorsLayer;
 
-use crate::{chat::ChatState, config::ServiceConfig, database::Database};
+use crate::{
+    chat::{ChatState, repository::ChatRepository},
+    config::ServiceConfig,
+    database::{Database, DatabaseOptions},
+    user::repository::UserRepository,
+};
 
 #[derive(Clone, Debug)]
 pub struct CurrentUser {
@@ -40,6 +53,20 @@ pub fn app() -> Router {
 }
 
 pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Error> {
+    let database = Database::connect(&DatabaseOptions {
+        url: config.database_url.clone(),
+        schema: config.database_schema.clone(),
+        max_connections: config.database_max_connections,
+        acquire_timeout: Duration::from_secs(config.database_acquire_timeout_seconds),
+        application_name: "curio-service".to_owned(),
+    })
+    .await?;
+    database.verify_migrations().await?;
+
+    Ok(app_with_database(config, database))
+}
+
+pub fn app_with_database(config: ServiceConfig, database: Database) -> Router {
     let allowed_origins = config
         .cors_allowed_origins
         .iter()
@@ -54,14 +81,13 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
             http::Method::DELETE,
         ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
-    let database = Database::connect(&config.database_url).await?;
     let calendar_api_routes = calendar::api_routes(database.clone());
-    let user_api_routes = user::api_routes(database.clone());
+    let user_api_routes = user::api_routes(UserRepository::new(database.clone()));
     let chat_state = ChatState::new(
         config.openai_api_key,
         config.openai_model,
         config.openai_base_url,
-        database,
+        ChatRepository::new(database.clone()),
     );
 
     let chat_routes = Router::new()
@@ -73,11 +99,16 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
         )
         .with_state(chat_state);
 
-    Ok(base_router()
+    let readiness_route = Router::new()
+        .route("/ready", get(readiness))
+        .with_state(database);
+
+    base_router()
+        .merge(readiness_route)
         .merge(chat_routes)
         .merge(calendar_api_routes)
         .merge(user_api_routes)
-        .layer(cors))
+        .layer(cors)
 }
 
 fn base_router() -> Router {
@@ -97,6 +128,18 @@ async fn root() -> &'static str {
 
 async fn health() -> Json<HealthResponse> {
     Json(HealthResponse { status: "ok" })
+}
+
+async fn readiness(State(database): State<Database>) -> (StatusCode, Json<HealthResponse>) {
+    match database.readiness().await {
+        Ok(()) => (StatusCode::OK, Json(HealthResponse { status: "ok" })),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(HealthResponse {
+                status: "unavailable",
+            }),
+        ),
+    }
 }
 
 pub(crate) async fn auth(mut request: Request, next: Next) -> Result<Response, StatusCode> {

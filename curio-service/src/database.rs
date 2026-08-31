@@ -1,278 +1,163 @@
-use std::str::FromStr;
+use std::{fmt, io, str::FromStr, time::Duration};
 
-use serde::Serialize;
+use chrono::{DateTime, Utc};
+use serde::Serializer;
 use sqlx::{
-    Row, SqlitePool,
-    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    PgPool,
+    migrate::{MigrateError, Migrator},
+    postgres::{PgConnectOptions, PgPoolOptions},
 };
 
-use crate::chat::protocol::ChatStreamRequest;
+use crate::config::validate_schema_name;
+
+pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations/postgres");
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct DatabaseOptions {
+    pub url: String,
+    pub schema: String,
+    pub max_connections: u32,
+    pub acquire_timeout: Duration,
+    pub application_name: String,
+}
+
+impl fmt::Debug for DatabaseOptions {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("DatabaseOptions")
+            .field("url", &"[REDACTED]")
+            .field("schema", &self.schema)
+            .field("max_connections", &self.max_connections)
+            .field("acquire_timeout", &self.acquire_timeout)
+            .field("application_name", &self.application_name)
+            .finish()
+    }
+}
 
 #[derive(Clone)]
 pub struct Database {
-    pool: SqlitePool,
-}
-
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct ConversationRecord {
-    pub id: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct UserRecord {
-    pub id: String,
-    pub name: String,
-    pub email: String,
-    pub avatar_url: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-#[derive(Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct MessageRecord {
-    pub id: String,
-    pub conversation_id: String,
-    pub role: String,
-    pub content: String,
-    pub status: String,
-    pub response_id: Option<String>,
-    pub error_code: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
+    pool: PgPool,
+    schema: String,
 }
 
 impl Database {
-    pub async fn connect(database_url: &str) -> Result<Self, sqlx::Error> {
-        let options = SqliteConnectOptions::from_str(database_url)?
-            .create_if_missing(true)
-            .foreign_keys(true);
-        let max_connections = if database_url.contains(":memory:") {
-            1
-        } else {
-            5
-        };
-        let pool = SqlitePoolOptions::new()
-            .max_connections(max_connections)
-            .connect_with(options)
-            .await?;
-
-        sqlx::migrate!().run(&pool).await?;
-        Ok(Self { pool })
-    }
-
-    pub(crate) fn pool(&self) -> &SqlitePool {
-        &self.pool
-    }
-
-    pub async fn begin_chat(&self, request: &ChatStreamRequest) -> Result<(), sqlx::Error> {
-        let mut transaction = self.pool.begin().await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO conversations (id)
-            VALUES (?1)
-            ON CONFLICT(id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
-            "#,
-        )
-        .bind(&request.conversation_id)
-        .execute(&mut *transaction)
-        .await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO messages (id, conversation_id, role, content, status)
-            VALUES (?1, ?2, 'user', ?3, 'completed')
-            "#,
-        )
-        .bind(&request.user_message_id)
-        .bind(&request.conversation_id)
-        .bind(&request.prompt)
-        .execute(&mut *transaction)
-        .await?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO messages (id, conversation_id, role, content, status)
-            VALUES (?1, ?2, 'assistant', '', 'pending')
-            "#,
-        )
-        .bind(&request.assistant_message_id)
-        .bind(&request.conversation_id)
-        .execute(&mut *transaction)
-        .await?;
-
-        transaction.commit().await
-    }
-
-    pub async fn complete_assistant(
-        &self,
-        request: &ChatStreamRequest,
-        content: &str,
-        response_id: &str,
-    ) -> Result<(), sqlx::Error> {
-        self.finish_assistant(request, content, "completed", Some(response_id), None)
-            .await
-    }
-
-    pub async fn fail_assistant(
-        &self,
-        request: &ChatStreamRequest,
-        content: &str,
-        error_code: &str,
-    ) -> Result<(), sqlx::Error> {
-        self.finish_assistant(request, content, "failed", None, Some(error_code))
-            .await
-    }
-
-    pub async fn interrupt_assistant(
-        &self,
-        request: &ChatStreamRequest,
-        content: &str,
-        error_code: &str,
-    ) -> Result<(), sqlx::Error> {
-        self.finish_assistant(request, content, "interrupted", None, Some(error_code))
-            .await
-    }
-
-    async fn finish_assistant(
-        &self,
-        request: &ChatStreamRequest,
-        content: &str,
-        status: &str,
-        response_id: Option<&str>,
-        error_code: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
-        let mut transaction = self.pool.begin().await?;
-        let result = sqlx::query(
-            r#"
-            UPDATE messages
-            SET content = ?1,
-                status = ?2,
-                response_id = ?3,
-                error_code = ?4,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?5 AND conversation_id = ?6 AND role = 'assistant'
-            "#,
-        )
-        .bind(content)
-        .bind(status)
-        .bind(response_id)
-        .bind(error_code)
-        .bind(&request.assistant_message_id)
-        .bind(&request.conversation_id)
-        .execute(&mut *transaction)
-        .await?;
-
-        if result.rows_affected() != 1 {
-            return Err(sqlx::Error::RowNotFound);
+    /// Opens and validates a PostgreSQL pool without applying any DDL.
+    pub async fn connect(options: &DatabaseOptions) -> Result<Self, sqlx::Error> {
+        if !validate_schema_name(&options.schema) {
+            return Err(configuration_error(
+                "CURIO_DB_SCHEMA is not a safe identifier",
+            ));
         }
 
-        sqlx::query("UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1")
-            .bind(&request.conversation_id)
-            .execute(&mut *transaction)
+        let connect_options =
+            PgConnectOptions::from_str(&options.url)?.application_name(&options.application_name);
+        let schema = options.schema.clone();
+        let search_path = format!("{schema},pg_catalog");
+
+        let pool = PgPoolOptions::new()
+            .max_connections(options.max_connections)
+            .acquire_timeout(options.acquire_timeout)
+            .after_connect(move |connection, _metadata| {
+                let schema = schema.clone();
+                let search_path = search_path.clone();
+                Box::pin(async move {
+                    sqlx::query("SET TIME ZONE 'UTC'")
+                        .execute(&mut *connection)
+                        .await?;
+                    sqlx::query_scalar::<_, String>("SELECT set_config('search_path', $1, false)")
+                        .bind(search_path)
+                        .fetch_one(&mut *connection)
+                        .await?;
+
+                    let current_schema =
+                        sqlx::query_scalar::<_, Option<String>>("SELECT current_schema()")
+                            .fetch_one(&mut *connection)
+                            .await?;
+                    if current_schema.as_deref() != Some(schema.as_str()) {
+                        return Err(configuration_error(
+                            "configured database schema does not exist or is not accessible",
+                        ));
+                    }
+
+                    Ok(())
+                })
+            })
+            .connect_with(connect_options)
             .await?;
 
-        transaction.commit().await
-    }
-
-    pub async fn save_user(
-        &self,
-        id: &str,
-        name: &str,
-        email: &str,
-        avatar_url: Option<&str>,
-    ) -> Result<UserRecord, sqlx::Error> {
-        sqlx::query(
-            r#"
-            INSERT INTO users (id, name, email, avatar_url)
-            VALUES (?1, ?2, ?3, ?4)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                email = excluded.email,
-                avatar_url = excluded.avatar_url,
-                updated_at = CURRENT_TIMESTAMP
-            "#,
-        )
-        .bind(id)
-        .bind(name)
-        .bind(email)
-        .bind(avatar_url)
-        .execute(&self.pool)
-        .await?;
-
-        let row = sqlx::query(
-            "SELECT id, name, email, avatar_url, created_at, updated_at FROM users WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(UserRecord {
-            id: row.try_get("id")?,
-            name: row.try_get("name")?,
-            email: row.try_get("email")?,
-            avatar_url: row.try_get("avatar_url")?,
-            created_at: row.try_get("created_at")?,
-            updated_at: row.try_get("updated_at")?,
+        Ok(Self {
+            pool,
+            schema: options.schema.clone(),
         })
     }
 
-    pub async fn list_conversations(&self) -> Result<Vec<ConversationRecord>, sqlx::Error> {
-        let rows = sqlx::query(
-            "SELECT id, created_at, updated_at FROM conversations ORDER BY updated_at DESC, id",
-        )
-        .fetch_all(&self.pool)
-        .await?;
-
-        rows.into_iter()
-            .map(|row| {
-                Ok(ConversationRecord {
-                    id: row.try_get("id")?,
-                    created_at: row.try_get("created_at")?,
-                    updated_at: row.try_get("updated_at")?,
-                })
-            })
-            .collect()
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
     }
 
-    pub async fn conversation_messages(
-        &self,
-        conversation_id: &str,
-    ) -> Result<Vec<MessageRecord>, sqlx::Error> {
-        let rows = sqlx::query(
+    pub fn schema(&self) -> &str {
+        &self.schema
+    }
+
+    pub async fn migrate(&self) -> Result<(), MigrateError> {
+        MIGRATOR.run(&self.pool).await
+    }
+
+    pub async fn verify_migrations(&self) -> Result<(), sqlx::Error> {
+        let Some(expected_version) = MIGRATOR.iter().last().map(|migration| migration.version)
+        else {
+            return Err(configuration_error("no PostgreSQL migrations are embedded"));
+        };
+
+        let migration_is_current = sqlx::query_scalar::<_, bool>(
             r#"
-            SELECT id, conversation_id, role, content, status, response_id, error_code,
-                   created_at, updated_at
-            FROM messages
-            WHERE conversation_id = ?1
-            ORDER BY created_at, rowid
+            SELECT EXISTS (
+                SELECT 1
+                FROM _sqlx_migrations
+                WHERE version = $1 AND success = TRUE
+            )
             "#,
         )
-        .bind(conversation_id)
-        .fetch_all(&self.pool)
+        .bind(expected_version)
+        .fetch_one(&self.pool)
         .await?;
 
-        rows.into_iter()
-            .map(|row| {
-                Ok(MessageRecord {
-                    id: row.try_get("id")?,
-                    conversation_id: row.try_get("conversation_id")?,
-                    role: row.try_get("role")?,
-                    content: row.try_get("content")?,
-                    status: row.try_get("status")?,
-                    response_id: row.try_get("response_id")?,
-                    error_code: row.try_get("error_code")?,
-                    created_at: row.try_get("created_at")?,
-                    updated_at: row.try_get("updated_at")?,
-                })
-            })
-            .collect()
+        if !migration_is_current {
+            return Err(configuration_error(
+                "database schema has not applied the expected migration",
+            ));
+        }
+
+        Ok(())
     }
+
+    pub async fn readiness(&self) -> Result<(), sqlx::Error> {
+        sqlx::query_scalar::<_, i32>("SELECT 1")
+            .fetch_one(&self.pool)
+            .await?;
+        self.verify_migrations().await
+    }
+
+    pub async fn close(&self) {
+        self.pool.close().await;
+    }
+}
+
+fn configuration_error(message: &'static str) -> sqlx::Error {
+    sqlx::Error::Configuration(Box::new(io::Error::new(
+        io::ErrorKind::InvalidInput,
+        message,
+    )))
+}
+
+pub(crate) fn serialize_timestamp<S>(
+    value: &DateTime<Utc>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&value.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
 #[cfg(test)]

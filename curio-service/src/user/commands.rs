@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     CurrentUser,
-    database::{Database, UserRecord},
+    user::repository::{UserRecord, UserRepository},
 };
 
 #[derive(Deserialize)]
@@ -67,7 +67,7 @@ fn user_error(status: StatusCode, error: &'static str) -> UserError {
 }
 
 pub async fn save_user(
-    State(database): State<Database>,
+    State(repository): State<UserRepository>,
     Extension(_current_user): Extension<CurrentUser>,
     Json(request): Json<SaveUserRequest>,
 ) -> Result<Json<UserRecord>, UserError> {
@@ -87,7 +87,7 @@ pub async fn save_user(
         ));
     }
 
-    match database.save_user(id, name, email, avatar_url).await {
+    match repository.save(id, name, email, avatar_url).await {
         Ok(user) => Ok(Json(user)),
         Err(sqlx::Error::Database(error)) if error.is_unique_violation() => Err(user_error(
             StatusCode::CONFLICT,

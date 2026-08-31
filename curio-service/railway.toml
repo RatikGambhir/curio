@@ -1,0 +1,10 @@
+[build]
+builder = "RAILPACK"
+
+[deploy]
+preDeployCommand = ["cargo run --release --bin curio_db -- migrate"]
+startCommand = "CURIO_SERVICE_ADDR=0.0.0.0:$PORT cargo run --release --bin curio-service"
+healthcheckPath = "/ready"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

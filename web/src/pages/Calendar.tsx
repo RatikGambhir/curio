@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useState, type FormEvent } from "react";
 
 import type { CalendarView } from "@/api/calendar";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -14,6 +14,11 @@ import type {
   CalendarStatus,
   CurioCalendarEvent,
 } from "@/components/calendar/calendar.types";
+import {
+  CalendarViewSwitcher,
+  type CalendarPageView,
+  type TaskLayout,
+} from "@/components/calendar/calendar-view-switcher";
 import type {
   CalendarQuickComposerRenderer,
   TaskItem,
@@ -25,6 +30,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Spinner } from "@/components/ui/spinner";
 import {
   useCalendarEvents,
   useCreateCalendarEvent,
@@ -42,6 +48,10 @@ const EVENT_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
   minute: "2-digit",
 });
+
+const CalendarTaskViews = lazy(
+  () => import("@/components/calendar/calendar-task-views"),
+);
 
 type CalendarCreateFormProps = Parameters<CalendarQuickComposerRenderer>[0];
 
@@ -122,6 +132,10 @@ const Calendar = () => {
   // Stable identity: an inline `new Date()` would take a fresh identity every
   // render and drive onRangeChange into a loop.
   const [now] = useState(() => new Date());
+  const [pageView, setPageView] = useState<CalendarPageView>("calendar");
+  const [taskLayout, setTaskLayout] = useState<TaskLayout>("list");
+  const [calendarView, setCalendarView] = useState<CalendarView>("month");
+  const [calendarDate, setCalendarDate] = useState(() => now);
   const [visibleRange, setVisibleRange] = useState<VisibleCalendarRange | null>(
     null,
   );
@@ -129,6 +143,12 @@ const Calendar = () => {
   const { mutate: createEvent } = useCreateCalendarEvent();
   const events = calendarQuery.data?.events ?? EMPTY_EVENTS;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const taskErrorMessage =
+    calendarQuery.isError && events.length === 0
+      ? calendarQuery.error instanceof Error
+        ? calendarQuery.error.message
+        : "Please try again."
+      : undefined;
 
   const handleTaskClick = useCallback((task: TaskItem) => {
     setSelectedEventId(task.id);
@@ -188,30 +208,61 @@ const Calendar = () => {
       <AppSidebar />
       <SidebarInset>
         <div className="flex h-full w-full min-w-0 flex-col">
-          <PageHeader />
-          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            <EventCalendar
-              data={events}
-              onItemAdded={handleItemAdded}
-              statusOptions={statusOptions}
-              priorityOptions={priorityOptions}
-              labelOptions={labelOptions}
-              statusColors={statusColors}
-              flagPriority={isHighPriority}
-              defaultView="month"
-              now={now}
-              showMiniNav
-              editable
-              editing={calendarEditing}
-              permissions={calendarPermissions}
-              renderQuickComposer={renderCreateComposer}
-              selectedId={selectedEventId}
-              onSelect={setSelectedEventId}
-              onTaskClick={handleTaskClick}
-              onRangeChange={handleRangeChange}
-              renderTooltip={renderTooltip}
-              className="h-full rounded-none border-0"
+          <PageHeader>
+            <CalendarViewSwitcher
+              pageView={pageView}
+              taskLayout={taskLayout}
+              onPageViewChange={setPageView}
+              onTaskLayoutChange={setTaskLayout}
             />
+          </PageHeader>
+          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            {pageView === "calendar" ? (
+              <EventCalendar
+                data={events}
+                onItemAdded={handleItemAdded}
+                statusOptions={statusOptions}
+                priorityOptions={priorityOptions}
+                labelOptions={labelOptions}
+                statusColors={statusColors}
+                flagPriority={isHighPriority}
+                view={calendarView}
+                onViewChange={setCalendarView}
+                date={calendarDate}
+                onDateChange={setCalendarDate}
+                now={now}
+                showMiniNav
+                editable
+                editing={calendarEditing}
+                permissions={calendarPermissions}
+                renderQuickComposer={renderCreateComposer}
+                selectedId={selectedEventId}
+                onSelect={setSelectedEventId}
+                onTaskClick={handleTaskClick}
+                onRangeChange={handleRangeChange}
+                renderTooltip={renderTooltip}
+                className="h-full rounded-none border-0"
+              />
+            ) : (
+              <Suspense
+                fallback={
+                  <div
+                    role="status"
+                    className="flex h-full items-center justify-center gap-2 bg-background text-sm text-muted-foreground"
+                  >
+                    <Spinner aria-hidden="true" />
+                    <span>Loading tasks…</span>
+                  </div>
+                }
+              >
+                <CalendarTaskViews
+                  layout={taskLayout}
+                  tasks={events}
+                  isLoading={calendarQuery.isPending && events.length === 0}
+                  errorMessage={taskErrorMessage}
+                />
+              </Suspense>
+            )}
           </main>
         </div>
       </SidebarInset>

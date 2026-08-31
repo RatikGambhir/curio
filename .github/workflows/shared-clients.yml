@@ -43,6 +43,24 @@ jobs:
 
   curio-service:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: curio_test
+          POSTGRES_USER: curio_test_runner
+          POSTGRES_PASSWORD: ci-local-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U curio_test_runner -d curio_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # This credential reaches only the disposable PostgreSQL container above.
+      # Pull-request code never receives a Railway or production secret.
+      CURIO_TEST_DATABASE_URL: postgresql://curio_test_runner:ci-local-only@127.0.0.1:5432/curio_test
     defaults:
       run:
         working-directory: curio-service
@@ -52,5 +70,15 @@ jobs:
         with:
           components: clippy,rustfmt
       - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Verify the default runtime excludes SQLite
+        shell: bash
+        run: |
+          dependency_tree="$(cargo tree --edges normal)"
+          grep -q "sqlx-postgres" <<<"$dependency_tree"
+          if grep -q "sqlx-sqlite" <<<"$dependency_tree"; then
+            echo "The default curio-service dependency graph includes sqlx-sqlite." >&2
+            exit 1
+          fi
       - run: cargo test
+      - run: cargo test --features sqlite-import --test sqlite_import

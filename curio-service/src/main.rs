@@ -14,12 +14,19 @@ async fn main() {
         }
     };
 
-    let app = app_with_config(config)
-        .await
-        .expect("failed to initialize curio-service database");
+    let app = match app_with_config(config).await {
+        Ok(app) => app,
+        Err(_) => {
+            eprintln!("curio-service database connection or migration verification failed");
+            std::process::exit(1);
+        }
+    };
 
-    let address =
-        std::env::var("CURIO_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_owned());
+    let address = std::env::var("CURIO_SERVICE_ADDR").unwrap_or_else(|_| {
+        std::env::var("PORT")
+            .map(|port| format!("0.0.0.0:{port}"))
+            .unwrap_or_else(|_| "127.0.0.1:3000".to_owned())
+    });
     let listener = tokio::net::TcpListener::bind(&address)
         .await
         .expect("failed to bind curio-service");

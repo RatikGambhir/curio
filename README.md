@@ -15,7 +15,7 @@ SPA or as the UI embedded in the Tauri desktop shell located at
                    |             Rust HTTP bridge (src-tauri)
                     \                    /
                           curio-service
-                     Axum + OpenAI + SQLite
+                  Axum + OpenAI + PostgreSQL
 ```
 
 `curio-service` is the backend for both clients. On the web, requests go
@@ -25,18 +25,32 @@ Authentication remains local mock state; it is shared by both builds but is not
 production authentication. The Cloudflare workers under `curio-workers` are
 legacy and no longer referenced by the clients.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the code boundaries and streaming
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the code boundaries and streaming
 flow, and [docs/deployment.md](docs/deployment.md) for deployment, SPA fallback,
 CORS, and desktop signing notes.
 
 ## Local development
 
-Start the service (it applies its SQLite migrations at startup):
+Copy `curio-service/.env.example` to `curio-service/.env`, then provide a
+PostgreSQL application-role URL in `DATABASE_URL`, a migrator-role URL in
+`CURIO_MIGRATOR_DATABASE_URL`, and `CURIO_DB_SCHEMA=curio_dev`. Local access to
+Railway requires its TLS public TCP proxy; do not use the production or Railway
+administrator credential for development.
+
+The current Vite server uses port 1420. Until the service example is aligned,
+also include `http://localhost:1420,http://127.0.0.1:1420` in
+`CURIO_CORS_ALLOWED_ORIGINS`; copying the example as-is lists only port 5173.
+
+Apply migrations explicitly, then start the service:
 
 ```bash
 cd curio-service
-OPENAI_API_KEY=... OPENAI_MODEL=gpt-4.1-mini cargo run
+cargo run --bin curio_db -- migrate
+cargo run --bin curio-service
 ```
+
+The web and desktop clients continue to connect only to `curio-service`; no
+PostgreSQL URL belongs in a Vite variable or client bundle.
 
 Install the canonical frontend once, then choose a target:
 
@@ -77,5 +91,13 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-Service checks run from `curio-service` with `cargo fmt --check`,
-`cargo clippy --all-targets -- -D warnings`, and `cargo test`.
+Service checks run from `curio-service`. `CURIO_TEST_DATABASE_URL` must identify
+a non-production test-runner role; the tests create and remove isolated
+`curio_test_*` schemas:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+cargo test --features sqlite-import --test sqlite_import
+```

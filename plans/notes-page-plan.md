@@ -469,7 +469,7 @@ on update. If they accumulate, that is the signal to either adopt the tree as
 app-owned or negotiate a narrow, reviewed gate exemption.
 
 Do not add a blanket vendor carve-out to `check-frontend-boundaries.mjs`. That
-script is a security boundary documented in `ARCHITECTURE.md`, and a wildcard
+script is a security boundary documented in `docs/ARCHITECTURE.md`, and a wildcard
 under `src/components/` would disable it for far more than the editor.
 
 ## Phase 6 — Persistence (not in this plan)
