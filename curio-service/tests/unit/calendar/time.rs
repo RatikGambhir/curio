@@ -9,26 +9,19 @@ fn date_only_values() {
 }
 
 #[test]
-fn inclusive_all_day_ends() {
+fn explicit_all_day_ends_are_exclusive() {
     let interval = normalize_event(true, "2026-06-22", Some("2026-06-25")).unwrap();
 
     assert_eq!(interval.starts_at, "2026-06-22T00:00:00.000Z");
-    assert_eq!(interval.ends_at, "2026-06-26T00:00:00.000Z");
+    assert_eq!(interval.ends_at, "2026-06-25T00:00:00.000Z");
 }
 
 #[test]
-fn milestones_and_zero_length_events() {
+fn milestones_receive_a_queryable_nominal_interval() {
     let milestone = normalize_event(false, "2026-06-22T14:00:00.000Z", None).unwrap();
-    let zero_length = normalize_event(
-        false,
-        "2026-06-22T14:00:00.000Z",
-        Some("2026-06-22T14:00:00.000Z"),
-    )
-    .unwrap();
 
     assert_eq!(milestone.ends_at, "2026-06-22T14:01:00.000Z");
     assert!(milestone.ends_at > milestone.starts_at);
-    assert_eq!(zero_length.ends_at, "2026-06-22T14:01:00.000Z");
 }
 
 #[test]
@@ -56,7 +49,16 @@ fn incompatible_formats() {
 
 #[test]
 fn invalid_ordering() {
+    assert!(normalize_event(true, "2026-06-22", Some("2026-06-22")).is_err());
     assert!(normalize_event(true, "2026-06-22", Some("2026-06-21")).is_err());
+    assert!(
+        normalize_event(
+            false,
+            "2026-06-22T14:00:00.000Z",
+            Some("2026-06-22T14:00:00.000Z")
+        )
+        .is_err()
+    );
     assert!(
         normalize_event(
             false,

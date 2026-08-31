@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CalendarEventRecord } from "@/api/calendar";
+import { calendarPermissions } from "@/components/calendar/calendar.config";
 import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data";
 import type { TaskItem } from "@/components/calendar/calendar.types";
 import {
@@ -100,6 +101,19 @@ describe("event classification", () => {
     expect(event.setAt).toBe("2026-06-22");
     expect(event.expireAt).toBe("2026-06-25");
     expect(classify(event)).toBe("all-day");
+  });
+});
+
+describe("calendar persistence permissions", () => {
+  it("keeps unsupported updates and deletes read-only", () => {
+    expect(calendarPermissions.default).toEqual({
+      edit: false,
+      remove: false,
+      addChildren: false,
+      drag: false,
+      toggleActive: false,
+      overrideColor: false,
+    });
   });
 });
 

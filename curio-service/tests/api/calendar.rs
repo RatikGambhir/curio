@@ -9,8 +9,6 @@ use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
 
-const TEST_TOKEN: &str = "Bearer development-token";
-
 async fn calendar_app() -> Router {
     let app = app_with_config(ServiceConfig {
         openai_api_key: "local-test-value".to_owned(),
@@ -32,6 +30,7 @@ async fn calendar_app() -> Router {
                     "name": id,
                     "email": format!("{id}@example.com")
                 }),
+                id,
             ))
             .await
             .unwrap();
@@ -41,23 +40,42 @@ async fn calendar_app() -> Router {
     app
 }
 
-fn authenticated_json(builder: axum::http::request::Builder, body: Value) -> Request<Body> {
+fn authenticated_json(
+    builder: axum::http::request::Builder,
+    body: Value,
+    bearer_token: &str,
+) -> Request<Body> {
     builder
-        .header(header::AUTHORIZATION, TEST_TOKEN)
+        .header(header::AUTHORIZATION, format!("Bearer {bearer_token}"))
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(body.to_string()))
         .unwrap()
 }
 
 fn create_request(event: Value) -> Request<Body> {
-    authenticated_json(Request::post("/v1/calendar/events"), event)
+    let bearer_token = event["userId"].as_str().unwrap_or("user-a").to_owned();
+    create_request_as(&bearer_token, event)
+}
+
+fn create_request_as(bearer_token: &str, event: Value) -> Request<Body> {
+    authenticated_json(Request::post("/v1/calendar/events"), event, bearer_token)
 }
 
 fn list_request(user_id: &str, view: &str, start: &str, end: &str) -> Request<Body> {
+    list_request_as(user_id, user_id, view, start, end)
+}
+
+fn list_request_as(
+    bearer_token: &str,
+    user_id: &str,
+    view: &str,
+    start: &str,
+    end: &str,
+) -> Request<Body> {
     Request::get(format!(
         "/v1/calendar/events?userId={user_id}&view={view}&start={start}&end={end}"
     ))
-    .header(header::AUTHORIZATION, TEST_TOKEN)
+    .header(header::AUTHORIZATION, format!("Bearer {bearer_token}"))
     .body(Body::empty())
     .unwrap()
 }
@@ -136,6 +154,39 @@ mod authentication {
 
         assert_eq!(create.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(list.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn bearer_identity_cannot_access_another_users_calendar() {
+        let app = calendar_app().await;
+        let create = app
+            .clone()
+            .oneshot(create_request_as(
+                "user-a",
+                timed_event(
+                    "cross-user-event",
+                    "user-b",
+                    "2026-06-22T14:00:00.000Z",
+                    None,
+                ),
+            ))
+            .await
+            .unwrap();
+        let list = app
+            .oneshot(list_request_as(
+                "user-b",
+                "user-a",
+                "day",
+                "2026-06-22T00:00:00.000Z",
+                "2026-06-23T00:00:00.000Z",
+            ))
+            .await
+            .unwrap();
+
+        assert_eq!(create.status(), StatusCode::FORBIDDEN);
+        assert_eq!(list.status(), StatusCode::FORBIDDEN);
+        assert!(json_body(create).await["error"].is_string());
+        assert!(json_body(list).await["error"].is_string());
     }
 }
 
@@ -230,6 +281,11 @@ mod ranges {
                 "2026-06-24T00:00:00.000Z",
             ),
             (
+                "day",
+                "2026-06-24T00:00:00.000Z",
+                "2026-06-25T00:00:00.000Z",
+            ),
+            (
                 "week",
                 "2026-06-21T00:00:00.000Z",
                 "2026-06-28T00:00:00.000Z",
@@ -244,6 +300,16 @@ mod ranges {
             assert_eq!(events.len(), 1);
             assert_eq!(events[0]["id"], "all-day-span");
         }
+
+        let events = list_events(
+            &app,
+            "user-a",
+            "day",
+            "2026-06-25T00:00:00.000Z",
+            "2026-06-26T00:00:00.000Z",
+        )
+        .await;
+        assert!(events.is_empty());
     }
 
     #[tokio::test]
@@ -313,6 +379,7 @@ mod validation {
             .await
             .unwrap();
         let bad_status = app
+            .clone()
             .oneshot(create_request(json!({
                 "userId": "user-a",
                 "title": "Design review",
@@ -322,11 +389,21 @@ mod validation {
             })))
             .await
             .unwrap();
+        let zero_length = app
+            .oneshot(create_request(timed_event(
+                "zero-length",
+                "user-a",
+                "2026-06-22T14:00:00.000Z",
+                Some("2026-06-22T14:00:00.000Z"),
+            )))
+            .await
+            .unwrap();
 
         assert_eq!(duplicate.status(), StatusCode::CONFLICT);
         assert_eq!(blank.status(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(unknown_user.status(), StatusCode::UNPROCESSABLE_ENTITY);
         assert_eq!(bad_status.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(zero_length.status(), StatusCode::UNPROCESSABLE_ENTITY);
         assert!(json_body(duplicate).await["error"].is_string());
         assert!(json_body(blank).await["error"].is_string());
         assert_eq!(
@@ -334,6 +411,7 @@ mod validation {
             "No profile exists for that user yet."
         );
         assert!(json_body(bad_status).await["error"].is_string());
+        assert!(json_body(zero_length).await["error"].is_string());
     }
 
     #[tokio::test]

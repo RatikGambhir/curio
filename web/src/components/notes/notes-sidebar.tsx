@@ -11,6 +11,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
 
 import { NotesNav } from "./notes-nav"
@@ -60,6 +61,7 @@ export function NotesSidebar({
               className="h-7 w-auto object-contain"
             />
           </Link>
+          <SidebarTrigger className="ml-auto md:hidden" />
         </div>
       </SidebarHeader>
       <SidebarContent>

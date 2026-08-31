@@ -1,7 +1,18 @@
 import { NotebookPen } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
-export function ThoughtCard() {
+import {
+  HOME_THOUGHT_MAX_LENGTH,
+  readHomeThought,
+  writeHomeThought,
+} from "@/features/home/thought-storage";
+
+export function ThoughtCard({ userId }: { userId: string }) {
+  const [thought, setThought] = useState(() =>
+    readHomeThought(window.localStorage, userId),
+  );
+
   return (
     <section
       aria-labelledby="seedling-thoughts-title"
@@ -30,10 +41,23 @@ export function ThoughtCard() {
 
       <textarea
         aria-labelledby="seedling-thoughts-title"
+        aria-describedby="seedling-thoughts-storage-note"
         placeholder="Jot down a quick thought…"
-        maxLength={500}
+        value={thought}
+        onChange={(event) => {
+          const nextThought = event.target.value;
+          setThought(nextThought);
+          writeHomeThought(window.localStorage, userId, nextThought);
+        }}
+        maxLength={HOME_THOUGHT_MAX_LENGTH}
         className="mt-4 min-h-[7rem] w-full flex-1 resize-none bg-transparent text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground/55 focus-visible:placeholder:text-muted-foreground/35 sm:text-[1.0625rem]"
       />
+      <p
+        id="seedling-thoughts-storage-note"
+        className="mt-2 text-xs text-muted-foreground"
+      >
+        Saved on this device
+      </p>
     </section>
   );
 }

@@ -53,6 +53,9 @@ impl ServiceRepository {
         if !path.starts_with('/') || path.starts_with("//") {
             return Err("Service paths must begin with one forward slash.".to_owned());
         }
+        if path.contains('\\') {
+            return Err("Service paths cannot include backslashes.".to_owned());
+        }
 
         let endpoint = self
             .base_url
@@ -63,6 +66,9 @@ impl ServiceRepository {
         }
         if endpoint.fragment().is_some() {
             return Err("Service paths cannot include fragments.".to_owned());
+        }
+        if !endpoint.username().is_empty() || endpoint.password().is_some() {
+            return Err("Service paths cannot include credentials.".to_owned());
         }
         Ok(endpoint)
     }

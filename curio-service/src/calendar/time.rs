@@ -67,18 +67,18 @@ fn normalize_all_day(
     end_date: Option<&str>,
 ) -> Result<NormalizedInterval, &'static str> {
     let start = parse_date(start_date).ok_or("The start date could not be parsed.")?;
-    let last_day = match end_date {
-        Some(end_date) => parse_date(end_date).ok_or("The end date could not be parsed.")?,
-        None => start,
+    let exclusive_end = match end_date {
+        Some(end_date) => {
+            let end = parse_date(end_date).ok_or("The end date could not be parsed.")?;
+            if end <= start {
+                return Err("The end date must fall after the start date.");
+            }
+            end
+        }
+        None => start
+            .checked_add_days(Days::new(1))
+            .ok_or("That start date is out of range.")?,
     };
-
-    if last_day < start {
-        return Err("The end date cannot fall before the start date.");
-    }
-
-    let exclusive_end = last_day
-        .checked_add_days(Days::new(1))
-        .ok_or("That end date is out of range.")?;
 
     Ok(NormalizedInterval {
         starts_at: format_instant(start_of_day(start)),
@@ -91,17 +91,18 @@ fn normalize_timed(
     end_date: Option<&str>,
 ) -> Result<NormalizedInterval, &'static str> {
     let starts_at = parse_timestamp(start_date).ok_or("The start date could not be parsed.")?;
-    let nominal_end = starts_at + Duration::minutes(NOMINAL_MILESTONE_MINUTES);
 
     let ends_at = match end_date {
         Some(end_date) => {
             let ends_at = parse_timestamp(end_date).ok_or("The end date could not be parsed.")?;
-            if ends_at < starts_at {
-                return Err("The end date cannot fall before the start date.");
+            if ends_at <= starts_at {
+                return Err("The end date must fall after the start date.");
             }
-            ends_at.max(nominal_end)
+            ends_at
         }
-        None => nominal_end,
+        None => starts_at
+            .checked_add_signed(Duration::minutes(NOMINAL_MILESTONE_MINUTES))
+            .ok_or("That start date is out of range.")?,
     };
 
     Ok(NormalizedInterval {

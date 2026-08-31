@@ -19,6 +19,13 @@ fn paths_are_scoped_to_the_configured_origin() {
     assert!(repository
         .endpoint("//attacker.example/v1/conversations")
         .is_err());
+    // URL parsers treat backslashes as authority separators for HTTPS URLs.
+    // Reject them before same-origin credentials can become an extra
+    // Authorization header in reqwest.
+    assert!(repository
+        .endpoint(r"/\user:secret@service.example/v1/conversations")
+        .is_err());
+    assert!(repository.endpoint(r"/v1\conversations").is_err());
     assert!(repository.endpoint("/v1/conversations#private").is_err());
     assert!(ServiceRepository::new("file:///tmp/service").is_err());
     assert!(ServiceRepository::new("https://user:secret@service.example").is_err());

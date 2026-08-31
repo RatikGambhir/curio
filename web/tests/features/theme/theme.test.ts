@@ -133,6 +133,22 @@ describe("parseThemePreference", () => {
 
     expect(parsed.customThemes).toHaveLength(MAX_CUSTOM_THEMES)
   })
+
+  it("drops custom ids that would collide in the picker", () => {
+    const parsed = parseThemePreference(
+      JSON.stringify({
+        customThemes: [
+          { id: "sky", color: "#123456" },
+          { id: " custom-1 ", label: "First", color: "#123456" },
+          { id: "custom-1", label: "Duplicate", color: "#654321" },
+        ],
+      }),
+    )
+
+    expect(parsed.customThemes).toEqual([
+      { id: "custom-1", label: "First", color: "#123456" },
+    ])
+  })
 })
 
 describe("theme preference storage", () => {

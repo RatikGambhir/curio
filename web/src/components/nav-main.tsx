@@ -8,26 +8,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { cn } from "@/lib/utils"
-
-function GroupLabelAction({
-  className,
-  ...props
-}: React.ComponentProps<"button">) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        "flex size-6 shrink-0 items-center justify-center rounded-full text-sidebar-foreground outline-none transition-colors",
-        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        "[&_svg]:size-3.5 [&_svg]:shrink-0",
-        className,
-      )}
-      {...props}
-    />
-  )
-}
 
 export function PlatformHeader() {
   return (
@@ -36,12 +18,13 @@ export function PlatformHeader() {
         Platform
       </span>
       <span className="flex items-center gap-1">
-        <GroupLabelAction
-          aria-label="Search"
-          className="bg-sidebar-accent hover:bg-sidebar-accent/80"
+        <Link
+          to="/vault"
+          aria-label="Search vault"
+          className="flex size-6 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-accent/80 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden [&_svg]:size-3.5 [&_svg]:shrink-0"
         >
           <Search />
-        </GroupLabelAction>
+        </Link>
         <Link
           to="/chat"
           aria-label="New chat"
@@ -49,6 +32,7 @@ export function PlatformHeader() {
         >
           <SquarePen />
         </Link>
+        <SidebarTrigger className="md:hidden" />
       </span>
     </div>
   )
@@ -73,7 +57,11 @@ export function NavMain({
           const isActive = isRoute && location.pathname === item.url
           return (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title} isActive={isActive} asChild>
+              <SidebarMenuButton
+                tooltip={item.title}
+                isActive={isActive}
+                asChild
+              >
                 {isRoute ? (
                   <NavLink to={item.url}>
                     {item.icon && <item.icon />}

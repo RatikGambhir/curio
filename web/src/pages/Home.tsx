@@ -43,7 +43,7 @@ const Home = () => {
               </header>
 
               <div className="mt-8 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,2.1fr)_minmax(17rem,1fr)]">
-                <ThoughtCard />
+                <ThoughtCard userId={user?.id ?? "anonymous"} />
                 <UpcomingCard items={UPCOMING_ITEMS} />
               </div>
 

@@ -10,6 +10,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
 import type { ChatListItem } from "@/features/chat/types"
 import ChatNav from "./ui/chat-nav"
@@ -58,6 +59,7 @@ export function ChatSidebar({
               className="h-7 w-auto object-contain"
             />
           </Link>
+          <SidebarTrigger className="ml-auto md:hidden" />
         </div>
       </SidebarHeader>
       <SidebarContent>

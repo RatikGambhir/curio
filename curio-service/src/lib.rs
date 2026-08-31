@@ -19,7 +19,15 @@ use tower_http::cors::CorsLayer;
 use crate::{chat::ChatState, config::ServiceConfig, database::Database};
 
 #[derive(Clone, Debug)]
-pub struct CurrentUser;
+pub struct CurrentUser {
+    id: String,
+}
+
+impl CurrentUser {
+    pub(crate) fn owns(&self, user_id: &str) -> bool {
+        self.id == user_id.trim()
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,6 +117,8 @@ pub(crate) async fn auth(mut request: Request, next: Next) -> Result<Response, S
 async fn authorize_current_user(auth_header: &str) -> Option<CurrentUser> {
     auth_header
         .strip_prefix("Bearer ")
-        .filter(|token| !token.trim().is_empty())
-        .map(|_| CurrentUser)
+        .filter(|token| !token.is_empty() && !token.as_bytes().iter().any(u8::is_ascii_whitespace))
+        .map(|token| CurrentUser {
+            id: token.to_owned(),
+        })
 }

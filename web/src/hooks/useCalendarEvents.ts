@@ -25,6 +25,10 @@ export function calendarEventsKey(
   ] as const
 }
 
+export function calendarEventsKeyPrefix(userId: string | undefined) {
+  return ["calendar", userId ?? null] as const
+}
+
 /** Preserve the date strings: their format controls all-day/timed rendering. */
 export function calendarRecordToEvent(
   record: CalendarEventRecord,
@@ -64,7 +68,7 @@ export function useCalendarEvents(range: VisibleCalendarRange | null) {
   })
 }
 
-export function useCreateCalendarEvent(range: VisibleCalendarRange | null) {
+export function useCreateCalendarEvent() {
   const { user } = useAuthenticatedUser()
   const queryClient = useQueryClient()
   const userId = user?.id
@@ -76,10 +80,12 @@ export function useCreateCalendarEvent(range: VisibleCalendarRange | null) {
       }
       return createCalendarEvent({ ...input, userId }, { bearerToken: userId })
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: calendarEventsKey(userId, range),
-      })
-    },
+    // Always reconcile every cached range with server truth. A successful
+    // create can overlap more than the range it was composed in, while a
+    // rejected POST must leave the controlled calendar unchanged.
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: calendarEventsKeyPrefix(userId),
+      }),
   })
 }

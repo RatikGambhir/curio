@@ -116,12 +116,14 @@ function parseCustomTheme(value: unknown): CustomTheme | null {
     ? normalizeHexColor(candidate.color)
     : null
 
-  if (!color || typeof candidate.id !== "string" || !candidate.id) {
+  const id = typeof candidate.id === "string" ? candidate.id.trim() : ""
+
+  if (!color || !id) {
     return null
   }
 
   return {
-    id: candidate.id,
+    id,
     label: normalizeThemeLabel(candidate.label, color),
     color,
   }
@@ -152,12 +154,23 @@ export function parseThemePreference(value: string | null): ThemePreference {
 
   try {
     const parsed = JSON.parse(value) as Partial<ThemePreference>
-    const customThemes = Array.isArray(parsed.customThemes)
+    const parsedCustomThemes = Array.isArray(parsed.customThemes)
       ? parsed.customThemes
           .map(parseCustomTheme)
           .filter((theme): theme is CustomTheme => theme !== null)
-          .slice(0, MAX_CUSTOM_THEMES)
       : []
+    const reservedIds = new Set(BUILTIN_THEMES.map((theme) => theme.id))
+    const customThemes: CustomTheme[] = []
+    for (const theme of parsedCustomThemes) {
+      if (reservedIds.has(theme.id)) {
+        continue
+      }
+      reservedIds.add(theme.id)
+      customThemes.push(theme)
+      if (customThemes.length === MAX_CUSTOM_THEMES) {
+        break
+      }
+    }
 
     const themeId =
       typeof parsed.themeId === "string" && parsed.themeId

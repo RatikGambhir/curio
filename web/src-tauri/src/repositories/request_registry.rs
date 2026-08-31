@@ -42,7 +42,6 @@ impl RequestRegistry {
             .lock()
             .map_err(|_| "Desktop service cancellation state is unavailable.".to_owned())
     }
-
 }
 
 #[cfg(test)]
