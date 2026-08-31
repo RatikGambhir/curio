@@ -23,7 +23,9 @@ describe("web service transport", () => {
   it("posts JSON bodies and streams chunks after reporting the status", async () => {
     const encoder = new TextEncoder()
     const fetchMock = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
-      expect(String(input)).toBe("http://127.0.0.1:3000/v1/chat/stream")
+      expect(String(input)).toBe(
+        new URL("/v1/chat/stream", __CURIO_SERVICE_URL__).href,
+      )
       expect(init?.method).toBe("POST")
       expect(new Headers(init?.headers).get("Content-Type")).toBe(
         "application/json",
