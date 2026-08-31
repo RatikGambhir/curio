@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 
+import type { CalendarView } from "@/api/calendar";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   calendarPermissions,
@@ -8,67 +9,163 @@ import {
   statusColors,
   statusOptions,
 } from "@/components/calendar/calendar.config";
-import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data";
-import type { CurioCalendarEvent } from "@/components/calendar/calendar.types";
-import type { TaskItem } from "@/components/event-calendar";
+import type {
+  CalendarPriority,
+  CalendarStatus,
+  CurioCalendarEvent,
+} from "@/components/calendar/calendar.types";
+import type {
+  CalendarQuickComposerRenderer,
+  TaskItem,
+  TaskItemAddedEvent,
+} from "@/components/event-calendar";
 import { EventCalendar } from "@/components/event-calendar";
 import { calendarEditing } from "@/components/event-calendar/features/editing";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import {
+  useCalendarEvents,
+  useCreateCalendarEvent,
+  type VisibleCalendarRange,
+} from "@/hooks/useCalendarEvents";
 
-function findEvent(
-  items: readonly TaskItem[],
-  eventId: string | null,
-): TaskItem | undefined {
-  if (!eventId) {
-    return undefined;
-  }
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const EMPTY_EVENTS: CurioCalendarEvent[] = [];
+const EVENT_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+const EVENT_TIME_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  hour: "numeric",
+  minute: "2-digit",
+});
 
-  for (const item of items) {
-    if (item.id === eventId) {
-      return item;
+type CalendarCreateFormProps = Parameters<CalendarQuickComposerRenderer>[0];
+
+function CalendarCreateForm({
+  date,
+  allDay,
+  defaultEnd,
+  commit,
+  cancel,
+}: CalendarCreateFormProps) {
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const when = allDay
+    ? `${EVENT_DATE_FORMATTER.format(date)} · all day`
+    : `${EVENT_DATE_FORMATTER.format(date)} · ${EVENT_TIME_FORMATTER.format(date)}–${EVENT_TIME_FORMATTER.format(defaultEnd)}`;
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) {
+      setError("Enter a title for the event.");
+      return;
     }
-    const child = findEvent(item.children ?? [], eventId);
-    if (child) {
-      return child;
-    }
-  }
+    commit({ name: normalizedTitle });
+  };
 
-  return undefined;
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">{when}</p>
+      <Input
+        autoFocus
+        value={title}
+        onChange={(event) => {
+          setTitle(event.target.value);
+          setError(null);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            cancel();
+          }
+        }}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? "calendar-create-error" : undefined}
+        placeholder="Event title"
+        className="h-8"
+      />
+      {error ? (
+        <p
+          id="calendar-create-error"
+          role="alert"
+          className="text-xs text-destructive"
+        >
+          {error}
+        </p>
+      ) : null}
+      <div className="flex justify-end gap-1.5">
+        <Button type="button" size="sm" variant="ghost" onClick={cancel}>
+          Cancel
+        </Button>
+        <Button type="submit" size="sm">
+          Create
+        </Button>
+      </div>
+    </form>
+  );
 }
 
 const isHighPriority = (item: TaskItem) => item.priority === "high";
+const isCalendarStatus = (value: string): value is CalendarStatus =>
+  statusOptions.some((option) => option.value === value);
+const isCalendarPriority = (
+  value: string | undefined,
+): value is CalendarPriority =>
+  value !== undefined &&
+  priorityOptions.some((option) => option.value === value);
 
 const Calendar = () => {
   // Stable identity: an inline `new Date()` would take a fresh identity every
   // render and drive onRangeChange into a loop.
   const [now] = useState(() => new Date());
-  const [events, setEvents] = useState<CurioCalendarEvent[]>(() =>
-    buildMockCalendarEvents(now),
+  const [visibleRange, setVisibleRange] = useState<VisibleCalendarRange | null>(
+    null,
   );
+  const calendarQuery = useCalendarEvents(visibleRange);
+  const { mutate: createEvent } = useCreateCalendarEvent();
+  const events = calendarQuery.data?.events ?? EMPTY_EVENTS;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-
-  const selectedEvent = useMemo(
-    () => findEvent(events, selectedEventId),
-    [events, selectedEventId],
-  );
-
-  const handleEventsChange = useCallback((nextEvents: TaskItem[]) => {
-    setEvents(nextEvents);
-    setSelectedEventId((currentId) =>
-      findEvent(nextEvents, currentId) ? currentId : null,
-    );
-  }, []);
 
   const handleTaskClick = useCallback((task: TaskItem) => {
     setSelectedEventId(task.id);
   }, []);
 
-  const handleRangeChange = useCallback(() => {
-    // Phase 1 renders every event from memory. When `GET /v1/events?start=&end=`
-    // exists this is where the visible range drives the query — through
-    // src/api/, never a network call from page code.
-  }, []);
+  const handleRangeChange = useCallback(
+    (range: { view: CalendarView; start: Date; end: Date }) => {
+      setVisibleRange({
+        view: range.view,
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+      });
+    },
+    [],
+  );
+
+  const handleItemAdded = useCallback(
+    ({ item }: TaskItemAddedEvent) => {
+      const startDate = item.startAt ?? item.setAt;
+      createEvent({
+        id: item.id,
+        title: item.name,
+        description: item.description ?? null,
+        status: isCalendarStatus(item.status) ? item.status : null,
+        priority: isCalendarPriority(item.priority) ? item.priority : null,
+        allDay: DATE_ONLY.test(startDate),
+        startDate,
+        endDate: item.expireAt ?? null,
+      });
+    },
+    [createEvent],
+  );
+
+  const renderCreateComposer = useCallback<CalendarQuickComposerRenderer>(
+    (props) => <CalendarCreateForm {...props} />,
+    [],
+  );
 
   const renderTooltip = useCallback(
     (task: TaskItem) => (
@@ -86,29 +183,16 @@ const Calendar = () => {
     [],
   );
 
-  const selectionLabel = useMemo(() => {
-    if (!selectedEvent) {
-      return "Select an event to see it here";
-    }
-    return `${selectedEvent.name} · ${selectedEvent.status}`;
-  }, [selectedEvent]);
-
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <div className="flex h-screen w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full min-w-0 flex-col">
           <PageHeader />
-          <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3 pb-2">
-            <h1 className="text-lg font-semibold text-foreground">Calendar</h1>
-            <span className="truncate text-xs text-muted-foreground">
-              {selectionLabel}
-            </span>
-          </div>
-          <main className="min-h-0 flex-1 px-4 pb-4">
+          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
             <EventCalendar
               data={events}
-              onChange={handleEventsChange}
+              onItemAdded={handleItemAdded}
               statusOptions={statusOptions}
               priorityOptions={priorityOptions}
               labelOptions={labelOptions}
@@ -120,12 +204,13 @@ const Calendar = () => {
               editable
               editing={calendarEditing}
               permissions={calendarPermissions}
+              renderQuickComposer={renderCreateComposer}
               selectedId={selectedEventId}
               onSelect={setSelectedEventId}
               onTaskClick={handleTaskClick}
               onRangeChange={handleRangeChange}
               renderTooltip={renderTooltip}
-              className="h-full"
+              className="h-full rounded-none border-0"
             />
           </main>
         </div>

@@ -11,7 +11,9 @@ describe("api client", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
-        expect(String(input)).toBe("http://127.0.0.1:3000/v1/users")
+        expect(String(input)).toBe(
+          new URL("/v1/users", __CURIO_SERVICE_URL__).href,
+        )
         expect(init?.method).toBe("POST")
         expect(new Headers(init?.headers).get("Authorization")).toBe(
           "Bearer user-1",

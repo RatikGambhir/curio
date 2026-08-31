@@ -39,7 +39,7 @@ export function AttachmentsTab({
   }
 
   return (
-    <section className="rounded-[2rem] border border-border bg-card p-6 shadow-md sm:p-8">
+    <section className="p-6 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-card-foreground">Attachments</h2>
@@ -53,7 +53,7 @@ export function AttachmentsTab({
           value={selectedFilter}
           onValueChange={(value) => onFilterChange(value as AttachmentFilter)}
         >
-          <SelectTrigger className="w-[11.25rem] rounded-full border-none bg-accent text-accent-foreground shadow-xs hover:bg-accent/85">
+          <SelectTrigger className="w-[11.25rem] rounded-md border-none bg-accent text-accent-foreground shadow-xs hover:bg-accent/85">
             <SelectValue placeholder="All files" />
           </SelectTrigger>
           <SelectContent align="end">
@@ -66,7 +66,7 @@ export function AttachmentsTab({
         </Select>
       </div>
 
-      <div className="mt-8 overflow-hidden rounded-2xl border border-border bg-secondary/70">
+      <div className="mt-8 overflow-hidden border border-border bg-secondary/70">
         <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold text-muted-foreground sm:grid-cols-[2.5rem_minmax(0,1fr)_11rem]">
           <input
             type="checkbox"
@@ -114,7 +114,7 @@ export function AttachmentsTab({
         ) : (
           <div className="flex min-h-[18rem] items-center justify-center bg-card px-6 py-10">
             <div className="flex max-w-sm flex-col items-center text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+              <div className="flex size-14 items-center justify-center rounded-md bg-accent text-accent-foreground">
                 <Inbox className="size-6" />
               </div>
               <h3 className="mt-4 text-xl font-bold text-card-foreground">

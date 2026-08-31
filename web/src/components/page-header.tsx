@@ -10,7 +10,7 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "flex h-16 shrink-0 items-center gap-3 border-b border-border bg-background px-4",
+        "flex h-[2.75rem] shrink-0 items-center gap-3 border-b-[0.5px] border-border bg-card px-[1.25rem] md:h-[calc(var(--app-header-height)-0.5px)]",
         className,
       )}
       {...props}

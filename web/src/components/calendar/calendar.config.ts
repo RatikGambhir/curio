@@ -61,14 +61,20 @@ export const statusColors: Record<string, string> = {
   cancelled: "var(--chart-4)",
 };
 
-/** Demo policy using the shared task-card permission matrix. */
+/**
+ * The current calendar service can create and list events, but it does not yet
+ * expose update or delete endpoints. Keep stored events read-only so the UI
+ * never presents a rename, drag, resize, status change, or delete as saved when
+ * it only changed the in-memory calendar. Root-level creation is controlled by
+ * the calendar's `editable` flag and remains available.
+ */
 export const calendarPermissions: TaskPermissions = {
   default: {
-    edit: true,
-    remove: true,
-    addChildren: true,
-    drag: true,
-    toggleActive: true,
-    overrideColor: true,
+    edit: false,
+    remove: false,
+    addChildren: false,
+    drag: false,
+    toggleActive: false,
+    overrideColor: false,
   },
 };

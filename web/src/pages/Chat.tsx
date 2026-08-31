@@ -93,10 +93,10 @@ const Chat = () => {
         onSelectChat={setSelectedChatId}
         onStartNewChat={handleStartNewChat}
       />
-      <SidebarInset className="bg-background">
-        <div className="flex h-full w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full flex-col">
           <PageHeader />
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-5 md:px-8 md:py-6">
           <AnimatePresence mode="popLayout" initial={false}>
             {isNewChat ? (
               <motion.div

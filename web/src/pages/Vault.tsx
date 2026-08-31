@@ -63,8 +63,8 @@ const Vault = () => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <div className="flex h-full w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full flex-col">
           <PageHeader />
 
           <main className="min-h-0 flex-1 overflow-y-auto">

@@ -21,7 +21,7 @@ export function AccountTab() {
   }
 
   return (
-    <section className="rounded-[2rem] border border-border bg-card p-8 shadow-md">
+    <section className="p-6 sm:p-8">
       <h2 className="text-2xl font-bold text-card-foreground">Account</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Update the profile Curio stores for your account.

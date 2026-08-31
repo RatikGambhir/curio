@@ -6,9 +6,9 @@ type SettingsConstructionStateProps = {
 
 export function SettingsConstructionState({ title }: SettingsConstructionStateProps) {
   return (
-    <section className="flex min-h-[26rem] items-center justify-center rounded-[2rem] border border-border bg-card p-8 shadow-md">
+    <section className="flex min-h-[26rem] items-center justify-center p-6 sm:p-8">
       <div className="flex max-w-sm flex-col items-center text-center">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+        <div className="flex size-14 items-center justify-center rounded-md bg-accent text-accent-foreground">
           <Hammer className="size-6" />
         </div>
         <h2 className="mt-4 text-2xl font-bold text-card-foreground">{title}</h2>

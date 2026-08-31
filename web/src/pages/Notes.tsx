@@ -87,8 +87,8 @@ const Notes = () => {
         onSelectNote={setSelectedNoteId}
         onCreateNote={handleCreateNote}
       />
-      <SidebarInset className="bg-background">
-        <div className="flex h-full w-full flex-col bg-background">
+      <SidebarInset>
+        <div className="flex h-full w-full flex-col">
           <PageHeader>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold text-foreground">
@@ -119,7 +119,7 @@ const Notes = () => {
               />
             </main>
           ) : (
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-5 md:px-8 md:py-6">
+            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-5 md:px-8 md:py-6">
               <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
                 <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
                   <NotebookPen className="size-5" />

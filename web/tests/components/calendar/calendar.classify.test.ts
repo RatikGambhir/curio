@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import type { CalendarEventRecord } from "@/api/calendar";
+import { calendarPermissions } from "@/components/calendar/calendar.config";
 import { buildMockCalendarEvents } from "@/components/calendar/calendar.mock-data";
 import type { TaskItem } from "@/components/calendar/calendar.types";
 import {
@@ -12,6 +14,7 @@ import {
   formatDateValue,
   setWindow,
 } from "@/components/event-calendar/features/editing/lib/edit-mutations";
+import { calendarRecordToEvent } from "@/hooks/useCalendarEvents";
 
 const allDayTask: TaskItem = {
   id: "all-day",
@@ -76,6 +79,41 @@ describe("event classification", () => {
     expect(parseDateValue("2026-06-22").dateOnly).toBe(true);
     expect(parseDateValue("2026-06-22T14:00:00.000Z").dateOnly).toBe(false);
     expect(parseDateValue(undefined).dateOnly).toBe(false);
+  });
+
+  it("classifies an API record without normalizing its date strings", () => {
+    const record: CalendarEventRecord = {
+      id: "api-all-day",
+      userId: "user-1",
+      title: "Offsite",
+      description: null,
+      status: "scheduled",
+      priority: "medium",
+      allDay: true,
+      startDate: "2026-06-22",
+      endDate: "2026-06-25",
+      createdAt: "2026-06-01 00:00:00",
+      updatedAt: "2026-06-01 00:00:00",
+    };
+
+    const event = calendarRecordToEvent(record);
+
+    expect(event.setAt).toBe("2026-06-22");
+    expect(event.expireAt).toBe("2026-06-25");
+    expect(classify(event)).toBe("all-day");
+  });
+});
+
+describe("calendar persistence permissions", () => {
+  it("keeps unsupported updates and deletes read-only", () => {
+    expect(calendarPermissions.default).toEqual({
+      edit: false,
+      remove: false,
+      addChildren: false,
+      drag: false,
+      toggleActive: false,
+      overrideColor: false,
+    });
   });
 });
 

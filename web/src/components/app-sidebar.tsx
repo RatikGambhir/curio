@@ -9,11 +9,8 @@ import {
   MessageSquare,
   NotebookPen,
   PieChart,
-  Settings2,
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import curioLogo from "../assets/curio-logo.png";
-import { NavMain } from "@/components/nav-main";
+import { NavMain, PlatformHeader } from "@/components/nav-main";
 import { NavProjects } from "@/components/nav-projects";
 import { NavUser } from "@/components/nav-user";
 import {
@@ -22,7 +19,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 const data = {
@@ -57,11 +53,6 @@ const data = {
       url: "/atlas",
       icon: Globe,
     },
-    {
-      title: "Settings",
-      url: "/profile",
-      icon: Settings2,
-    },
   ],
   projects: [
     {
@@ -85,28 +76,8 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="h-16 shrink-0 justify-center border-b border-sidebar-border p-2">
-        <div className="grid h-full grid-cols-[1fr_auto] items-center gap-2 group-data-[collapsible=icon]:grid-cols-1 group-data-[collapsible=icon]:place-items-center">
-          <Link
-            to="/home"
-            className="flex min-w-0 items-center gap-2 px-2 group-data-[collapsible=icon]:hidden"
-          >
-            <img
-              src={curioLogo}
-              alt="Curio Logo"
-              className="h-10 w-auto object-contain"
-              data-image="logo"
-              style={{ mixBlendMode: "multiply" }}
-            />
-            <span
-              className="truncate text-lg leading-none tracking-tight"
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
-              curio
-            </span>
-          </Link>
-          <SidebarTrigger className="rounded-full text-muted-foreground hover:bg-white/45 hover:text-foreground" />
-        </div>
+      <SidebarHeader className="h-(--app-header-height) shrink-0 justify-center p-0">
+        <PlatformHeader />
       </SidebarHeader>
       <SidebarContent className="pt-0">
         <NavMain items={data.navMain} />

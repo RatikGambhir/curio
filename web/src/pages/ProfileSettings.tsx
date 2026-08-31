@@ -92,18 +92,17 @@ function ProfileSettings() {
 
   return (
     <main className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-[90rem]">
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[1.75rem] border border-border bg-card p-4 shadow-sm sm:p-5">
+      <div className="mx-auto w-full max-w-[90rem] overflow-hidden rounded-[0.75rem] border border-border bg-card">
+        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border p-4 sm:p-5">
           <div className="flex items-start gap-3">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="rounded-full"
-              onClick={() => navigate("/chat")}
+              onClick={() => navigate("/home")}
             >
               <ArrowLeft className="size-4" />
-              Back to chat
+              Back to home
             </Button>
             <div className="space-y-1">
               <h1 className="text-2xl font-bold text-card-foreground">Settings</h1>
@@ -118,7 +117,6 @@ function ProfileSettings() {
               type="button"
               variant="outline"
               size="icon-sm"
-              className="rounded-full"
               onClick={() => navigate("/chat")}
               aria-label="Open chat"
             >
@@ -128,7 +126,6 @@ function ProfileSettings() {
               type="button"
               variant="outline"
               size="sm"
-              className="rounded-full"
               onClick={handleSignOut}
             >
               <LogOut className="size-4" />
@@ -137,10 +134,10 @@ function ProfileSettings() {
           </div>
         </header>
 
-        <div className="grid gap-4 lg:grid-cols-[19.5rem_minmax(0,1fr)] lg:items-start">
+        <div className="grid max-lg:divide-y max-lg:divide-border lg:grid-cols-[19.5rem_minmax(0,1fr)]">
           <SettingsSidebar profile={profileSummary} />
 
-          <section className="space-y-4">
+          <section className="min-w-0">
             <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
             {renderTabContent()}
           </section>

@@ -10,7 +10,7 @@ type ChatViewProps = {
 
 export function ChatView({ messages }: ChatViewProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length > 0 ? (
           <AnimatePresence initial={false}>
