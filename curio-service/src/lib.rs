@@ -2,6 +2,7 @@ mod calendar;
 pub mod chat;
 pub mod config;
 pub mod database;
+pub mod diagnostics;
 mod user;
 
 #[cfg(test)]
@@ -60,8 +61,12 @@ pub async fn app_with_config(config: ServiceConfig) -> Result<Router, sqlx::Erro
         acquire_timeout: Duration::from_secs(config.database_acquire_timeout_seconds),
         application_name: "curio-service".to_owned(),
     })
-    .await?;
-    database.verify_migrations().await?;
+    .await
+    .inspect_err(|error| diagnostics::log_database_error("service_database_connect", error))?;
+    database
+        .verify_migrations()
+        .await
+        .inspect_err(|error| diagnostics::log_database_error("service_migration_verify", error))?;
 
     Ok(app_with_database(config, database))
 }
@@ -133,12 +138,15 @@ async fn health() -> Json<HealthResponse> {
 async fn readiness(State(database): State<Database>) -> (StatusCode, Json<HealthResponse>) {
     match database.readiness().await {
         Ok(()) => (StatusCode::OK, Json(HealthResponse { status: "ok" })),
-        Err(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(HealthResponse {
-                status: "unavailable",
-            }),
-        ),
+        Err(error) => {
+            diagnostics::log_database_error("readiness_check", &error);
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(HealthResponse {
+                    status: "unavailable",
+                }),
+            )
+        }
     }
 }
 

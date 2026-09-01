@@ -29,7 +29,7 @@ const Chat = () => {
   const [messagesByChatId, setMessagesByChatId] = useState(demoMessagesByChatId)
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
-  const { isStreaming, sendMessage } = useChat()
+  const { cancelStream, isStreaming, sendMessage } = useChat()
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
   const handleStartNewChat = () => {
     setSelectedChatId(null)
@@ -69,7 +69,6 @@ const Chat = () => {
       userMessageId,
       assistantMessageId,
     })
-
   }
 
   const handleSendMessage = async (text: string) => {
@@ -82,7 +81,6 @@ const Chat = () => {
     await sendMessage({ chatId: selectedChatId, text, setMessagesByChatId })
     upsertChatMeta(selectedChatId, text)
   }
-
 
   return (
     <SidebarProvider className="h-screen w-full font-sans">
@@ -97,44 +95,42 @@ const Chat = () => {
         <div className="flex h-full w-full flex-col">
           <PageHeader />
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-5 md:px-8 md:py-6">
-          <AnimatePresence mode="popLayout" initial={false}>
-            {isNewChat ? (
-              <motion.div
-                key="new-chat"
-                className="relative z-10 flex h-full w-full flex-col"
-                initial={{ opacity: 0, y: 20, scale: 0.985 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -16, scale: 0.99 }}
-                transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              >
-                <ChatEmptyState
-                  disabled={isStreaming}
-                  onSubmit={handleCreateChat}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key={selectedChatId ?? "thread"}
-                className="relative z-10 mx-auto flex h-full w-full max-w-4xl flex-col gap-3"
-                initial={{ opacity: 0, y: 24, scale: 0.99 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -16, scale: 0.995 }}
-                transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-              >
+            <AnimatePresence mode="popLayout" initial={false}>
+              {isNewChat ? (
                 <motion.div
-                  className="min-h-0 flex-1 overflow-hidden"
+                  key="new-chat"
+                  className="relative z-10 flex h-full w-full flex-col"
+                  initial={{ opacity: 0, y: 20, scale: 0.985 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -16, scale: 0.99 }}
+                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  <ChatView messages={messages} />
+                  <ChatEmptyState
+                    disabled={isStreaming}
+                    onSubmit={handleCreateChat}
+                  />
                 </motion.div>
-                <motion.div>
+              ) : (
+                <motion.div
+                  key={selectedChatId ?? "thread"}
+                  className="relative z-10 mx-auto flex h-full w-full max-w-3xl flex-col gap-3"
+                  initial={{ opacity: 0, y: 24, scale: 0.99 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -16, scale: 0.995 }}
+                  transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <div className="min-h-0 flex-1 overflow-hidden">
+                    <ChatView messages={messages} />
+                  </div>
                   <ChatPrompt
                     disabled={isStreaming}
+                    isStreaming={isStreaming}
+                    onStop={() => cancelStream(selectedChatId ?? undefined)}
                     onSubmit={handleSendMessage}
                   />
                 </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </SidebarInset>

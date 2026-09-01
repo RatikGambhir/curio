@@ -59,7 +59,7 @@ export function ChatSidebar({
               className="h-7 w-auto object-contain"
             />
           </Link>
-          <SidebarTrigger className="ml-auto md:hidden" />
+          <SidebarTrigger className="ml-auto" />
         </div>
       </SidebarHeader>
       <SidebarContent>

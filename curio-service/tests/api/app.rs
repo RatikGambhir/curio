@@ -313,22 +313,36 @@ async fn chat_route_normalizes_openai_streams() {
 }
 
 #[tokio::test]
-async fn provider_http_failures_are_sanitized() {
-    let Some(postgres) = PostgresFixture::provision("provider_http_failures_are_sanitized").await
+async fn provider_http_failures_propagate_detail_without_credentials() {
+    let Some(postgres) =
+        PostgresFixture::provision("provider_http_failures_propagate_detail_without_credentials")
+            .await
     else {
         return;
     };
-    let sensitive_detail = "upstream detail that must not reach clients";
+    // A real 429/401 body quotes the rejected credential back at us. The
+    // diagnostic half must reach the client; the credential must not.
+    let secret = "sk-proj-MUSTNOTLEAK123";
+    let provider_body = format!(
+        r#"{{"error":{{"message":"Rate limit reached. Incorrect API key provided: {secret}.","type":"requests","code":"rate_limit_exceeded"}}}}"#
+    );
     let (base_url, mock_task) =
-        start_mock_openai(StatusCode::TOO_MANY_REQUESTS, sensitive_detail).await;
+        start_mock_openai(StatusCode::TOO_MANY_REQUESTS, provider_body).await;
     let app = configured_app(base_url, &postgres);
     let response = app.oneshot(chat_request()).await.unwrap();
     let body = response.into_body().collect().await.unwrap().to_bytes();
     let body = String::from_utf8(body.to_vec()).unwrap();
 
     assert!(body.contains("event: error"));
-    assert!(body.contains(r#""code":"provider_error""#));
-    assert!(!body.contains(sensitive_detail));
+    assert!(body.contains(r#""code":"provider_rate_limited""#));
+    assert!(body.contains("Rate limit reached."));
+    assert!(body.contains("rate_limit_exceeded"));
+    assert!(body.contains("HTTP 429"));
+    assert!(
+        !body.contains(secret),
+        "the API key reached the client: {body}"
+    );
+    assert!(body.contains("sk-***"));
 
     mock_task.abort();
     postgres.cleanup().await;

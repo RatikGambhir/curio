@@ -39,7 +39,9 @@ const SIDEBAR_MIN_WIDTH = 180;
 const SIDEBAR_MAX_WIDTH = 480;
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
-const APP_TITLEBAR_HEIGHT = "2.625rem";
+// Keep a subtle strip above the inset without giving up useful page height.
+// Sidebar controls live in each sidebar's own header.
+const APP_TITLEBAR_HEIGHT = "0.75rem";
 const APP_HEADER_HEIGHT = "2.75rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
 // Pointer travel before a rail press counts as a resize instead of a toggle.
@@ -332,32 +334,12 @@ function SidebarTrigger({
 }
 
 function AppTitlebar() {
-  const { state, isMobile, isResizing } = useSidebar();
-  const collapsed = !isMobile && state === "collapsed";
-
   return (
     <div
       data-slot="app-titlebar"
-      className="flex h-(--app-titlebar-height) shrink-0 items-center bg-sidebar"
+      className="flex h-(--app-header-height) shrink-0 items-center bg-sidebar px-3 md:h-(--app-titlebar-height) md:px-0"
     >
-      <div
-        className={cn(
-          "flex h-full items-center",
-          "transition-[width] duration-200 ease-linear",
-          isMobile
-            ? "w-auto px-[1rem]"
-            : collapsed
-              ? "w-(--sidebar-width-icon) justify-center px-0"
-              : "w-(--sidebar-width) px-[1rem]",
-          isResizing && "transition-none",
-        )}
-      >
-        <SidebarTrigger className="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground" />
-      </div>
-      <div
-        className="flex h-full min-w-0 flex-1 items-center px-2"
-        aria-hidden="true"
-      />
+      <SidebarTrigger className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground md:hidden" />
     </div>
   );
 }
@@ -467,7 +449,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
       className={cn(
         "relative flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden bg-card",
         "md:fixed md:top-(--app-titlebar-height) md:right-0 md:bottom-0 md:left-(--sidebar-width) md:z-10 md:w-auto",
-        "md:rounded-none md:rounded-tl-[0.75rem] md:border-0 md:border-t-[0.5px] md:border-l-[0.5px] md:border-border md:shadow-sm",
+        "md:rounded-none md:rounded-tl-[1rem] md:border-0 md:border-t-[0.5px] md:border-l-[0.5px] md:border-border md:shadow-sm",
         "md:peer-data-[collapsible=icon]:left-(--sidebar-width-icon)",
         "md:peer-data-[variant=floating]:peer-data-[collapsible=icon]:left-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",
         "md:peer-data-[variant=inset]:peer-data-[collapsible=icon]:left-[calc(var(--sidebar-width-icon)+(--spacing(4)))]",

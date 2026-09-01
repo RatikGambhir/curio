@@ -486,11 +486,12 @@ and supports a capped list of custom color seeds.
 `curio-service/src/main.rs`:
 
 1. loads a local `.env` if present;
-2. parses required/default configuration;
-3. constructs the full router with `app_with_config`;
-4. binds `CURIO_SERVICE_ADDR`, otherwise `0.0.0.0:$PORT` when Railway-style
+2. initializes compact structured diagnostics from `RUST_LOG`;
+3. parses required/default configuration;
+4. constructs the full router with `app_with_config`;
+5. binds `CURIO_SERVICE_ADDR`, otherwise `0.0.0.0:$PORT` when Railway-style
    `PORT` exists, otherwise `127.0.0.1:3000`;
-5. calls `axum::serve`.
+6. calls `axum::serve`.
 
 `app_with_config` is the real composition root. It:
 
@@ -509,8 +510,10 @@ and legacy placeholder routes. Tests use it, but production must use
 OpenAI configuration is required at process startup even when only health,
 calendar, or user functionality is wanted. The server distinguishes process
 liveness from database readiness, but currently has no graceful shutdown,
-structured tracing, request IDs, rate limit, or explicit project-level
-timeout/body-size policy beyond framework and dependency defaults.
+request IDs, rate limit, or explicit project-level timeout/body-size policy
+beyond framework and dependency defaults. Targeted structured diagnostics cover
+startup, readiness, and the chat/provider/persistence path, but there is no
+request-wide tracing middleware.
 
 ### Route inventory and protection
 
@@ -654,6 +657,13 @@ implicit row identifier.
 8. Serialization failure, downstream disconnect, or unexpected upstream end
    attempts to mark the assistant row `interrupted`.
 
+The chat path logs correlation IDs already supplied by the client, provider HTTP
+status or transport-error classification, OpenAI's `x-request-id` when present,
+and sanitized database operation/error classifications. It deliberately does
+not log prompts, message/response bodies, API keys, authorization headers, or
+database URLs. Provider response details remain private and are not forwarded
+to clients.
+
 Public normalized events are:
 
 - `token { conversationId, messageId, token }`
@@ -734,9 +744,11 @@ Error behavior is currently boundary-specific:
 | Axum extractor rejection | Framework-default response |
 | Chat/provider/storage after SSE starts | HTTP success stream with terminal `error` event |
 | Conversation-history database read | Bare `500` |
-| Startup CORS/database/bind failure | Error/exit or panic at composition/startup |
+| Startup CORS/database/bind failure | Structured error/exit or panic at composition/startup |
 
-There is no common application error type or structured request logging yet.
+There is no common application error type or request-wide logging/correlation
+middleware. Structured diagnostics are currently targeted at startup,
+readiness, and chat provider/persistence failures.
 
 ## Tauri desktop architecture
 
@@ -913,7 +925,7 @@ fails.
 | Variable | Scope | Requirement/default |
 | --- | --- | --- |
 | `OPENAI_API_KEY` | Service only; secret | Required |
-| `OPENAI_MODEL` | Service only | Required |
+| `OPENAI_MODEL` | Service only | Required; `gpt-5.6` is the default the project ships with |
 | `OPENAI_BASE_URL` | Service only | Defaults to `https://api.openai.com` |
 | `DATABASE_URL` | Service runtime and `curio_db verify`; secret | Required application-role PostgreSQL URL |
 | `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` and conventional importer target; secret | Required migrator-role PostgreSQL URL for those operations |
@@ -923,6 +935,7 @@ fails.
 | `CURIO_TEST_DATABASE_URL` | Service integration tests; secret | Test-runner URL; must never target production |
 | `CURIO_CORS_ALLOWED_ORIGINS` | Service only | Exact comma-separated origins; local defaults |
 | `CURIO_SERVICE_ADDR` | Service process | Explicit bind; otherwise Railway `PORT`, then `127.0.0.1:3000` |
+| `RUST_LOG` | Service diagnostics | Optional `tracing_subscriber` filter; defaults to `curio_service=info` |
 
 ### Clients and desktop build
 
@@ -1166,9 +1179,9 @@ are addressed.
 9. JSON/API error shapes are not uniform across auth, Axum extraction, history,
    feature errors, and SSE.
 10. Service startup couples every feature to valid OpenAI configuration.
-11. Operational server concerns—graceful shutdown, tracing, request IDs,
-    HTTP timeouts, rate limits, and production connection monitoring—are
-    minimal.
+11. Operational server concerns—graceful shutdown, request-wide tracing and
+    request IDs, HTTP timeouts, rate limits, and production connection
+    monitoring—are minimal.
 12. Legacy Worker functionality, especially attachments/embeddings, is not
     active and is outside root CI.
 13. There is no cross-stack end-to-end test suite.

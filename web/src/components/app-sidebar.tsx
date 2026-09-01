@@ -1,92 +1,181 @@
-import * as React from "react";
+import { useCallback, useEffect, useState, type ComponentProps } from "react"
 import {
   BookOpen,
   CalendarDays,
-  Frame,
   Globe,
   House,
-  Map,
+  LibraryBig,
   MessageSquare,
   NotebookPen,
-  PieChart,
-} from "lucide-react";
-import { NavMain, PlatformHeader } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
-import { NavUser } from "@/components/nav-user";
+} from "lucide-react"
+import { useLocation } from "react-router-dom"
+
+import {
+  NavMain,
+  NavSubmenu,
+  PlatformHeader,
+  SidebarSearch,
+  type AppNavigationGroup,
+  type AppNavigationSection,
+} from "@/components/nav-main"
+import { NavUser } from "@/components/nav-user"
+import { MailCheckIcon } from "@/components/ui/mail-check"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/sidebar"
+import { useSidebar } from "@/components/ui/sidebar-context"
 
-const data = {
-  navMain: [
-    {
-      title: "Home",
-      url: "/home",
-      icon: House,
-    },
-    {
-      title: "Vaults",
-      url: "/vault",
-      icon: BookOpen,
-    },
-    {
-      title: "Chat",
-      url: "/chat",
-      icon: MessageSquare,
-    },
-    {
-      title: "Calendar",
-      url: "/calendar",
-      icon: CalendarDays,
-    },
-    {
-      title: "Notes",
-      url: "/notes",
-      icon: NotebookPen,
-    },
-    {
-      title: "Atlas",
-      url: "/atlas",
-      icon: Globe,
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-};
+const appNavigationSections: AppNavigationSection[] = [
+  {
+    label: "Overview",
+    items: [
+      {
+        title: "Home",
+        url: "/home",
+        icon: House,
+        description: "Your daily Curio overview.",
+      },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      {
+        id: "inbox",
+        title: "Inbox",
+        icon: MailCheckIcon,
+        items: [],
+      },
+      {
+        title: "Notes",
+        url: "/notes",
+        icon: NotebookPen,
+        description: "Capture and shape what you learn.",
+      },
+      {
+        title: "Calendar",
+        url: "/calendar",
+        icon: CalendarDays,
+        description: "Plan events and track tasks.",
+      },
+    ],
+  },
+  {
+    label: "Knowledge",
+    items: [
+      {
+        id: "explore",
+        title: "Explore",
+        icon: LibraryBig,
+        items: [],
+      },
+      {
+        title: "Vaults",
+        url: "/vault",
+        icon: BookOpen,
+        description: "Browse your saved knowledge.",
+      },
+    ],
+  },
+  {
+    label: "Ask AI",
+    items: [
+      {
+        title: "Chat",
+        url: "/chat",
+        icon: MessageSquare,
+        description: "Ask questions and explore ideas.",
+      },
+      {
+        title: "Atlas",
+        url: "/atlas",
+        icon: Globe,
+        description: "See how your ideas connect.",
+      },
+    ],
+  },
+]
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+const navigationGroups = appNavigationSections
+  .flatMap((section) => section.items)
+  .filter((item): item is AppNavigationGroup => "items" in item)
+
+export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
+  const location = useLocation()
+  const { isMobile, state } = useSidebar()
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null)
+  const openGroup =
+    navigationGroups.find((group) => group.id === openGroupId) ?? null
+
+  useEffect(() => {
+    setOpenGroupId(null)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (!openGroup) {
+      return
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenGroupId(null)
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape)
+    return () => window.removeEventListener("keydown", closeOnEscape)
+  }, [openGroup])
+
+  const closeSubmenu = useCallback(() => setOpenGroupId(null), [])
+  const toggleGroup = useCallback((groupId: string) => {
+    setOpenGroupId((current) => (current === groupId ? null : groupId))
+  }, [])
+
   return (
-    <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="h-(--app-header-height) shrink-0 justify-center p-0">
-        <PlatformHeader />
-      </SidebarHeader>
-      <SidebarContent className="pt-0">
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
-      </SidebarContent>
-      <SidebarFooter>
-        <NavUser />
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
-  );
+    <>
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarHeader className="h-(--app-header-height) shrink-0 justify-center border-b border-sidebar-border p-0">
+          <PlatformHeader />
+        </SidebarHeader>
+        <SidebarContent className="pt-0">
+          {isMobile && openGroup ? (
+            <NavSubmenu group={openGroup} onBack={closeSubmenu} />
+          ) : (
+            <>
+              <SidebarSearch />
+              <NavMain
+                sections={appNavigationSections}
+                openGroupId={openGroupId}
+                onGroupToggle={toggleGroup}
+                onNavigate={closeSubmenu}
+              />
+            </>
+          )}
+        </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border">
+          <NavUser />
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+
+      {!isMobile && openGroup ? (
+        <aside
+          aria-label={`${openGroup.title} submenu`}
+          className="fixed bottom-0 top-(--app-titlebar-height) z-[15] w-[19rem] animate-in overflow-hidden rounded-tr-[0.875rem] border-r border-t border-border bg-card text-card-foreground shadow-lg duration-200 fade-in-0 slide-in-from-left-2"
+          style={{
+            left:
+              state === "collapsed"
+                ? "var(--sidebar-width-icon)"
+                : "var(--sidebar-width)",
+          }}
+        >
+          <NavSubmenu group={openGroup} onBack={closeSubmenu} />
+        </aside>
+      ) : null}
+    </>
+  )
 }

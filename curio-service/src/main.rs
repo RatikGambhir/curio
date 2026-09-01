@@ -1,15 +1,17 @@
-use curio_service::{app_with_config, config::ServiceConfig};
+use curio_service::{app_with_config, config::ServiceConfig, diagnostics};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {
     // Load .env first so local runs pick up configuration without exporting it.
     let _ = dotenvy::dotenv();
+    diagnostics::init();
 
     let config = match ServiceConfig::from_env() {
         Ok(config) => config,
         Err(error) => {
-            eprintln!("invalid curio-service configuration: {error}");
-            eprintln!("copy .env.example to .env and fill in the required values");
+            error!(%error, "invalid curio-service configuration");
+            error!("copy .env.example to .env and fill in the required values");
             std::process::exit(1);
         }
     };
@@ -17,7 +19,7 @@ async fn main() {
     let app = match app_with_config(config).await {
         Ok(app) => app,
         Err(_) => {
-            eprintln!("curio-service database connection or migration verification failed");
+            error!("curio-service database connection or migration verification failed");
             std::process::exit(1);
         }
     };
@@ -27,16 +29,22 @@ async fn main() {
             .map(|port| format!("0.0.0.0:{port}"))
             .unwrap_or_else(|_| "127.0.0.1:3000".to_owned())
     });
-    let listener = tokio::net::TcpListener::bind(&address)
-        .await
-        .expect("failed to bind curio-service");
+    let listener = match tokio::net::TcpListener::bind(&address).await {
+        Ok(listener) => listener,
+        Err(bind_error) => {
+            error!(%bind_error, %address, "failed to bind curio-service");
+            std::process::exit(1);
+        }
+    };
 
-    println!(
-        "curio-service listening on {}",
-        listener.local_addr().unwrap()
-    );
+    let bound_address = listener
+        .local_addr()
+        .map(|address| address.to_string())
+        .unwrap_or(address);
+    info!(address = %bound_address, "curio-service listening");
 
-    axum::serve(listener, app)
-        .await
-        .expect("curio-service stopped unexpectedly");
+    if let Err(server_error) = axum::serve(listener, app).await {
+        error!(%server_error, "curio-service stopped unexpectedly");
+        std::process::exit(1);
+    }
 }

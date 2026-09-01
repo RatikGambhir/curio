@@ -244,8 +244,6 @@ cargo test
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
 Database-backed tests can return early when `CURIO_TEST_DATABASE_URL` is absent. A green command without that safe variable is partial evidence, not a PostgreSQL pass.

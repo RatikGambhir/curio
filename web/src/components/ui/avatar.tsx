@@ -5,13 +5,17 @@ import { cn } from "@/lib/utils"
 
 function Avatar({
   className,
+  size = "default",
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root>) {
+}: React.ComponentProps<typeof AvatarPrimitive.Root> & {
+  size?: "default" | "sm" | "lg"
+}) {
   return (
     <AvatarPrimitive.Root
       data-slot="avatar"
+      data-size={size}
       className={cn(
-        "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        "relative flex size-8 shrink-0 overflow-hidden rounded-full data-[size=sm]:size-6 data-[size=lg]:size-10",
         className
       )}
       {...props}
