@@ -43,6 +43,14 @@ The service binds `CURIO_SERVICE_ADDR` (default `127.0.0.1:3000`) and requires
 `CURIO_DB_MAX_CONNECTIONS` and `CURIO_DB_ACQUIRE_TIMEOUT_SECONDS`; keep the sum
 of every replica's pool below the database connection limit.
 
+The service writes compact structured diagnostics to standard error. Its
+default filter is `curio_service=info`; set `RUST_LOG` to another
+`tracing_subscriber` filter when a deployment needs different verbosity. Chat
+failures include client-supplied correlation IDs, provider HTTP status or
+transport classification, OpenAI's `x-request-id` when available, and sanitized
+database error classifications. Logs must not include prompts, provider bodies,
+API keys, authorization headers, database URLs, or other credentials.
+
 Set `CURIO_CORS_ALLOWED_ORIGINS` to a comma-separated list of exact deployed web
 origins, for example `https://curio.example.com`. When the variable is absent,
 only the common local Vite development origins (ports 5173 and 1420) are

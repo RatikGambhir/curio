@@ -99,5 +99,4 @@ a non-production test-runner role; the tests create and remove isolated
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --test sqlite_import
 ```
