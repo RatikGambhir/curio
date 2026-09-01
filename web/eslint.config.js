@@ -82,4 +82,15 @@ export default tseslint.config([
       'no-restricted-globals': 'off',
     },
   },
+  {
+    // Vendored shadcn-registry components (Nexus UI). They drop props they
+    // deliberately control by destructuring them into `_`-prefixed bindings.
+    files: ['src/components/nexus-ui/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
 ])
