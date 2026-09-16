@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "rust-skills": {
+      "source": {
+        "source": "github",
+        "repo": "actionbook/rust-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "rust-skills@rust-skills": true
+  }
+}

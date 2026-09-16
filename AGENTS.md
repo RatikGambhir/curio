@@ -11,6 +11,10 @@ Follow, in order:
 3. The relevant project skill under `.agents/skills`.
 4. The established source, test, and package conventions nearest the change.
 
+`.claude/settings.json` enables the `actionbook/rust-skills` plugin, which
+supplies general Rust guidance. It sits below this guide and the project skills
+in that order: where it disagrees with either, they win.
+
 If instructions and code disagree, investigate before editing. Prefer current executable code and tests for behavior, then correct stale documentation as part of an authorized change. Plans under `plans/` are historical or proposed work, not current runtime truth.
 
 ## Start every task here
@@ -41,6 +45,7 @@ Do not reformat, stage, revert, delete, or “clean up” unrelated work. Never 
 | `.github/workflows/shared-clients.yml` | Current CI command matrix | Active, but does not cover legacy Workers or live deployment |
 | `plans` | Design history and proposed work | Non-authoritative |
 | `.agents/skills` | Reusable repository-specific agent workflows | Active guidance |
+| `.claude/settings.json` | Claude Code plugin sources enabled for this checkout | Active guidance |
 
 Package roots and managers:
 

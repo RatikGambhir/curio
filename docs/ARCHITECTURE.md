@@ -85,6 +85,7 @@ The principal architectural choices are:
 | `docs/ARCHITECTURE.md` | Canonical current architecture, contracts, limitations, and extension rules | Documentation only |
 | `docs/deployment.md` | Environment, database-role, hosting, and release operations | Documentation only |
 | `.agents/skills` | Repository-specific React/Vite, Axum, and verification guidance | Agent support |
+| `.claude/settings.json` | Claude Code plugin sources enabled for this checkout | Agent support |
 | `plans` and ignored `*/tasks` folders | Design/implementation planning artifacts | Not runtime code |
 
 There is no root npm, Cargo, or task-runner workspace coordinating everything.
@@ -1374,5 +1375,8 @@ logical edit emits one request.
   verification rules.
 - [`../.agents/skills`](../.agents/skills): project-specific React/Vite, Axum,
   and verification workflows.
+- [`../.claude/settings.json`](../.claude/settings.json): registers the
+  `actionbook/rust-skills` marketplace and enables its general-purpose Rust
+  skills. Those skills never override the project skills above.
 - [`../plans`](../plans): historical or proposed implementation plans, not
   authoritative descriptions of active runtime behavior.
