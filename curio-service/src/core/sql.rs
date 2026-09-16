@@ -191,6 +191,10 @@ impl Insert {
 
     /// On a conflict of `key`, refreshes every other column from the proposed
     /// row and stamps `updated_at`. The table must have an `updated_at` column.
+    ///
+    /// `updated_at` is stamped here rather than copied from the proposed row,
+    /// so a caller that also sets it explicitly does not produce the duplicate
+    /// assignment PostgreSQL rejects.
     pub fn upsert_on(mut self, key: &'static str) -> Self {
         self.conflict_key = Some(key);
         self
@@ -211,7 +215,7 @@ impl Insert {
                 let refreshed = self
                     .columns
                     .iter()
-                    .filter(|column| **column != key)
+                    .filter(|column| **column != key && **column != UPDATED_AT)
                     .map(|column| format!("{column} = EXCLUDED.{column}"))
                     .chain([format!("{UPDATED_AT} = {NOW}")])
                     .collect::<Vec<_>>()

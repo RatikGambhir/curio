@@ -61,6 +61,25 @@ fn stamps_updated_at_when_an_upsert_carries_only_the_key() {
 }
 
 #[test]
+fn stamps_updated_at_once_when_an_upsert_also_sets_it() {
+    let statement = Sql::insert_into("users")
+        .set("id", "user-a")
+        .set("name", "Ada")
+        .set("updated_at", "2026-09-16T00:00:00Z")
+        .upsert_on("id")
+        .statement();
+
+    // PostgreSQL rejects two assignments to one column in DO UPDATE SET, so
+    // `updated_at` must be stamped exactly once and never copied from EXCLUDED.
+    assert_eq!(
+        statement.sql(),
+        "INSERT INTO users (id, name, updated_at) VALUES ($1, $2, $3) \
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, \
+         updated_at = CURRENT_TIMESTAMP"
+    );
+}
+
+#[test]
 fn joins_filters_in_written_order() {
     let statement = Sql::select("id, starts_at")
         .from("calendar_events")
