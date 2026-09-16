@@ -36,6 +36,7 @@ DECLARE
         'conversations',
         'messages',
         'calendar_events',
+        'tasks',
         'sqlite_import_manifests'
     ];
     missing_objects text[];
@@ -128,6 +129,35 @@ BEGIN
         JOIN pg_catalog.pg_class AS class ON class.oid = attribute.attrelid
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
         WHERE namespace.nspname = schema_name
+          AND class.relname = 'tasks'
+          AND attribute.attname = 'active'
+          AND pg_catalog.format_type(attribute.atttypid, attribute.atttypmod) = 'boolean'
+    ) THEN
+        RAISE EXCEPTION 'tasks.active is not boolean';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_attribute AS attribute
+        JOIN pg_catalog.pg_class AS class ON class.oid = attribute.attrelid
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
+        WHERE namespace.nspname = schema_name
+          AND class.relname = 'tasks'
+          AND attribute.attname IN ('set_at', 'due_at')
+          AND pg_catalog.format_type(attribute.atttypid, attribute.atttypmod)
+              = 'timestamp(3) with time zone'
+        GROUP BY class.oid
+        HAVING pg_catalog.count(*) = 2
+    ) THEN
+        RAISE EXCEPTION 'tasks set_at/due_at columns are not timestamptz(3)';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_attribute AS attribute
+        JOIN pg_catalog.pg_class AS class ON class.oid = attribute.attrelid
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
+        WHERE namespace.nspname = schema_name
           AND class.relname = 'messages'
           AND attribute.attname = 'created_at'
           AND pg_catalog.format_type(attribute.atttypid, attribute.atttypmod)
@@ -170,10 +200,10 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1
         FROM _sqlx_migrations
-        WHERE version = 202608310001
+        WHERE version = 202608310002
           AND success
     ) THEN
-        RAISE EXCEPTION 'required SQLx migration 202608310001 is not successful';
+        RAISE EXCEPTION 'required SQLx migration 202608310002 is not successful';
     END IF;
 END
 $migration$;
@@ -194,6 +224,8 @@ SELECT 'conversations', pg_catalog.count(*)::bigint FROM conversations
 UNION ALL
 SELECT 'messages', pg_catalog.count(*)::bigint FROM messages
 UNION ALL
+SELECT 'tasks', pg_catalog.count(*)::bigint FROM tasks
+UNION ALL
 SELECT 'users', pg_catalog.count(*)::bigint FROM users
 ORDER BY table_name;
 
@@ -205,6 +237,11 @@ UNION ALL
 SELECT 'calendar_events_without_user', pg_catalog.count(*)::bigint
 FROM calendar_events AS event
 LEFT JOIN users AS app_user ON app_user.id = event.user_id
+WHERE app_user.id IS NULL
+UNION ALL
+SELECT 'tasks_without_user', pg_catalog.count(*)::bigint
+FROM tasks AS task
+LEFT JOIN users AS app_user ON app_user.id = task.user_id
 WHERE app_user.id IS NULL
 UNION ALL
 SELECT 'invalid_message_role', pg_catalog.count(*)::bigint
@@ -224,6 +261,20 @@ SELECT 'invalid_calendar_priority', pg_catalog.count(*)::bigint
 FROM calendar_events
 WHERE priority IS NOT NULL
   AND priority NOT IN ('low', 'medium', 'high')
+UNION ALL
+SELECT 'invalid_task_status', pg_catalog.count(*)::bigint
+FROM tasks
+WHERE status NOT IN ('scheduled', 'in-progress', 'blocked', 'done', 'cancelled')
+UNION ALL
+SELECT 'invalid_task_priority', pg_catalog.count(*)::bigint
+FROM tasks
+WHERE priority IS NOT NULL
+  AND priority NOT IN ('low', 'medium', 'high')
+UNION ALL
+SELECT 'invalid_task_due_time', pg_catalog.count(*)::bigint
+FROM tasks
+WHERE due_at IS NOT NULL
+  AND due_at < set_at
 ORDER BY check_name;
 
 SELECT

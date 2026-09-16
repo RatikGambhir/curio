@@ -1,8 +1,10 @@
+mod assistant;
 mod calendar;
-pub mod chat;
 pub mod config;
+mod core;
 pub mod database;
 pub mod diagnostics;
+mod task;
 mod user;
 
 #[cfg(test)]
@@ -19,17 +21,15 @@ use axum::{
     http::{StatusCode, header},
     middleware::{self, Next},
     response::Response,
-    routing::{get, post},
+    routing::get,
 };
 use http::HeaderValue;
 use serde::Serialize;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    chat::{ChatState, repository::ChatRepository},
     config::ServiceConfig,
     database::{Database, DatabaseOptions},
-    user::repository::UserRepository,
 };
 
 #[derive(Clone, Debug)]
@@ -86,23 +86,15 @@ pub fn app_with_database(config: ServiceConfig, database: Database) -> Router {
             http::Method::DELETE,
         ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
-    let calendar_api_routes = calendar::api_routes(database.clone());
-    let user_api_routes = user::api_routes(UserRepository::new(database.clone()));
-    let chat_state = ChatState::new(
+    let calendar_routes = calendar::routes(database.clone());
+    let task_routes = task::routes(database.clone());
+    let user_routes = user::api_routes(database.clone());
+    let assistant_routes = assistant::routes(
         config.openai_api_key,
         config.openai_model,
         config.openai_base_url,
-        ChatRepository::new(database.clone()),
+        database.clone(),
     );
-
-    let chat_routes = Router::new()
-        .route("/v1/chat/stream", post(chat::stream_chat))
-        .route("/v1/conversations", get(chat::list_conversations))
-        .route(
-            "/v1/conversations/{id}/messages",
-            get(chat::conversation_messages),
-        )
-        .with_state(chat_state);
 
     let readiness_route = Router::new()
         .route("/ready", get(readiness))
@@ -110,15 +102,16 @@ pub fn app_with_database(config: ServiceConfig, database: Database) -> Router {
 
     base_router()
         .merge(readiness_route)
-        .merge(chat_routes)
-        .merge(calendar_api_routes)
-        .merge(user_api_routes)
+        .merge(assistant_routes)
+        .merge(calendar_routes)
+        .merge(task_routes)
+        .merge(user_routes)
         .layer(cors)
 }
 
 fn base_router() -> Router {
     let protected_routes = Router::new()
-        .nest("/user", user::routes())
+        .nest("/user", user::placeholder_routes())
         .route_layer(middleware::from_fn(auth));
 
     Router::new()

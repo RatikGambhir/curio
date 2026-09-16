@@ -37,6 +37,12 @@ router
   -> Database: pool and migration lifecycle only
 ```
 
+Keep each domain under `src/<domain>/` with the common files `model.rs`,
+`repository.rs`, `service.rs`, `handler.rs`, and `route.rs`. Keep `mod.rs` as a
+small boundary that exports route composition. Add domain-specific files such
+as `error.rs`, `time.rs`, or `provider.rs` only when a real responsibility does
+not fit the common spine.
+
 Use this as a responsibility guide, not a reason to create empty layers. Keep feature SQL in feature repositories. Keep transport DTOs out of the central database implementation. Reuse one cheaply cloned `Database`/`PgPool`; do not open pools per request.
 
 Handlers should be thin and explicit about path/query/body/state/extension extraction. Services should return stable domain errors. Repositories should use bound parameters and typed records. Map internal errors into sanitized client responses at a deliberate boundary and log only non-sensitive operational context.
@@ -55,7 +61,7 @@ Keep these invariants:
   `curio-service/migrations/postgres`; do not create a no-op migration for an
   HTTP-only change or rewrite a migration that may have been applied.
 - For a real schema change, update relevant `ops/postgres/verify.sql` catalog or
-  version expectations and assess importer compatibility/tests. Do not edit
+  version expectations and assess archived SQLite compatibility. Do not edit
   archived SQLite migrations merely because an HTTP route changed.
 - Run migrations explicitly with the schema-owner credential through `cargo run --bin curio_db -- migrate` before a release.
 - The service uses the lower-privilege `DATABASE_URL` and verifies the expected migration at startup.
@@ -65,7 +71,9 @@ Keep these invariants:
   when a response or state transition depends on the committed row.
 - Do not expose or log database URLs, credentials, provider keys, raw sensitive payloads, or unrestricted upstream error bodies.
 
-SQLite is archival/import-only. The default dependency graph must remain PostgreSQL-only. `migrations/sqlite` exists for audit/import compatibility, and the `sqlite-import` feature is confined to the one-time importer and its test. Do not introduce SQLite into request paths or default features.
+SQLite is archival-only. The dependency graph must remain PostgreSQL-only.
+`migrations/sqlite` exists for audit compatibility; there is no active importer
+or SQLite feature. Do not introduce SQLite into request paths.
 
 ## Authentication and ownership are incomplete
 
@@ -74,7 +82,7 @@ The current bearer middleware is a development placeholder: the nonblank bearer 
 - Do not describe the service as production-authenticated.
 - Calendar must continue to compare bearer-derived identity with `userId`.
 - User upsert currently does not enforce body ID equals bearer ID.
-- Chat stream/history routes are currently public, and conversations have no user owner.
+- Assistant stream/history routes are currently public, and conversations have no user owner.
 - CORS does not repair missing authentication or ownership.
 
 Any production-auth change is cross-stack and data-model work: define token verification, ownership, migrations, route coverage, client token flow, and tests together. Do not silently broaden or narrow existing access while implementing an unrelated feature.
@@ -90,7 +98,7 @@ failures, feature errors, history errors, and SSE terminal errors currently
 have different shapes; avoid claiming there is one global error schema until
 one is implemented.
 
-For chat:
+For the Assistant domain's chat contract:
 
 - Persist the conversation, completed user message, and pending assistant row before calling OpenAI.
 - Parse provider SSE incrementally across arbitrary LF/CRLF and byte boundaries.
@@ -146,15 +154,11 @@ Run from `curio-service`:
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
-Start with the narrowest relevant test target. Run both importer targets when
-feature flags, database dependencies, migrations, import code, or archived
-SQLite compatibility changes. When configuration, routing, deployment, or
-migrations change, also run the relevant `curio_db verify` or local readiness
-check against an explicitly safe database.
+Start with the narrowest relevant test target. When configuration, routing,
+deployment, or migrations change, also run the relevant `curio_db verify` or
+local readiness check against an explicitly safe database.
 
 Report exact checks, prerequisites, results, skipped coverage, and remaining uncertainty. Never interpret a skipped database test as a pass.
 

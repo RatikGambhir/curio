@@ -528,5 +528,5 @@ fn truncate_message(mut message: String) -> String {
 }
 
 #[cfg(test)]
-#[path = "../../tests/unit/chat/openai.rs"]
+#[path = "../../tests/unit/assistant/provider.rs"]
 mod tests;

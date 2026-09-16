@@ -32,6 +32,13 @@ pub struct CalendarEvent {
     pub updated_at: DateTime<Utc>,
 }
 
+impl CalendarEvent {
+    /// The columns backing a calendar event row. The normalized `starts_at` and
+    /// `ends_at` interval stays internal and is deliberately not selected.
+    pub(crate) const COLUMNS: &'static str = "id, user_id, title, description, status, priority, \
+         all_day, start_date, end_date, created_at, updated_at";
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateEventInput {

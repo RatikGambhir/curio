@@ -2,7 +2,7 @@ use chrono::Duration;
 
 use crate::calendar::{
     error::CalendarError,
-    models::{
+    model::{
         CalendarEvent, CalendarView, CreateEventInput, EVENT_PRIORITIES, EVENT_STATUSES,
         ListEventsQuery, NewCalendarEvent,
     },

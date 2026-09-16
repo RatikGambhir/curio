@@ -81,4 +81,3 @@ jobs:
             exit 1
           fi
       - run: cargo test
-      - run: cargo test --features sqlite-import --test sqlite_import

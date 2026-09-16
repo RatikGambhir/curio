@@ -4,3 +4,5 @@ mod app;
 mod calendar;
 #[path = "support/postgres.rs"]
 mod postgres;
+#[path = "api/tasks.rs"]
+mod tasks;

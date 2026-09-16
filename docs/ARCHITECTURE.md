@@ -144,7 +144,7 @@ browser CORS.
 ### Service
 
 `curio-service` is one process containing liveness, readiness, user, calendar,
-conversation history, and streaming chat routes. At startup it opens the
+task, conversation history, and streaming chat routes. At startup it opens the
 configured PostgreSQL schema, verifies that the expected migration is already
 applied, constructs feature repositories, and merges the routers under one CORS
 layer. Schema changes run separately through `curio_db migrate`; the running
@@ -417,14 +417,16 @@ The Calendar/Tasks switcher currently presents two views over the same
 - Tasks/List uses the generic data table.
 - Tasks/Kanban groups the same records by event status.
 
-There is no active `tasks` table, `/v1/tasks` route, or task API client.
-Existing stored events are read-only in the UI because the service has no update
-or delete endpoints. Calendar editing permissions disable rename, move, resize,
-status changes, and delete; root creation remains available and persisted.
-The Tasks projections use the most recently reported visible calendar range,
-not an independent task query. Tasks mode renders explicit loading/error UI,
-while calendar-mode initial loading or failure currently appears as empty data;
-create failures are also not surfaced to the user.
+The service now has an independent user-owned `tasks` table and authenticated
+create/list routes at `/v1/tasks`, but the frontend has no task API client or
+hook yet. Existing stored events remain read-only in the UI because the service
+has no calendar update or delete endpoints. Calendar editing permissions
+disable rename, move, resize, status changes, and delete; root creation remains
+available and persisted. The visible Tasks projections still use the most
+recently reported calendar range rather than the independent task resource.
+Tasks mode renders explicit loading/error UI, while calendar-mode initial
+loading or failure currently appears as empty data; create failures are also
+not surfaced to the user.
 
 The reusable editing extension can emit `onChange` plus granular edit/reschedule
 callbacks for one logical action. This is harmless while persistence is
@@ -498,9 +500,11 @@ and supports a capped list of custom color seeds.
 - validates configured CORS origins as HTTP header values;
 - opens a schema-scoped PostgreSQL pool with bounded connection settings;
 - verifies the latest embedded PostgreSQL migration without applying DDL;
-- builds Calendar, User, and Chat feature repositories from database clones;
-- creates `ChatState` from OpenAI configuration and `ChatRepository`;
-- merges base, readiness, chat, calendar, and user routers;
+- delegates Calendar, Task, User, and Assistant construction to each domain's
+  `route.rs` composition function;
+- creates `AssistantService` from OpenAI configuration and
+  `AssistantRepository` inside the Assistant route module;
+- merges base, readiness, assistant, calendar, task, and user routers;
 - applies CORS to the combined application.
 
 The public `app()` helper is materially smaller: it returns only root, health,
@@ -512,7 +516,7 @@ calendar, or user functionality is wanted. The server distinguishes process
 liveness from database readiness, but currently has no graceful shutdown,
 request IDs, rate limit, or explicit project-level timeout/body-size policy
 beyond framework and dependency defaults. Targeted structured diagnostics cover
-startup, readiness, and the chat/provider/persistence path, but there is no
+startup, readiness, and the assistant/provider/persistence path, but there is no
 request-wide tracing middleware.
 
 ### Route inventory and protection
@@ -528,6 +532,8 @@ request-wide tracing middleware.
 | `POST /v1/users` | Bearer middleware | PostgreSQL user upsert with `RETURNING` |
 | `POST /v1/calendar/events` | Bearer plus owner check | PostgreSQL create with `RETURNING` |
 | `GET /v1/calendar/events` | Bearer plus owner check | Bounded PostgreSQL overlap query |
+| `POST /v1/tasks` | Bearer plus owner check | PostgreSQL create with `RETURNING` |
+| `GET /v1/tasks` | Bearer plus owner check | Owner-scoped list ordered by creation time and ID |
 | `POST /v1/chat/stream` | No service middleware | PostgreSQL + OpenAI + normalized SSE |
 | `GET /v1/conversations` | No service middleware | All conversations, unbounded |
 | `GET /v1/conversations/{id}/messages` | No service middleware | Messages or empty list |
@@ -545,25 +551,43 @@ The current middleware is explicitly a placeholder:
 - It verifies no signature, expiry, issuer, or database record.
 - Unauthorized responses are empty `401` responses.
 
-Calendar compares that ID with the client-supplied `userId`. The user upsert
-extracts `CurrentUser` but does not compare it with the body ID, so any
-syntactically valid bearer can currently upsert any user ID. Chat/history routes
-are unprotected and conversations have no owner column.
+Calendar and Task compare that ID with the client-supplied `userId`. The user
+upsert extracts `CurrentUser` but does not compare it with the body ID, so any
+syntactically valid bearer can currently upsert any user ID. Assistant
+stream/history routes are unprotected and conversations have no owner column.
 
 The client route guard is therefore a UX boundary, not a security boundary.
 Production auth requires coordinated frontend tokens, service verification,
 route-wide enforcement, and data ownership migrations.
 
-### Backend module styles
+### Backend domain modules
+
+Calendar, Task, Assistant, and User are domain modules under `src/`. Every
+domain uses the same five-file spine:
+
+| File | Responsibility |
+| --- | --- |
+| `model.rs` | Domain records, request/response DTOs, and repository inputs |
+| `repository.rs` | Bound PostgreSQL statements and typed row mapping |
+| `service.rs` | Validation, business rules, orchestration, and error classification |
+| `handler.rs` | Axum extraction plus HTTP/SSE response adaptation |
+| `route.rs` | Domain dependency construction, paths, middleware, and Axum state |
+
+`mod.rs` is only the domain boundary and exports the route composition function.
+Domains may add narrowly owned files when the common spine is insufficient:
+Calendar has `time.rs` and `error.rs`, Task and User have `error.rs`, and
+Assistant has `provider.rs` for the OpenAI adapter.
 
 Active persistence follows feature-local typed repositories:
 
 | Area | Current organization |
 | --- | --- |
-| Calendar | Feature-local router, handlers, typed models, service, repository, time rules, and error mapping |
-| Chat | Feature-local provider/protocol/orchestration plus typed `ChatRepository` records and SQL |
-| User | HTTP handlers plus typed `UserRepository`; the module also contains legacy non-persistent conversation placeholders |
+| Calendar | Authenticated event create/range-list plus temporal normalization |
+| Task | Authenticated create/list for independent task aggregates |
+| Assistant | OpenAI streaming, chat persistence, normalized SSE, and conversation history |
+| User | Profile upsert plus legacy non-persistent conversation placeholders |
 | Database | PostgreSQL pool configuration, migration execution/verification, readiness, and timestamp serialization; no feature SQL |
+| Core | `core::sql`, the shared bind-first statement builder every repository composes its SQL with; no feature SQL and no table knowledge |
 
 For new database-backed features, Calendar is the reference pattern:
 
@@ -600,18 +624,10 @@ application-table catalog check. Both select the target through
 makes a failed pre-deploy migration stop the rollout.
 
 The original three SQLite migrations remain under `migrations/sqlite` solely
-for audit and import compatibility. The default build enables only
-`sqlx-postgres`; the optional `sqlite-import` feature enables SQLite only for
-the one-time `import_sqlite` utility. No active request path reads SQLite.
-
-The importer requires an explicit source path, target-URL environment-variable
-name, and target schema. Without `--apply` it performs a dry run. Apply mode
-checks the source and sidecars, target identity/catalog/emptiness, uses a
-database lock, imports transactionally, then verifies counts, canonical hashes,
-and a redacted manifest. It does not load `.env`; the selected target URL must
-be present in the actual process environment. `CURIO_MIGRATOR_DATABASE_URL` is
-the conventional target credential, but `--target-url-env` accepts another
-explicit environment-variable name.
+for audit compatibility. The default and all-feature builds enable only
+`sqlx-postgres`; there is no active SQLite driver, importer binary, or request
+path. `sqlite_import_manifests` remains in the PostgreSQL baseline as historical
+schema, but the current service does not write it.
 
 Current application tables (in addition to SQLx's `_sqlx_migrations` metadata):
 
@@ -621,21 +637,56 @@ Current application tables (in addition to SQLx's `_sqlx_migrations` metadata):
 | `messages` | User/assistant content, lifecycle status, provider/error IDs, and identity `sort_order`; cascades with conversation |
 | `users` | Profile keyed by user ID; email unique |
 | `calendar_events` | User-owned event with cascade delete, public date strings, and normalized range instants |
-| `sqlite_import_manifests` | Redacted SQLite source hash, importer version/commit, completion time, and per-table counts |
+| `tasks` | User-owned task state, optional due time, and stable owner-list ordering |
+| `sqlite_import_manifests` | Historical redacted import provenance; currently read-only/unused |
 
 PostgreSQL stores audit and normalized-range instants as `timestamptz(3)` and
 serializes public audit timestamps as millisecond RFC 3339 UTC strings.
 `calendar_events.all_day` is a native boolean; message role/status and calendar
-status/priority constraints live in the database. Calendar wire
+status/priority constraints live in the database. Task status, priority, and
+due-time ordering are also database-constrained. Calendar wire
 `start_date`/`end_date` strings remain text so date-only meaning is preserved.
 
-Static SQL uses `$n` parameters, `query_as`, and typed `FromRow` records. Chat
-start/finish mutations remain transactional. User upsert and calendar create
-use `INSERT ... RETURNING`. Conversation messages order by `created_at`, then
-the explicit identity-backed `sort_order`, rather than an engine-specific
-implicit row identifier.
+Repositories compose statements with `core::sql`, the shared builder described
+below, and map rows into typed `FromRow` records. Assistant start/finish
+mutations remain transactional. User upsert, calendar create, and task create
+use `INSERT ... RETURNING`. Conversation messages order by `created_at`, then the explicit
+identity-backed `sort_order`, rather than an engine-specific implicit row
+identifier.
 
-### Chat service flow
+### Shared statement construction
+
+`src/core/sql.rs` owns statement construction for every repository. It knows
+nothing about tables or domains; it exists to remove one specific failure mode.
+
+A hand-written statement keeps three parallel lists in sync — the column list,
+the `$n` placeholders, and the argument order. Every edit has to touch all
+three, a mismatch still compiles, and it fails or binds the wrong column only at
+runtime. In the builder, binding a value is what produces its placeholder, so
+each column or filter is written once, beside the value it carries, and the
+lists cannot drift apart.
+
+Two properties hold by construction:
+
+- Statement structure (`table`, `column`, filter fragments, `ORDER BY`,
+  `RETURNING`) is `&'static str`, so only literals and constants reach the SQL
+  text. Every caller-supplied value is bound.
+- Placeholder numbering follows bind order, so reordering a chain cannot
+  misalign arguments.
+
+`Sql::select`, `Sql::insert_into`, and `Sql::update` are separate builder types,
+so a clause is only reachable on the statement shape that accepts it.
+`upsert_on(key)` refreshes every non-key column from the proposed row and stamps
+`updated_at`; `execute_one` requires exactly one affected row and otherwise
+returns `sqlx::Error::RowNotFound`. A bind that fails to encode is surfaced as
+`sqlx::Error::Encode` rather than sent as an incomplete argument list.
+
+Column lists live as `COLUMNS` constants next to each `FromRow` record, so the
+selected set is written once and stays explicit. This is deliberate rather than
+`SELECT *`: `calendar_events.starts_at`/`ends_at` and `messages.sort_order` are
+internal columns that must not be fetched into public records.
+
+### Assistant service flow
 
 `POST /v1/chat/stream` follows a persistence-before-terminal-event rule:
 
@@ -661,8 +712,8 @@ The chat path logs correlation IDs already supplied by the client, provider HTTP
 status or transport-error classification, OpenAI's `x-request-id` when present,
 and sanitized database operation/error classifications. It deliberately does
 not log prompts, message/response bodies, API keys, authorization headers, or
-database URLs. Provider response details remain private and are not forwarded
-to clients.
+database URLs. A bounded, credential-redacted provider error description may be
+forwarded to clients so failures remain diagnosable.
 
 Public normalized events are:
 
@@ -670,7 +721,8 @@ Public normalized events are:
 - `done { conversationId, messageId, responseId }`
 - `error { conversationId, messageId, code, message }`
 
-Provider HTTP bodies/details are not forwarded to clients.
+Raw provider HTTP bodies are not forwarded to clients. Parsed error labels and
+messages may appear after credential redaction and length limiting.
 
 Current chat limitations:
 
@@ -686,15 +738,16 @@ Current chat limitations:
 
 ### Calendar vertical slice
 
-`calendar/mod.rs` constructs one `CalendarService` from one
+`calendar/route.rs` constructs one `CalendarService` from one
 `CalendarRepository`, attaches it as Axum state, nests the event routes, and
-applies auth once.
+applies auth once. `calendar/mod.rs` only exposes that composition function.
 
 Layer responsibilities:
 
-- `models.rs`: public records, create/query inputs, repository insert input,
+- `model.rs`: public records, create/query inputs, repository insert input,
   and allowed status/priority values.
-- `handlers.rs`: Axum extraction, owner check, response status/envelope.
+- `handler.rs`: Axum extraction, owner check, response status/envelope.
+- `route.rs`: dependency construction, paths, auth middleware, and Axum state.
 - `service.rs`: trimming, UUID generation, enum validation, temporal rules,
   bounded-range policy, and SQL error classification.
 - `repository.rs`: insert/list SQL and one row mapper.
@@ -722,6 +775,24 @@ sanitized.
 There is no get-one, update, or delete route. Listing an unknown user returns an
 empty result because it does not join the users table.
 
+### Task vertical slice
+
+`task/route.rs` constructs an authenticated domain router from
+`TaskService`/`TaskRepository`; `task/mod.rs` only exports it. Tasks are
+independent aggregates rather than second writes to `calendar_events`.
+
+- `POST /v1/tasks` trims and validates task fields, defaults status/active/start
+  time, generates a UUID when needed, and returns the persisted row with `201`.
+- `GET /v1/tasks?userId=...` returns only that owner's rows ordered by
+  `created_at DESC, id ASC`.
+- Both routes compare the development bearer identity with `userId`.
+- Status is one of `scheduled`, `in-progress`, `blocked`, `done`, or
+  `cancelled`; priority is optional `low`, `medium`, or `high`.
+- `setAt`/`dueAt` are RFC 3339 instants stored as `timestamptz(3)`, and a due
+  time cannot precede the start time.
+- There is no task get-one, update, delete, pagination, calendar projection, or
+  frontend API consumer yet.
+
 ### User and legacy placeholder routes
 
 `POST /v1/users` trims required values, converts a blank avatar to null,
@@ -740,6 +811,7 @@ Error behavior is currently boundary-specific:
 | --- | --- |
 | Auth middleware | Empty `401` |
 | Calendar domain/storage | JSON `{ "error": "..." }` |
+| Task domain/storage | JSON `{ "error": "..." }` |
 | User validation/conflict/storage | JSON `{ "error": "..." }` |
 | Axum extractor rejection | Framework-default response |
 | Chat/provider/storage after SSE starts | HTTP success stream with terminal `error` event |
@@ -875,6 +947,20 @@ EventCalendar visible range
 Root-level creation travels back through the same layers with
 `POST /v1/calendar/events`, then invalidates every cached range for that user.
 
+### Task create and list
+
+```text
+authenticated service request
+  → POST/GET /v1/tasks
+  → bearer owner check
+  → task validation/defaults
+  → TaskRepository with bound static SQL
+  → tasks
+```
+
+The active clients do not currently call these routes; the Calendar Tasks tab
+continues to project `calendar_events`.
+
 ### External links
 
 - Calls made through `PlatformServices.openExternalUrl` validate HTTP/HTTPS on
@@ -928,7 +1014,7 @@ fails.
 | `OPENAI_MODEL` | Service only | Required; `gpt-5.6` is the default the project ships with |
 | `OPENAI_BASE_URL` | Service only | Defaults to `https://api.openai.com` |
 | `DATABASE_URL` | Service runtime and `curio_db verify`; secret | Required application-role PostgreSQL URL |
-| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` and conventional importer target; secret | Required migrator-role PostgreSQL URL for those operations |
+| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate`; secret | Required migrator-role PostgreSQL URL |
 | `CURIO_DB_SCHEMA` | Service and database commands | Required validated schema such as `curio_dev` or `curio_prod` |
 | `CURIO_DB_MAX_CONNECTIONS` | Service pool | Code default `10`; copied local example sets `5`; bounded from 1 through 50 |
 | `CURIO_DB_ACQUIRE_TIMEOUT_SECONDS` | Service pool | Defaults to `10`; bounded from 1 through 60 |
@@ -1011,27 +1097,12 @@ cargo run --bin curio-service
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
 Run `curio_db migrate` with the schema-owner credential before starting a new
 service release. Railway declares this as its pre-deploy command and probes
 `/ready`; ordinary service startup uses the application credential and only
-verifies migration state. The feature-gated importer is a one-time cutover tool,
-not part of the normal runtime dependency graph. A dry run has this shape (the
-target URL variable must already be exported because this binary does not load
-`.env`):
-
-```bash
-cargo run --features sqlite-import --bin import_sqlite -- \
-  --source /absolute/path/to/curio.sqlite \
-  --target-url-env CURIO_MIGRATOR_DATABASE_URL \
-  --target-schema curio_dev
-```
-
-Add `--apply` only after the dry run, target-identity checks, backup, and
-explicit authorization for the write.
+verifies migration state.
 
 `curio-service/ops/postgres/bootstrap_roles.sql` is an operator-reviewed role
 and schema bootstrap script; it is not an application migration and must not be
@@ -1048,15 +1119,13 @@ wrapper must review/enforce nonzero results.
   build, desktop UI build, and Tauri Rust format/clippy/tests.
 - Service: an ephemeral PostgreSQL 18 container, Rust format, all-feature clippy
   with warnings denied, a default-dependency check that rejects `sqlx-sqlite`,
-  PostgreSQL tests, and the feature-gated importer test.
+  and PostgreSQL tests.
 
 CI does not currently:
 
 - run the legacy Worker packages;
 - exercise Railway networking/roles from pull-request code;
 - run browser or packaged-desktop end-to-end tests;
-- run the unit tests embedded in the `import_sqlite` binary target (the
-  integration importer test is covered);
 - produce/sign a desktop bundle;
 - deploy the service or SPA.
 
@@ -1114,10 +1183,11 @@ Coverage includes:
   schema;
 - calendar authentication/ownership, create/list, UUIDs, range overlap,
   all-day/timed/milestone semantics, DST slack, and error statuses.
+- task authentication/ownership, validation/defaults, create/list ordering,
+  injection-shaped values, native PostgreSQL types, and reconnect durability.
 
-The feature-gated importer is the only service tool allowed to read a legacy
-SQLite snapshot; normal database-backed tests and runtime remain PostgreSQL-only.
-Material gaps include production auth, user ownership, chat history
+Normal database-backed tests and runtime remain PostgreSQL-only. Material gaps
+include production auth, user ownership, chat history
 authorization/pagination, retries/idempotency, pending-message recovery,
 calendar update/delete, production pool/load characterization, operational
 middleware, and end-to-end client/service tests.
@@ -1137,7 +1207,7 @@ middleware, and end-to-end client/service tests.
   or remote-network access.
 - Service CORS reflects only exact configured web origins.
 - OpenAI errors are sanitized before becoming Curio SSE events.
-- Calendar data is checked against the bearer-derived owner ID.
+- Calendar and Task data are checked against the bearer-derived owner ID.
 - `ServiceConfig` uses a custom `Debug` implementation that redacts the OpenAI
   key and database URL.
 
@@ -1145,8 +1215,7 @@ middleware, and end-to-end client/service tests.
 
 - Client login is mock local storage, not real authentication.
 - The service treats bearer contents as the user ID.
-- Chat and conversation-history routes are public and conversations have no
-  owner.
+- Assistant stream/history routes are public and conversations have no owner.
 - User upsert does not enforce bearer ID equals body ID.
 - CORS is not an authorization mechanism.
 - Frontend route guards protect navigation only.
@@ -1169,11 +1238,12 @@ are addressed.
    backend chat request.
 4. Stored conversation history is not sent back to OpenAI as context.
 5. Calendar is the most complete handler/service/repository/error vertical
-   slice; chat and user now keep persistence in typed feature repositories.
+   slice; Assistant and User keep persistence in typed feature repositories.
 6. Calendar only supports create and bounded list, so persisted entries must
    remain read-only in edit surfaces.
-7. The Calendar “Tasks” views are projections of calendar events. There is no
-   independent task resource yet.
+7. The Calendar “Tasks” views are projections of calendar events even though an
+   independent task service resource now exists; there is no frontend task
+   client or projection yet.
 8. Notes, Vault, Atlas, Profile Setup, and most dashboard/settings data are
    mock, local, or in-memory.
 9. JSON/API error shapes are not uniform across auth, Axum extraction, history,
@@ -1287,8 +1357,8 @@ logical edit emits one request.
 - Provider secrets never enter client builds.
 - PostgreSQL migrations run explicitly before deployment, startup verifies the
   expected version, and the default service build contains no SQLite driver.
-- Archived SQLite migrations and the feature-gated importer remain isolated
-  from active request handling.
+- Archived SQLite migrations remain isolated from active request handling; no
+  SQLite importer or driver is active.
 - New service features follow Calendar's feature-local layering.
 - Calendar public date strings retain their all-day/timed meaning.
 - The legacy Workers remain explicitly disconnected unless a planned migration

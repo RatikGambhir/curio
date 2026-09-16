@@ -1,7 +1,7 @@
 use crate::{
     calendar::{
         error::CalendarError,
-        models::{CalendarView, CreateEventInput, ListEventsQuery},
+        model::{CalendarView, CreateEventInput, ListEventsQuery},
         repository::CalendarRepository,
         service::CalendarService,
     },

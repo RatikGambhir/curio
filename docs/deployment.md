@@ -16,7 +16,7 @@ Database credentials are deliberately separated:
 | Variable | Used by | Required access |
 | --- | --- | --- |
 | `DATABASE_URL` | Running service and verification | Application role with DML access only |
-| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` and the SQLite importer | Migrator role that owns the selected schema |
+| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` | Migrator role that owns the selected schema |
 | `CURIO_DB_SCHEMA` | Both database clients | `curio_dev`, `curio_prod`, or a disposable `curio_test_*` schema |
 | `CURIO_TEST_DATABASE_URL` | Integration-test fixture | Test runner allowed to create/drop only `curio_test_*` schemas |
 
@@ -84,11 +84,10 @@ the expected migration version. Keep the migrator credential out of the
 running application's code paths even though Railway makes the variable
 available to the pre-deploy container.
 
-Before a production migration or import, verify the target database/user/schema,
-take a restorable backup, and run the redacted checks in
-`curio-service/ops/postgres/verify.sql`. Do not import into a non-empty or
-unknown schema and do not remove the final SQLite snapshot during the rollback
-window.
+Before a production migration, verify the target database/user/schema, take a
+restorable backup, and run the redacted checks in
+`curio-service/ops/postgres/verify.sql`. The archived SQLite migrations are
+audit material only; the active service has no SQLite importer.
 
 ## Web
 

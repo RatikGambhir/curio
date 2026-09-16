@@ -88,7 +88,8 @@ Preserve these unless the task explicitly changes the architecture and updates t
 - The Tauri bridge transports status and raw bytes; it does not duplicate JSON or Curio SSE parsing.
 - OpenAI keys, database URLs, migrator credentials, and other secrets never enter Vite variables, client storage, logs, fixtures, or committed environment files.
 - PostgreSQL schema changes are explicit, append-only migrations. Application startup verifies migration state but does not apply DDL.
-- The normal service build excludes SQLite; archived SQLite migrations/import code remain feature-gated and outside request handling.
+- The service build excludes SQLite; archived SQLite migrations remain outside
+  request handling and there is no active importer.
 - Calendar date-only strings and timestamp strings retain distinct public semantics.
 - Current auth limitations must be described honestly. Client guards and CORS are not authorization.
 - New external links and remote media use an intentional platform capability,
@@ -173,11 +174,17 @@ handler (Axum/HTTP/auth)
         -> Database (pool/migration lifecycle)
 ```
 
+Keep each backend domain under `curio-service/src/<domain>/` with a consistent
+spine: `model.rs`, `repository.rs`, `service.rs`, `handler.rs`, and `route.rs`.
+`mod.rs` is the domain boundary and should primarily expose route composition.
+Add narrowly owned modules such as `error.rs`, `time.rs`, or `provider.rs` only
+when that domain has a concrete need.
+
 Keep feature SQL out of `Database`. Bind every SQL value. Reuse the pool. Sanitize storage/provider failures before returning them and never log credentials or sensitive payloads.
 
 ### Authentication and errors
 
-The bearer token is currently treated as a development user ID. Calendar checks ownership, user upsert has an ownership gap, and chat/history are unprotected and globally scoped. Do not present this as production auth. A real auth change must coordinate tokens, middleware, all routes, ownership schema, client behavior, and tests.
+The bearer token is currently treated as a development user ID. Calendar checks ownership, user upsert has an ownership gap, and Assistant stream/history routes are unprotected and globally scoped. Do not present this as production auth. A real auth change must coordinate tokens, middleware, all routes, ownership schema, client behavior, and tests.
 
 There is no single global error envelope today. Preserve the owning feature's established contract unless the task is an intentional cross-service normalization.
 
@@ -189,7 +196,7 @@ There is no single global error envelope today. Preserve the owning feature's es
 - Add a migration under `curio-service/migrations/postgres` only when the schema
   changes; never create no-op migrations or edit an applied migration.
 - Schema changes also require an impact check for `ops/postgres/verify.sql`,
-  importer compatibility, deployment notes, and database-backed tests.
+  archived SQLite compatibility, deployment notes, and database-backed tests.
 - Run DDL through `curio_db migrate`, not service startup.
 - Readiness means database access plus expected migration-row verification.
 - `curio_db verify` performs additional catalog checks.
@@ -199,7 +206,7 @@ Do not run migrations, imports, or destructive database tools against a persiste
 
 ### Contract-sensitive domains
 
-Chat must persist initial records before the provider call and persist terminal/interrupted state before the corresponding terminal event where possible. Keep provider parsing incremental and errors sanitized.
+The Assistant domain must persist initial records before the provider call and persist terminal/interrupted state before the corresponding terminal event where possible. Keep provider parsing incremental and errors sanitized.
 
 Calendar preserves trimmed public wire values while separately normalizing half-open UTC intervals for overlap queries. Maintain date-only/timed/milestone rules, exclusive all-day ends, bounded views, and DST slack.
 

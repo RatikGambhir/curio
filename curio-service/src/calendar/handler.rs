@@ -9,7 +9,7 @@ use crate::{
     CurrentUser,
     calendar::{
         error::CalendarError,
-        models::{CalendarEvent, CreateEventInput, ListEventsQuery},
+        model::{CalendarEvent, CreateEventInput, ListEventsQuery},
         service::CalendarService,
     },
 };
