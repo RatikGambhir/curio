@@ -5,8 +5,8 @@ use axum::{
     response::Response,
 };
 use curio_service::{
+    app::config::{DocumentsConfig, ServiceConfig},
     app_with_database,
-    config::{DocumentsConfig, ServiceConfig},
 };
 use http_body_util::BodyExt;
 use serde_json::{Value, json};

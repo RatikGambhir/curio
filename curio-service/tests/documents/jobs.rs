@@ -2,7 +2,7 @@
 use std::time::Duration;
 
 use axum::http::{StatusCode, header};
-use curio_service::config::DocumentsConfig;
+use curio_service::app::config::DocumentsConfig;
 use serde_json::Value;
 
 use crate::support::{OWNER_A, OWNER_B, TestDocuments, body_bytes, docx_bytes, file, pdf_bytes};

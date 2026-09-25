@@ -33,7 +33,7 @@ Map changed paths to affected contracts, not only to their language:
 | `web/src-tauri` | Rust format, clippy, unit tests; rebuild desktop UI/package when contract or packaging changes |
 | `curio-service` pure logic | focused Rust test, format, clippy |
 | service router/auth/contracts | unit/full-router tests plus relevant client contract tests |
-| repositories or PostgreSQL migrations | database-backed tests, default-dependency check, importer test when the SQLite boundary is affected |
+| repositories or PostgreSQL migrations | database-backed tests |
 | `curio-workers` | that Worker's typecheck and Vitest; remember root CI does not cover it |
 | docs or `.agents/skills` only | link/path/frontmatter review, diff check, and skill validation when available |
 | cross-stack or CI/config changes | every affected package plus the workflow-equivalent command set |
@@ -87,21 +87,19 @@ Run from `curio-service`:
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
 `CURIO_TEST_DATABASE_URL` must identify a non-production test-runner role that can create and drop only `curio_test_*` schemas. Database-backed tests return early when this variable is absent, so a successful `cargo test` without the variable does not prove PostgreSQL behavior. Record whether the variable was present without printing its value.
 
-When default feature dependencies or database drivers change, also verify the normal dependency tree contains `sqlx-postgres` and excludes `sqlx-sqlite`, matching CI. Run migration/readiness tools only against an explicitly safe target:
+Run migration/readiness tools only against an explicitly safe target:
 
 ```bash
 cargo run --bin curio_db -- verify
 ```
 
-Migration application and SQLite import are state-changing operations. Do not
-run them merely as verification against an existing database. If the task
-explicitly requires them, resolve the exact schema and credential role first,
+Migration application is a state-changing operation. Do not
+run it merely as verification against an existing database. If the task
+explicitly requires it, resolve the exact schema and credential role first,
 use an isolated disposable target or approved environment, run a dry run where
 supported, and follow
 [`docs/deployment.md`](../../../docs/deployment.md).

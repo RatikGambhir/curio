@@ -36,7 +36,6 @@ DECLARE
         'conversations',
         'messages',
         'calendar_events',
-        'sqlite_import_manifests',
         'document_files',
         'document_file_versions',
         'document_file_blobs',
@@ -283,15 +282,3 @@ SELECT
 FROM pg_catalog.pg_indexes
 WHERE schemaname = pg_catalog.current_schema()
 ORDER BY tablename, indexname;
-
-SELECT
-    source_sha256,
-    completed_at,
-    importer_version,
-    importer_commit,
-    users_count,
-    conversations_count,
-    messages_count,
-    calendar_events_count
-FROM sqlite_import_manifests
-ORDER BY completed_at, source_sha256;

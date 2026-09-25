@@ -16,7 +16,7 @@ Database credentials are deliberately separated:
 | Variable | Used by | Required access |
 | --- | --- | --- |
 | `DATABASE_URL` | Running service and verification | Application role with DML access only |
-| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` and the SQLite importer | Migrator role that owns the selected schema |
+| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` | Migrator role that owns the selected schema |
 | `CURIO_DB_SCHEMA` | Both database clients | `curio_dev`, `curio_prod`, or a disposable `curio_test_*` schema |
 | `CURIO_TEST_DATABASE_URL` | Integration-test fixture | Test runner allowed to create/drop only `curio_test_*` schemas |
 
@@ -25,8 +25,13 @@ Percent-encode passwords when constructing a URL. Never expose any database URL
 as a `VITE_*` variable, log it, or give an application process the Railway
 administrator credential.
 
-For local development, copy `.env.example` to `.env`, use the development app
-and migrator roles, and select `curio_dev`. Railway's private hostname resolves
+For local development, `curio-service/.env` is the service's only env file
+(gitignored; there is no committed example). Set the variables in this section,
+use the development app and migrator roles, and select `curio_dev`. When the
+local URL uses an administrator login instead of the migrator's own password,
+append `options[role]=curio_dev_migrator` to `CURIO_MIGRATOR_DATABASE_URL` (and
+double-quote the value so shells can source the file) so migrated tables keep
+the migrator owner and its default grants. Railway's private hostname resolves
 only inside the project. A local or externally hosted service therefore needs
 Railway Public Access/TCP Proxy enabled and a TLS URL ending in
 `?sslmode=require` (or an approved private tunnel). Apply migrations and start
@@ -37,6 +42,9 @@ cd curio-service
 cargo run --bin curio_db -- migrate
 cargo run --bin curio-service
 ```
+
+If startup logs `operation="service_migration_verify" error_kind="configuration"`,
+the schema is missing a migration embedded in the binary; rerun `curio_db migrate`.
 
 The service binds `CURIO_SERVICE_ADDR` (default `127.0.0.1:3000`) and requires
 `OPENAI_API_KEY` and `OPENAI_MODEL`. Pool sizing is controlled by
@@ -97,11 +105,9 @@ the expected migration version. Keep the migrator credential out of the
 running application's code paths even though Railway makes the variable
 available to the pre-deploy container.
 
-Before a production migration or import, verify the target database/user/schema,
-take a restorable backup, and run the redacted checks in
-`curio-service/ops/postgres/verify.sql`. Do not import into a non-empty or
-unknown schema and do not remove the final SQLite snapshot during the rollback
-window.
+Before a production migration, verify the target database/user/schema, take a
+restorable backup, and run the redacted checks in
+`curio-service/ops/postgres/verify.sql`.
 
 ## Web
 

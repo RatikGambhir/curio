@@ -1,15 +1,15 @@
 //! Parser and chunker behavior through the public `documents::formats` API.
 //! These tests need no database.
-use curio_service::documents::{
-    domain::{
-        DocumentChunk, document_id_from_content, infer_supported_mime_type,
-        office_extension_for_mime_type, sha256_hex,
-    },
+use curio_service::domains::documents::{
     formats::{
         ParsedSourceFile, SourceFile,
         docx::{parse_docx_chunks_from_bytes, parse_docx_from_bytes},
         pdf::{parse_pdf_by_bytes, parse_pdf_from_bytes},
         text_chunking::{MAX_TOKEN_CHUNK, token_bounded_ranges},
+    },
+    model::{
+        DocumentChunk, document_id_from_content, infer_supported_mime_type,
+        office_extension_for_mime_type, sha256_hex,
     },
 };
 use std::path::Path;

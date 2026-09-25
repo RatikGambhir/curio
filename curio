@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+
+set -u
+set -o pipefail
+
+readonly CURIO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+readonly CURIO_SERVICE_HOST="127.0.0.1"
+readonly CURIO_SERVICE_PORT="3000"
+readonly CURIO_SERVICE_URL="http://${CURIO_SERVICE_HOST}:${CURIO_SERVICE_PORT}"
+# Vite uses a fixed dev-server port (strictPort) in both web and desktop modes.
+readonly CURIO_UI_PORT="1420"
+readonly CURIO_UI_ORIGINS="http://localhost:${CURIO_UI_PORT},http://127.0.0.1:${CURIO_UI_PORT}"
+readonly CURIO_STARTUP_TIMEOUT_SECONDS=300
+
+service_pid=""
+ui_pid=""
+
+usage() {
+  cat <<'EOF'
+Usage: ./curio <web|desktop>
+
+  web      Start curio-service, then the React UI in browser mode (Vite).
+  desktop  Start curio-service, then the Tauri shell with the desktop-mode UI.
+
+curio-service reads its configuration from curio-service/.env.
+EOF
+}
+
+fail() {
+  printf 'curio: %s\n' "$1" >&2
+  exit 1
+}
+
+process_group_is_running() {
+  local pid="$1"
+  [[ -n "$pid" ]] && kill -0 -- "-${pid}" 2>/dev/null
+}
+
+signal_process_group() {
+  local pid="$1"
+  local signal="$2"
+
+  if process_group_is_running "$pid"; then
+    kill "-${signal}" -- "-${pid}" 2>/dev/null || true
+  elif [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill "-${signal}" "$pid" 2>/dev/null || true
+  fi
+}
+
+children_are_running() {
+  process_group_is_running "$ui_pid" || process_group_is_running "$service_pid"
+}
+
+cleanup() {
+  local exit_status=$?
+  local attempt
+
+  trap - EXIT INT TERM HUP
+
+  signal_process_group "$ui_pid" INT
+  signal_process_group "$service_pid" INT
+
+  for attempt in {1..30}; do
+    if ! children_are_running; then
+      break
+    fi
+    sleep 0.1
+  done
+
+  signal_process_group "$ui_pid" TERM
+  signal_process_group "$service_pid" TERM
+
+  for attempt in {1..20}; do
+    if ! children_are_running; then
+      break
+    fi
+    sleep 0.1
+  done
+
+  signal_process_group "$ui_pid" KILL
+  signal_process_group "$service_pid" KILL
+
+  if [[ -n "$ui_pid" ]]; then
+    wait "$ui_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$service_pid" ]]; then
+    wait "$service_pid" 2>/dev/null || true
+  fi
+
+  exit "$exit_status"
+}
+
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -ne 1 ]]; then
+  usage >&2
+  exit 64
+fi
+
+case "$1" in
+  web)
+    readonly ui_label="React web UI"
+    readonly ui_command="dev:web"
+    ;;
+  desktop)
+    readonly ui_label="Tauri desktop app"
+    readonly ui_command="dev:desktop"
+    ;;
+  *)
+    usage >&2
+    exit 64
+    ;;
+esac
+
+for required_command in cargo npm curl; do
+  if ! command -v "$required_command" >/dev/null 2>&1; then
+    fail "required command not found: ${required_command}"
+  fi
+done
+
+if [[ ! -f "$CURIO_ROOT/curio-service/.env" ]]; then
+  fail "curio-service/.env is missing; create it with the variables listed in docs/deployment.md"
+fi
+
+if [[ ! -d "$CURIO_ROOT/web/node_modules" ]]; then
+  fail "web dependencies are not installed; run 'npm ci' in ${CURIO_ROOT}/web"
+fi
+
+if curl --fail --silent --max-time 1 "${CURIO_SERVICE_URL}/health" >/dev/null 2>&1; then
+  fail "another curio-service is already running at ${CURIO_SERVICE_URL}"
+fi
+
+if curl --silent --max-time 1 --output /dev/null "http://127.0.0.1:${CURIO_UI_PORT}" 2>/dev/null; then
+  fail "port ${CURIO_UI_PORT} is already in use; stop the other Vite dev server first"
+fi
+
+printf 'Starting curio-service at %s...\n' "$CURIO_SERVICE_URL"
+set -m
+(
+  cd "$CURIO_ROOT/curio-service" || exit 1
+  # Shell variables take precedence over curio-service/.env. The browser UI is
+  # served from the Vite dev server, so its origin must pass CORS; the desktop
+  # app calls the service from Rust and does not need it.
+  if [[ "$ui_command" == "dev:web" ]]; then
+    export CURIO_CORS_ALLOWED_ORIGINS="${CURIO_CORS_ALLOWED_ORIGINS:-$CURIO_UI_ORIGINS}"
+  fi
+  exec env \
+    CURIO_SERVICE_ADDR="${CURIO_SERVICE_HOST}:${CURIO_SERVICE_PORT}" \
+    cargo run --locked --bin curio-service
+) &
+service_pid=$!
+set +m
+
+readonly startup_deadline=$((SECONDS + CURIO_STARTUP_TIMEOUT_SECONDS))
+while ! curl --fail --silent --max-time 1 "${CURIO_SERVICE_URL}/health" >/dev/null 2>&1; do
+  if ! kill -0 "$service_pid" 2>/dev/null; then
+    wait "$service_pid"
+    service_status=$?
+    service_pid=""
+    if [[ $service_status -eq 0 ]]; then
+      service_status=1
+    fi
+    printf 'curio: curio-service exited before becoming ready.\n' >&2
+    exit "$service_status"
+  fi
+
+  if ((SECONDS >= startup_deadline)); then
+    fail "curio-service did not become ready within ${CURIO_STARTUP_TIMEOUT_SECONDS} seconds"
+  fi
+
+  sleep 0.25
+done
+
+printf 'curio-service is ready. Starting %s...\n' "$ui_label"
+set -m
+(
+  cd "$CURIO_ROOT/web" || exit 1
+  # Exported (not only in web/.env) so Tauri's Rust build sees it through
+  # option_env! in desktop mode as well as Vite in both modes.
+  exec env VITE_CURIO_SERVICE_URL="$CURIO_SERVICE_URL" npm run "$ui_command"
+) &
+ui_pid=$!
+set +m
+
+while true; do
+  if ! kill -0 "$service_pid" 2>/dev/null; then
+    wait "$service_pid"
+    service_status=$?
+    service_pid=""
+    if [[ $service_status -eq 0 ]]; then
+      service_status=1
+    fi
+    printf 'curio: curio-service stopped; shutting down %s.\n' "$ui_label" >&2
+    exit "$service_status"
+  fi
+
+  if ! kill -0 "$ui_pid" 2>/dev/null; then
+    wait "$ui_pid"
+    ui_status=$?
+    ui_pid=""
+    exit "$ui_status"
+  fi
+
+  sleep 0.5
+done

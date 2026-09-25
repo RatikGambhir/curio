@@ -1,9 +1,6 @@
 use std::{env, time::Duration};
 
-use curio_service::{
-    config::validate_schema_name,
-    database::{Database, DatabaseOptions},
-};
+use curio_service::adapters::postgres::client::{Database, DatabaseOptions, validate_schema_name};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
 const TEST_DATABASE_ENV: &str = "CURIO_TEST_DATABASE_URL";

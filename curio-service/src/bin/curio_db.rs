@@ -1,9 +1,6 @@
 use std::{env, process::ExitCode, time::Duration};
 
-use curio_service::{
-    config::validate_schema_name,
-    database::{Database, DatabaseOptions},
-};
+use curio_service::adapters::postgres::client::{Database, DatabaseOptions, validate_schema_name};
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -47,7 +44,6 @@ async fn run() -> Result<(), &'static str> {
     .map_err(|_| "could not connect to the configured PostgreSQL schema")?;
 
     if command == "migrate" {
-        verify_no_unknown_tables(&database).await?;
         database
             .migrate()
             .await
@@ -79,7 +75,6 @@ async fn verify_catalog(database: &Database) -> Result<(), &'static str> {
               'conversations',
               'messages',
               'calendar_events',
-              'sqlite_import_manifests',
               'document_files',
               'document_file_versions',
               'document_file_blobs',
@@ -91,7 +86,7 @@ async fn verify_catalog(database: &Database) -> Result<(), &'static str> {
     .await
     .map_err(|_| "catalog verification failed")?;
 
-    if expected_tables != 9 {
+    if expected_tables != 8 {
         return Err("one or more expected application tables are missing");
     }
 
@@ -111,7 +106,6 @@ async fn verify_no_unknown_tables(database: &Database) -> Result<(), &'static st
               'conversations',
               'messages',
               'calendar_events',
-              'sqlite_import_manifests',
               'document_files',
               'document_file_versions',
               'document_file_blobs',

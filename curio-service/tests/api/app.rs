@@ -7,8 +7,9 @@ use axum::{
     routing::post,
 };
 use curio_service::{
-    app, app_with_database,
-    config::{DocumentsConfig, ServiceConfig},
+    app,
+    app::config::{DocumentsConfig, ServiceConfig},
+    app_with_database,
 };
 use http_body_util::BodyExt;
 use serde_json::{Value, json};

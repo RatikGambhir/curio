@@ -15,8 +15,8 @@ use axum::{
     routing::post,
 };
 use curio_service::{
+    app::config::{DocumentsConfig, ServiceConfig},
     app_with_database,
-    config::{DocumentsConfig, ServiceConfig},
 };
 use docx_rust::{Docx, document::Paragraph};
 use http_body_util::BodyExt;

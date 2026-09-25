@@ -1,4 +1,4 @@
-use curio_service::{app_with_config, config::ServiceConfig, diagnostics};
+use curio_service::{app::config::ServiceConfig, app_with_config, shared::diagnostics};
 use tracing::{error, info};
 
 #[tokio::main]
@@ -11,7 +11,7 @@ async fn main() {
         Ok(config) => config,
         Err(error) => {
             error!(%error, "invalid curio-service configuration");
-            error!("copy .env.example to .env and fill in the required values");
+            error!("set the required values in .env (see docs/deployment.md)");
             std::process::exit(1);
         }
     };
@@ -20,6 +20,7 @@ async fn main() {
         Ok(app) => app,
         Err(_) => {
             error!("curio-service database connection or migration verification failed");
+            error!("if migrations are pending, run `cargo run --bin curio_db -- migrate`");
             std::process::exit(1);
         }
     };

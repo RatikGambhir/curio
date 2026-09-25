@@ -88,7 +88,7 @@ Preserve these unless the task explicitly changes the architecture and updates t
 - The Tauri bridge transports status and raw bytes; it does not duplicate JSON or Curio SSE parsing.
 - OpenAI keys, database URLs, migrator credentials, and other secrets never enter Vite variables, client storage, logs, fixtures, or committed environment files.
 - PostgreSQL schema changes are explicit, append-only migrations. Application startup verifies migration state but does not apply DDL.
-- The normal service build excludes SQLite; archived SQLite migrations/import code remain feature-gated and outside request handling.
+- PostgreSQL is the only database.
 - Calendar date-only strings and timestamp strings retain distinct public semantics.
 - Current auth limitations must be described honestly. Client guards and CORS are not authorization.
 - New external links and remote media use an intentional platform capability,
@@ -167,11 +167,14 @@ Production uses `app_with_config`; tests that need the complete application gene
 Model new database-backed features after the Calendar vertical slice when the responsibilities are real:
 
 ```text
-handler (Axum/HTTP/auth)
-  -> service (validation/business rules/error classification)
-     -> repository (typed SQL/row mapping)
-        -> Database (pool/migration lifecycle)
+route (paths/state)
+  -> handler (Axum/HTTP/ownership)
+     -> service (validation/business rules/error classification)
+        -> repository (typed SQL/row mapping)
+           -> Database (pool/migration lifecycle)
 ```
+
+Source layout: `src/app` (bootstrap, config, HTTP policy such as CORS and the bearer middleware), `src/adapters` (PostgreSQL, OpenAI, Office clients; no domain imports), `src/domains/<feature>` (`route.rs`, `handler.rs`, `model.rs`, `service.rs`, `repository.rs`), and `src/shared` (auth identity, diagnostics, serialization). Build services and choose which routers are protected in `app/bootstrap.rs`; a domain binds its provider ports to adapter types on its own side.
 
 Keep feature SQL out of `Database`. Bind every SQL value. Reuse the pool. Sanitize storage/provider failures before returning them and never log credentials or sensitive payloads.
 
@@ -189,7 +192,7 @@ There is no single global error envelope today. Preserve the owning feature's es
 - Add a migration under `curio-service/migrations/postgres` only when the schema
   changes; never create no-op migrations or edit an applied migration.
 - Schema changes also require an impact check for `ops/postgres/verify.sql`,
-  importer compatibility, deployment notes, and database-backed tests.
+  deployment notes, and database-backed tests.
 - Run DDL through `curio_db migrate`, not service startup.
 - Readiness means database access plus expected migration-row verification.
 - `curio_db verify` performs additional catalog checks.

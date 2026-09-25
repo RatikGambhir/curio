@@ -85,16 +85,18 @@ The principal architectural choices are:
 | `docs/ARCHITECTURE.md` | Canonical current architecture, contracts, limitations, and extension rules | Documentation only |
 | `docs/deployment.md` | Environment, database-role, hosting, and release operations | Documentation only |
 | `.agents/skills` | Repository-specific React/Vite, Axum, and verification guidance | Agent support |
+| `curio` | Local launcher: starts `curio-service`, waits for `/health`, then runs the web or Tauri desktop dev UI | Development only |
 | `plans` and ignored `*/tasks` folders | Design/implementation planning artifacts | Not runtime code |
 
-There is no root npm, Cargo, or task-runner workspace coordinating everything.
+There is no root npm, Cargo, or task-runner workspace coordinating everything;
+the root `curio` script only launches the existing package commands.
 `web`, `curio-service`, and each legacy Worker are independent package roots
 with their own lockfiles and commands. The two Rust crates are also independent;
 there is no shared Cargo workspace or shared Rust library.
 
 Generated directories such as `node_modules`, `dist`, Rust `target`, Tauri
-`gen`, local `.wrangler-state`, environment files, and local SQLite import
-snapshots are not architectural source.
+`gen`, local `.wrangler-state`, and environment files are not architectural
+source.
 
 ### Technology and toolchain snapshot
 
@@ -514,27 +516,33 @@ and supports a capped list of custom color seeds.
 1. loads a local `.env` if present;
 2. initializes compact structured diagnostics from `RUST_LOG`;
 3. parses required/default configuration;
-4. constructs the full router with `app_with_config`;
+4. constructs the full router with `app_with_config` from `src/app/bootstrap.rs`;
 5. binds `CURIO_SERVICE_ADDR`, otherwise `0.0.0.0:$PORT` when Railway-style
    `PORT` exists, otherwise `127.0.0.1:3000`;
 6. calls `axum::serve`.
 
-`app_with_config` is the real composition root. It:
+`app::bootstrap` is the only composition root. `app_with_config`:
 
-- validates configured CORS origins as HTTP header values;
 - opens a schema-scoped PostgreSQL pool with bounded connection settings;
 - verifies the latest embedded PostgreSQL migration without applying DDL;
-- delegates to each feature's `router` composition function;
-- composes `CalendarService`, `UserService`, and `ChatService` with cheaply cloned
-  PostgreSQL repositories; Chat also receives `OpenAiClient`;
-- composes the documents ingestion, job, search, and viewing services with
-  PostgreSQL store/index repositories, the documents OpenAI adapter, and the
-  LibreOffice converter from `DocumentsConfig`;
-- merges base, readiness, chat, calendar, user, and documents routers;
-- applies CORS to the combined application.
+- delegates to `app_with_database`.
+
+`app_with_database` then:
+
+- builds the adapters once: the chat `OpenAiClient`, the
+  `OpenAiDocumentsClient`, the `OfficeConverter`, and the cheaply cloned
+  `Database` handed to every repository;
+- constructs each domain service (`CalendarService`, `UserService`,
+  `ChatService`, and the documents ingestion, job, search, and viewing
+  services) and wraps it in an `Arc`;
+- merges each domain's `route::routes(...)`, wrapping calendar, users,
+  documents, and the legacy `/user` placeholders in `app::http::protected`
+  (the bearer middleware) while chat, system, and readiness stay public;
+- applies CORS through `app::http::create_router`, which validates configured
+  origins as HTTP header values.
 
 The public `app()` helper is materially smaller: it returns only root, health,
-and legacy placeholder routes. Tests use it, but production must use
+and legacy placeholder routes, without CORS. Tests use it, but production must use
 `app_with_config`.
 
 OpenAI configuration is required at process startup even when only health,
@@ -596,43 +604,83 @@ route-wide enforcement, and data ownership migrations.
 
 ### Backend modules and composition
 
-Calendar, User, and Chat use the same feature-local file names and dependency
-boundaries:
+`curio-service/src` follows the Quarry backend layout. Dependencies point
+inward: `app` depends on everything, `domains` depend on `adapters` and
+`shared`, and `adapters` depend only on `shared` and third-party crates.
+
+| Path | Responsibility |
+| --- | --- |
+| `lib.rs`, `main.rs`, `bin/curio_db.rs` | Crate roots; `lib.rs` re-exports `app`, `app_with_config`, `app_with_database`, and `ServiceConfig` |
+| `app/bootstrap.rs` | Composition root: adapters, domain services, and the assembled router |
+| `app/config.rs` | `ServiceConfig`/`DocumentsConfig` environment parsing with redacted `Debug` |
+| `app/http/` | `create_router` (CORS) and `protected`, the development bearer middleware |
+| `adapters/postgres/client.rs` | `Database`: pool, schema search path, migration verification, readiness, and `validate_schema_name` |
+| `adapters/postgres/query/` | Shared enum-based SQL builders |
+| `adapters/openai/client.rs` | Streaming chat client (`gen_chat_response_streaming`), provider SSE parser, and `ChatStreamError` sanitization |
+| `adapters/openai/documents.rs` | `OpenAiDocumentsClient`: batched embeddings and image descriptions |
+| `adapters/office/converter.rs` | Time-limited LibreOffice (`soffice`) PDF conversion |
+| `domains/system/` | `/`, `/health`, and `/ready` |
+| `domains/calendar/`, `domains/users/`, `domains/chat/` | Feature vertical slices |
+| `domains/documents/` | Documents bounded context and its subdomains |
+| `shared/auth.rs` | `CurrentUser`, the bearer-derived development identity |
+| `shared/diagnostics.rs`, `shared/serialization.rs` | Tracing setup and sanitized database-error logging; the millisecond UTC timestamp formatter |
+
+There is no Helix adapter: document chunks and vectors live in PostgreSQL, so
+the index is written in the same transaction as the file aggregate.
+
+Each domain uses the same file roles where the responsibility exists:
 
 | File | Responsibility |
 | --- | --- |
-| `mod.rs` | Composes the feature's concrete PostgreSQL/provider adapters, service, Axum state, and router |
-| `domain.rs` | Domain records, commands, validation, and lifecycle/error values; no Axum or SQLx dependencies |
+| `mod.rs` | Module declarations and the concrete service type alias (for example `CalendarService<CalendarRepository>`) |
+| `route.rs` | `routes(Arc<Service>) -> Router`: paths, body limits, and Axum state |
+| `handler.rs` | HTTP extraction, ownership checks, response envelopes, SSE encoding, and domain-error-to-HTTP mapping |
+| `model.rs` | Domain records, commands, validation, and lifecycle/error values; no Axum or SQLx dependencies |
 | `service.rs` | Application use cases and feature-specific persistence/provider ports |
-| `repository.rs` | `Postgres<Feature>Repository`, private SQLx row records, column/field enums, row conversion, transactions, and storage-error classification |
-| `handlers.rs` | HTTP extraction, auth/ownership, response envelopes, and domain-error-to-HTTP mapping |
+| `repository.rs` | `<Feature>Repository`, SQLx row records, column/field enums, transactions, and storage-error classification |
 
 Domain records retain Serde naming and timestamp serialization annotations to
-preserve the wire contract without a duplicate DTO tree. `serialization.rs`
-owns the shared millisecond UTC formatter. Calendar additionally owns pure
-`time.rs` rules; Chat owns `protocol.rs` for Curio SSE and `openai.rs` for its
-provider adapter. User's non-persistent conversation placeholders live in
-`legacy.rs` and remain separate from Chat.
+preserve the wire contract without a duplicate DTO tree. Calendar additionally
+owns pure `time.rs` rules. User's non-persistent conversation placeholders live
+in `users/legacy.rs` and remain separate from Chat. Chat's handler state is a
+`ChatHttpState { chat: Arc<ChatService> }`; the other domains use the `Arc`
+service directly as Axum state. Route functions never apply auth themselves;
+the bootstrap decides which routers are `protected`.
+
+Chat's files:
+
+| File | Responsibility |
+| --- | --- |
+| `chat/route.rs` | `routes(Arc<ChatService>)`: paths and `ChatHttpState` |
+| `chat/handler.rs` | JSON extraction, tracing spans, history envelopes, and `chat_sse`, which encodes service events as SSE with no-cache/no-buffering headers and a 15-second keep-alive comment |
+| `chat/model.rs` | `ChatStreamRequest`, the public `ChatStreamEvent` payloads, `AssistantOutcome`, and `ChatStorageError` |
+| `chat/service.rs` | `ChatService`, its `ChatStore`/`ChatModelClient` ports (with the `OpenAiClient` binding), and the run loop |
+| `chat/repository.rs` | `ChatRepository`, the `ConversationRecord`/`MessageRecord` rows it returns, and atomic lifecycle transactions |
 
 ```text
-feature router (composition root)
-  └─ handlers: HTTP/SSE mapping and identity checks
-       └─ service: use cases depending on feature ports and domain values
-            ├─ PostgreSQL repository: implements the persistence port
-            │    ├─ query: shared enum-based SQL composition
-            │    └─ Database: pool and migration lifecycle
-            └─ provider/event sink adapters (Chat)
+app::bootstrap (composition root)
+  └─ domain route: paths and state
+       └─ handler: HTTP/SSE mapping and identity checks
+            └─ service: use cases depending on domain ports and model values
+                 ├─ repository: implements the persistence port
+                 │    ├─ adapters::postgres::query: enum-based SQL composition
+                 │    └─ adapters::postgres::client::Database: pool and migrations
+                 └─ adapters::openai / adapters::office (bound to domain ports)
 ```
 
 `CalendarStore`, `UserStore`, and `ChatStore` expose feature-specific operations,
 not generic CRUD. Services are generic over these ports and can run with small
-in-memory test doubles. Repository adapters translate SQLx errors into domain
-errors and log only sanitized diagnostics. The Chat provider and event sink are
-also replaceable through `ModelProvider` and `ChatEventSink`.
+in-memory test doubles; `ChatService` defaults its parameters to
+`ChatRepository` and `OpenAiClient`, and its provider is replaceable through
+`ChatModelClient`. Adapter clients expose inherent methods; the domain that
+owns a port implements it for the adapter type (`ChatModelClient` in
+`chat/service.rs`, `Embedder`/`ImageDescriber` in `documents/model.rs`), so
+adapters never import domain code. Repository adapters translate SQLx errors
+into domain errors and log only sanitized diagnostics.
 
 ### Reusable SQL composition
 
-`curio-service/src/query` exposes `SelectQuery`, `InsertQuery`, and `UpdateQuery`
+`curio-service/src/adapters/postgres/query` exposes `SelectQuery`, `InsertQuery`, and `UpdateQuery`
 through `mod.rs`, with separate `select.rs`, `insert.rs`, `update.rs`, and private
 `bindings.rs` implementations. It adds no dependency or schema changes.
 
@@ -667,7 +715,7 @@ owner/resource scope, row mapping, and domain policy. The helper intentionally
 does not provide arbitrary SQL fragments, joins, generic CRUD, or implicit
 schema/migration management. Runnable examples live in `query/mod.rs`.
 
-### PostgreSQL lifecycle and SQLite import boundary
+### PostgreSQL lifecycle
 
 `Database::connect`:
 
@@ -688,19 +736,7 @@ application-table catalog check. Both select the target through
 `CURIO_DB_SCHEMA`. This keeps the production application role DML-only and
 makes a failed pre-deploy migration stop the rollout.
 
-The original three SQLite migrations remain under `migrations/sqlite` solely
-for audit and import compatibility. The default build enables only
-`sqlx-postgres`; the optional `sqlite-import` feature enables SQLite only for
-the one-time `import_sqlite` utility. No active request path reads SQLite.
-
-The importer requires an explicit source path, target-URL environment-variable
-name, and target schema. Without `--apply` it performs a dry run. Apply mode
-checks the source and sidecars, target identity/catalog/emptiness, uses a
-database lock, imports transactionally, then verifies counts, canonical hashes,
-and a redacted manifest. It does not load `.env`; the selected target URL must
-be present in the actual process environment. `CURIO_MIGRATOR_DATABASE_URL` is
-the conventional target credential, but `--target-url-env` accepts another
-explicit environment-variable name.
+PostgreSQL is the only database.
 
 Current application tables (in addition to SQLx's `_sqlx_migrations` metadata):
 
@@ -714,7 +750,6 @@ Current application tables (in addition to SQLx's `_sqlx_migrations` metadata):
 | `document_file_versions` | Immutable content version per file (SHA-256, MIME type, size, number); a partial unique index allows one current version |
 | `document_file_blobs` | Original bytes (`bytea`) of each version |
 | `document_chunks` | Owner-denormalized chunk text, `real[]` embedding, generated English `tsvector`, token/page/offset metadata; cascades with its version |
-| `sqlite_import_manifests` | Redacted SQLite source hash, importer version/commit, completion time, and per-table counts |
 
 PostgreSQL stores audit and normalized-range instants as `timestamptz(3)` and
 serializes public audit timestamps as millisecond RFC 3339 UTC strings.
@@ -731,13 +766,17 @@ implicit row identifier.
 
 ### Chat service flow
 
-`ChatService` orchestrates the conversation lifecycle through `ChatStore` and
-`ModelProvider`. Its `start` method returns a `ChatSession` only after the initial
-transaction commits; `run` consumes that session and delivers domain events to
-`ChatEventSink`. The HTTP adapter serializes those events into the existing SSE
-envelopes. `AssistantOutcome` carries completed, failed, or interrupted state
-and the corresponding response ID/error code, preventing invalid combinations
-at the persistence port.
+`ChatService::ask` orchestrates the conversation lifecycle through `ChatStore`
+and `ChatModelClient` and returns an `mpsc::Receiver<ChatStreamEvent>`. If the
+initial transaction fails, the receiver holds a single `storage_error` event and
+the provider is never called. Otherwise a spawned run task `select!`s over
+downstream disconnect, the provider future, and the provider's delta channel,
+buffering deltas and sending public `token` events. The provider future resolves
+to the response ID or a sanitized `ChatStreamError`. `handler::chat_sse`
+encodes each event; an encoding failure emits a correlated
+`serialization_error` event and ends the stream. `AssistantOutcome` carries
+completed, failed, or interrupted state and the corresponding response ID/error
+code, preventing invalid combinations at the persistence port.
 
 `POST /v1/chat/stream` follows a persistence-before-terminal-event rule:
 
@@ -745,7 +784,7 @@ at the persistence port.
    prompt.
 2. A transaction inserts/touches the conversation, inserts the completed user
    message, and inserts a pending assistant row.
-3. Only after commit does `OpenAiClient` call
+3. Only after commit does `OpenAiClient::gen_chat_response_streaming` call
    `{OPENAI_BASE_URL}/v1/responses` with `model`, `input`, and
    `stream: true`.
 4. The provider SSE parser handles fragmented LF/CRLF event blocks and
@@ -756,8 +795,12 @@ at the persistence port.
    the Curio `done` event.
 7. On provider failure, partial content and a sanitized error code are committed
    before the Curio `error` event.
-8. Serialization failure, downstream disconnect, or unexpected upstream end
-   attempts to mark the assistant row `interrupted`.
+8. Downstream disconnect (including a stream ended by an SSE encoding failure)
+   attempts to mark the assistant row `interrupted` with
+   `client_disconnected`. An upstream stream that ends without a terminal
+   event is a provider failure (`incomplete_provider_stream`) and is stored as
+   `failed`. A disconnect after the terminal state commits does not overwrite
+   it.
 
 The chat path logs correlation IDs already supplied by the client, provider HTTP
 status or transport-error classification, OpenAI's `x-request-id` when present,
@@ -788,11 +831,11 @@ Current chat limitations:
 
 ### Calendar vertical slice
 
-`calendar/mod.rs` constructs one `CalendarService` from one
-`PostgresCalendarRepository`, attaches it as Axum state, nests the event routes, and
-applies auth once.
+`app::bootstrap` constructs one `CalendarService` from one
+`CalendarRepository`; `calendar/route.rs` attaches it as Axum state and nests the
+event routes, and the bootstrap applies auth once.
 
-Calendar validation lives in `domain.rs`: `NewCalendarEvent` can only be
+Calendar validation lives in `model.rs`: `NewCalendarEvent` can only be
 constructed through complete validation/normalization, and `EventRange`
 encapsulates owner identity and bounded half-open UTC endpoints. Their fields
 are private and repositories receive these validated values through the
@@ -824,7 +867,7 @@ empty result because it does not join the users table.
 ### User and legacy placeholder routes
 
 `UserService` validates a `UserProfile` before calling `UserStore`; the concrete
-adapter is `PostgresUserRepository`. `POST /v1/users` trims required values, converts a blank avatar to null,
+adapter is `UserRepository`. `POST /v1/users` trims required values, converts a blank avatar to null,
 upserts by ID, returns `200` for create/update, maps duplicate email to
 `409`, and otherwise returns a sanitized error.
 
@@ -853,22 +896,23 @@ readiness, and chat provider/persistence failures.
 
 ### Documents bounded context
 
-`curio-service/src/documents` ports the Quarry documents domain onto
+`curio-service/src/domains/documents` ports the Quarry documents domain onto
 PostgreSQL. The bearer identity is the document owner for every route; request
 bodies cannot name an owner (`userId`-style multipart fields are rejected and
 search bodies deny unknown fields). Its subdomains keep Calendar's file roles:
 
 | Module | Responsibility |
 | --- | --- |
-| `mod.rs` | Composition root: builds adapters, services, the nested `/v1/documents` router, upload body limits, and the auth layer |
-| `domain.rs` | Shared kernel: `Document`/`DocumentChunk`, content-derived IDs, file policy, `DocumentError`, and the `Embedder`/`ImageDescriber` provider ports |
+| `mod.rs` | Module declarations and the concrete `Ingestion`/`Jobs`/`Search`/`Viewing` service aliases |
+| `route.rs` | Nests the ingestion, search, and viewing routers under `/v1/documents`; `ingestion/route.rs` owns the upload body limits |
+| `handler.rs` | `DocumentError` to `{ "error": ... }` HTTP mapping shared by the subdomain handlers |
+| `model.rs` | Shared kernel: `Document`/`DocumentChunk`, content-derived IDs, file policy, `DocumentError`, and the `Embedder`/`ImageDescriber` provider ports bound to `OpenAiDocumentsClient` |
 | `formats/` | Synchronous PDF and DOCX parsers producing token-bounded (800 o200k tokens) chunks with exclusive UTF-8 byte offsets and PDF page ranges; image, PowerPoint, and spreadsheet extractors are ported but not wired to ingestion |
 | `ingestion/` | Multipart handlers, SSE job events, `IngestionService` (dedupe, blocking-thread parse, batched embedding, aggregate write), in-memory `DocumentJobService`, and pure persistence-invariant construction |
 | `store/` | The file/version/blob aggregate and its PostgreSQL adapter |
 | `index/` | Chunk rows plus the owner-scoped chunk read model and search SQL |
 | `search/` | `SearchService` over the `ChunkSearch` port; text queries are embedded server-side |
 | `viewing/` | `StoredDocumentService`: list, soft delete, chunks, raw text, and PDF previews with a bounded LibreOffice semaphore and LRU preview cache |
-| `openai.rs`, `office.rs` | Embeddings/image-description provider adapter and the time-limited `soffice` converter |
 
 Ingestion rules:
 
@@ -1081,7 +1125,7 @@ fails.
 | `OPENAI_MODEL` | Service only | Required; `gpt-5.6` is the default the project ships with |
 | `OPENAI_BASE_URL` | Service only | Defaults to `https://api.openai.com` |
 | `DATABASE_URL` | Service runtime and `curio_db verify`; secret | Required application-role PostgreSQL URL |
-| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate` and conventional importer target; secret | Required migrator-role PostgreSQL URL for those operations |
+| `CURIO_MIGRATOR_DATABASE_URL` | `curio_db migrate`; secret | Required migrator-role PostgreSQL URL for migrations |
 | `CURIO_DB_SCHEMA` | Service and database commands | Required validated schema such as `curio_dev` or `curio_prod` |
 | `CURIO_DB_MAX_CONNECTIONS` | Service pool | Code default `10`; copied local example sets `5`; bounded from 1 through 50 |
 | `CURIO_DB_ACQUIRE_TIMEOUT_SECONDS` | Service pool | Defaults to `10`; bounded from 1 through 60 |
@@ -1113,8 +1157,8 @@ the explicit insecure-local escape hatch is set.
 Two current configuration traps matter during development and release:
 
 - `ServiceConfig` defaults include local origins on ports 5173 and 1420, but
-  copying the current `curio-service/.env.example` overrides the list with only
-  port 5173. Because Vite actually uses 1420, browser development needs that
+  a `curio-service/.env` that sets `CURIO_CORS_ALLOWED_ORIGINS` to only port
+  5173 overrides that list. Because Vite actually uses 1420, browser development needs that
   exact origin added to `CURIO_CORS_ALLOWED_ORIGINS`.
 - `build:web` runs Vite mode `web` and `build:desktop-ui` runs mode `desktop`.
   Vite therefore loads `.env.web*` or `.env.desktop*` (plus common `.env*`),
@@ -1130,6 +1174,19 @@ The Worker projects use Cloudflare bindings/secrets such as `GEMINI_API_KEY`,
 configuration. These are unrelated to active client configuration.
 
 ## Builds and deployment
+
+### Local launcher
+
+From the repository root, `./curio web` or `./curio desktop` starts
+`cargo run --locked --bin curio-service` with `CURIO_SERVICE_ADDR=127.0.0.1:3000`,
+waits up to 300 seconds for `/health`, then runs `npm run dev:web` or
+`npm run dev:desktop` in `web` with `VITE_CURIO_SERVICE_URL` exported so both
+Vite and Tauri's `option_env!` compile against that origin. Web mode also sets
+`CURIO_CORS_ALLOWED_ORIGINS` to the port-1420 Vite origins unless the shell
+already defines it (shell values win over `curio-service/.env`). The script
+refuses to start when `curio-service/.env` or `web/node_modules` is missing, or
+when port 3000 or 1420 is already serving. Either process exiting, or Ctrl-C,
+stops both process groups. It does not run migrations.
 
 ### Frontend and desktop commands
 
@@ -1169,32 +1226,17 @@ cargo run --bin curio-service
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
 Run `curio_db migrate` with the schema-owner credential before starting a new
 service release. Railway declares this as its pre-deploy command and probes
 `/ready`; ordinary service startup uses the application credential and only
-verifies migration state. The feature-gated importer is a one-time cutover tool,
-not part of the normal runtime dependency graph. A dry run has this shape (the
-target URL variable must already be exported because this binary does not load
-`.env`):
-
-```bash
-cargo run --features sqlite-import --bin import_sqlite -- \
-  --source /absolute/path/to/curio.sqlite \
-  --target-url-env CURIO_MIGRATOR_DATABASE_URL \
-  --target-schema curio_dev
-```
-
-Add `--apply` only after the dry run, target-identity checks, backup, and
-explicit authorization for the write.
+verifies migration state.
 
 `curio-service/ops/postgres/bootstrap_roles.sql` is an operator-reviewed role
 and schema bootstrap script; it is not an application migration and must not be
 run blindly. `ops/postgres/verify.sql` prints identity, catalog, constraints,
-indexes, counts, and possible data violations after migration/import. Its
+indexes, counts, and possible data violations after migration. Its
 violation queries are reports rather than automatic failures, so an operator or
 wrapper must review/enforce nonzero results.
 
@@ -1205,16 +1247,13 @@ wrapper must review/enforce nonzero results.
 - Frontend: Node 22, npm clean install, architecture check, lint, Vitest, web
   build, desktop UI build, and Tauri Rust format/clippy/tests.
 - Service: an ephemeral PostgreSQL 18 container, Rust format, all-feature clippy
-  with warnings denied, a default-dependency check that rejects `sqlx-sqlite`,
-  PostgreSQL tests, and the feature-gated importer test.
+  with warnings denied, and PostgreSQL tests.
 
 CI does not currently:
 
 - run the legacy Worker packages;
 - exercise Railway networking/roles from pull-request code;
 - run browser or packaged-desktop end-to-end tests;
-- run the unit tests embedded in the `import_sqlite` binary target (the
-  integration importer test is covered);
 - produce/sign a desktop bundle;
 - deploy the service or SPA.
 
@@ -1250,7 +1289,8 @@ They do not launch a WebView or a real Tauri IPC integration environment.
 
 ### Axum service
 
-Service unit tests use the same private-module inclusion pattern. Database-backed
+Service unit tests use the same private-module inclusion pattern; files under
+`tests/unit` mirror `src` (`tests/unit/adapters/...`, `tests/unit/domains/...`). Database-backed
 tests read `CURIO_TEST_DATABASE_URL`, reject production-looking targets, create
 a unique disposable `curio_test_<run-id>` PostgreSQL schema, apply the PostgreSQL
 migration, and close pools/drop the schema during cleanup. Full API tests use
@@ -1269,7 +1309,8 @@ Coverage includes:
 - OpenAI provider SSE parsing and sanitized errors;
 - normalized chat streaming plus database history;
 - in-memory service tests for validation before persistence and Chat's initial/
-  terminal commit ordering, provider/storage failures, and interruption;
+  terminal commit ordering, provider/storage failures, disconnect interruption,
+  and late disconnects after a committed terminal state;
 - query-builder bind ordering, data-carrying field enums, dynamic field vectors,
   NULLs, optional predicates, array filters, pagination, upserts, and scoped
   updates, including PostgreSQL round trips and fallible encoders;
@@ -1292,8 +1333,7 @@ Coverage includes:
   and dimension mismatches, bearer validation on every route, owner isolation,
   and CORS preflight.
 
-The feature-gated importer is the only service tool allowed to read a legacy
-SQLite snapshot; normal database-backed tests and runtime remain PostgreSQL-only.
+Database-backed tests and runtime are PostgreSQL-only.
 Material gaps include production auth, user ownership, chat history
 authorization/pagination, retries/idempotency, pending-message recovery,
 calendar update/delete, production pool/load characterization, operational
@@ -1484,9 +1524,7 @@ logical edit emits one request.
   frontend SSE parser.
 - Provider secrets never enter client builds.
 - PostgreSQL migrations run explicitly before deployment, startup verifies the
-  expected version, and the default service build contains no SQLite driver.
-- Archived SQLite migrations and the feature-gated importer remain isolated
-  from active request handling.
+  expected version.
 - New service features follow Calendar's feature-local layering.
 - Calendar public date strings retain their all-day/timed meaning.
 - The legacy Workers remain explicitly disconnected unless a planned migration

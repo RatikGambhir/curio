@@ -18,19 +18,19 @@ TypeScript consumer and cross-stack checks are designed with the Rust boundary.
 ## Understand the composition roots
 
 - `src/main.rs` loads `.env`, parses `ServiceConfig`, builds the production router, binds the configured address, and serves it.
-- `app_with_config` opens and verifies the PostgreSQL database before composing the application.
-- `app_with_database` is the testable full-router composition root for configured feature routes.
+- `app_with_config` (in `src/app/bootstrap.rs`) opens and verifies the PostgreSQL database before composing the application.
+- `app_with_database` is the testable full-router composition root: it builds adapters and domain services, merges each `domains/<feature>/route.rs`, and wraps protected routers with `app::http::protected`.
 - `app()` returns only the small base router. Do not use it as evidence that database-backed or chat routes are present.
 - Feature routers are merged under one exact-origin CORS layer. CORS is a browser policy, not authorization.
 
-Add routes at the feature router and merge new top-level feature routers at the full composition root. Apply middleware at the narrowest router that owns the policy. Keep extractors and state types compatible across merged routers.
+Add routes in the feature's `route.rs` and merge new feature routers in `app/bootstrap.rs`. New external clients belong under `src/adapters` and must not import domain code; cross-feature helpers belong in `src/shared`. Apply middleware at the narrowest router that owns the policy. Keep extractors and state types compatible across merged routers.
 
 ## Prefer feature-local vertical slices
 
 Calendar is the reference organization for new database-backed behavior:
 
 ```text
-router
+route.rs: paths, body limits, and state
   -> handler: extraction, identity/ownership, HTTP status and envelope
   -> service: validation, defaults, business rules, error classification
   -> repository: parameterized SQL and typed row mapping
@@ -55,8 +55,7 @@ Keep these invariants:
   `curio-service/migrations/postgres`; do not create a no-op migration for an
   HTTP-only change or rewrite a migration that may have been applied.
 - For a real schema change, update relevant `ops/postgres/verify.sql` catalog or
-  version expectations and assess importer compatibility/tests. Do not edit
-  archived SQLite migrations merely because an HTTP route changed.
+  version expectations.
 - Run migrations explicitly with the schema-owner credential through `cargo run --bin curio_db -- migrate` before a release.
 - The service uses the lower-privilege `DATABASE_URL` and verifies the expected migration at startup.
 - `CURIO_DB_SCHEMA` selects an explicit development, production, or disposable test schema; never interpolate an unvalidated identifier.
@@ -65,7 +64,7 @@ Keep these invariants:
   when a response or state transition depends on the committed row.
 - Do not expose or log database URLs, credentials, provider keys, raw sensitive payloads, or unrestricted upstream error bodies.
 
-SQLite is archival/import-only. The default dependency graph must remain PostgreSQL-only. `migrations/sqlite` exists for audit/import compatibility, and the `sqlite-import` feature is confined to the one-time importer and its test. Do not introduce SQLite into request paths or default features.
+PostgreSQL is the only database.
 
 ## Authentication and ownership are incomplete
 
@@ -146,13 +145,9 @@ Run from `curio-service`:
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test
-cargo test --features sqlite-import --bin import_sqlite
-cargo test --features sqlite-import --test sqlite_import
 ```
 
-Start with the narrowest relevant test target. Run both importer targets when
-feature flags, database dependencies, migrations, import code, or archived
-SQLite compatibility changes. When configuration, routing, deployment, or
+Start with the narrowest relevant test target. When configuration, routing, deployment, or
 migrations change, also run the relevant `curio_db verify` or local readiness
 check against an explicitly safe database.
 

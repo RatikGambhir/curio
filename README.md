@@ -31,7 +31,8 @@ CORS, and desktop signing notes.
 
 ## Local development
 
-Copy `curio-service/.env.example` to `curio-service/.env`, then provide a
+Create `curio-service/.env` (the service's single, gitignored env file; the
+variables are listed in [docs/deployment.md](docs/deployment.md)), then provide a
 PostgreSQL application-role URL in `DATABASE_URL`, a migrator-role URL in
 `CURIO_MIGRATOR_DATABASE_URL`, and `CURIO_DB_SCHEMA=curio_dev`. Local access to
 Railway requires its TLS public TCP proxy; do not use the production or Railway
@@ -52,7 +53,20 @@ cargo run --bin curio-service
 The web and desktop clients continue to connect only to `curio-service`; no
 PostgreSQL URL belongs in a Vite variable or client bundle.
 
-Install the canonical frontend once, then choose a target:
+With `curio-service/.env` configured and `web` dependencies installed, the
+root launcher starts the service and then the chosen client, and stops both on
+Ctrl-C:
+
+```bash
+./curio web
+```
+
+```bash
+./curio desktop
+```
+
+To run the pieces separately, install the canonical frontend once, then choose
+a target:
 
 ```bash
 cd web
