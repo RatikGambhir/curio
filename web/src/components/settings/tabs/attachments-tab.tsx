@@ -1,9 +1,13 @@
+import { ArrowDown, ArrowUp, FileImage, FileText, Inbox } from "lucide-react"
+
+import { SettingsSection } from "@/components/settings/settings-section"
 import {
   ATTACHMENT_FILTER_OPTIONS,
   type AttachmentFilter,
   type AttachmentRecord,
   type AttachmentSortDirection,
 } from "@/components/settings/settings.types"
+import { EmptyState } from "@/components/ui/empty-state"
 import {
   Select,
   SelectContent,
@@ -11,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowUpDown, FileImage, FileText, Inbox } from "lucide-react"
 
 type AttachmentsTabProps = {
   selectedFilter: AttachmentFilter
@@ -21,6 +24,8 @@ type AttachmentsTabProps = {
   onSortDirectionChange?: (direction: AttachmentSortDirection) => void
 }
 
+const GRID = "grid grid-cols-[2rem_minmax(0,1fr)_8rem] items-center gap-3 sm:grid-cols-[2rem_minmax(0,1fr)_11rem]"
+
 export function AttachmentsTab({
   selectedFilter,
   onFilterChange,
@@ -29,31 +34,18 @@ export function AttachmentsTab({
   onSortDirectionChange,
 }: AttachmentsTabProps) {
   const hasAttachments = attachments.length > 0
-
-  const handleSortClick = () => {
-    if (!onSortDirectionChange) {
-      return
-    }
-
-    onSortDirectionChange(sortDirection === "asc" ? "desc" : "asc")
-  }
+  const SortIcon = sortDirection === "asc" ? ArrowUp : ArrowDown
 
   return (
-    <section className="p-6 sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-card-foreground">Attachments</h2>
-          <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-            Manage every file that has been uploaded to your chats. Filter by
-            file type and review when each item was created.
-          </p>
-        </div>
-
+    <SettingsSection
+      title="Attachments"
+      description="Every file uploaded to your chats. Filter by type and review when each was added."
+      aside={
         <Select
           value={selectedFilter}
           onValueChange={(value) => onFilterChange(value as AttachmentFilter)}
         >
-          <SelectTrigger className="w-[11.25rem] rounded-md border-none bg-accent text-accent-foreground shadow-xs hover:bg-accent/85">
+          <SelectTrigger aria-label="Filter attachments" className="w-40">
             <SelectValue placeholder="All files" />
           </SelectTrigger>
           <SelectContent align="end">
@@ -64,24 +56,28 @@ export function AttachmentsTab({
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="mt-8 overflow-hidden border border-border bg-secondary/70">
-        <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 border-b border-border px-4 py-3 text-sm font-semibold text-muted-foreground sm:grid-cols-[2.5rem_minmax(0,1fr)_11rem]">
+      }
+    >
+      <div className="overflow-hidden rounded-lg border border-border">
+        <div className={`${GRID} border-b border-border bg-secondary px-4 py-2.5`}>
           <input
             type="checkbox"
             disabled={!hasAttachments}
             aria-label="Select all attachments"
-            className="size-4 rounded border border-border accent-primary disabled:cursor-not-allowed"
+            className="size-4 rounded border border-border accent-primary disabled:cursor-not-allowed disabled:opacity-50"
           />
-          <span>Name</span>
+          <span className="eyebrow text-muted-foreground">Name</span>
           <button
             type="button"
-            onClick={handleSortClick}
-            className="inline-flex items-center justify-start gap-1 text-left text-sm font-semibold text-muted-foreground hover:text-foreground"
+            onClick={() =>
+              onSortDirectionChange?.(sortDirection === "asc" ? "desc" : "asc")
+            }
+            disabled={!onSortDirectionChange}
+            aria-label={`Sort by date added, ${sortDirection === "asc" ? "oldest" : "newest"} first`}
+            className="focus-ring eyebrow inline-flex items-center gap-1 justify-self-start rounded-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            Created
-            <ArrowUpDown className="size-4" />
+            Added
+            <SortIcon className="size-3.5" aria-hidden="true" />
           </button>
         </div>
 
@@ -90,7 +86,7 @@ export function AttachmentsTab({
             {attachments.map((attachment) => (
               <li
                 key={attachment.id}
-                className="grid grid-cols-[2.5rem_minmax(0,1fr)_8.5rem] items-center gap-3 border-b border-border/70 bg-card px-4 py-3 last:border-b-0 sm:grid-cols-[2.5rem_minmax(0,1fr)_11rem]"
+                className={`${GRID} border-b border-border bg-card px-4 py-3 last:border-b-0`}
               >
                 <input
                   type="checkbox"
@@ -99,34 +95,26 @@ export function AttachmentsTab({
                 />
                 <div className="flex min-w-0 items-center gap-2">
                   {attachment.type === "image" ? (
-                    <FileImage className="size-4 text-muted-foreground" />
+                    <FileImage className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   ) : (
-                    <FileText className="size-4 text-muted-foreground" />
+                    <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   )}
-                  <span className="truncate text-sm font-medium text-card-foreground">
+                  <span className="truncate text-sm text-foreground">
                     {attachment.name}
                   </span>
                 </div>
-                <span className="text-sm text-muted-foreground">{attachment.createdAt}</span>
+                <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {attachment.createdAt}
+                </span>
               </li>
             ))}
           </ul>
         ) : (
-          <div className="flex min-h-[18rem] items-center justify-center bg-card px-6 py-10">
-            <div className="flex max-w-sm flex-col items-center text-center">
-              <div className="flex size-14 items-center justify-center rounded-md bg-accent text-accent-foreground">
-                <Inbox className="size-6" />
-              </div>
-              <h3 className="mt-4 text-xl font-bold text-card-foreground">
-                No attachments found.
-              </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Attachments from your chats will appear here as they are added.
-              </p>
-            </div>
-          </div>
+          <EmptyState icon={Inbox} title="No attachments yet" headingLevel={3} className="bg-card py-16">
+            Files you add to chats will be listed here.
+          </EmptyState>
         )}
       </div>
-    </section>
+    </SettingsSection>
   )
 }

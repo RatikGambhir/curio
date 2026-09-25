@@ -1,16 +1,21 @@
 use crate::{
     calendar::{
-        error::CalendarError,
-        models::{CalendarView, CreateEventInput, ListEventsQuery},
-        repository::CalendarRepository,
-        service::CalendarService,
+        domain::{
+            CalendarError, CalendarEvent, CalendarView, CreateEventInput, EventRange,
+            ListEventsQuery, NewCalendarEvent,
+        },
+        repository::PostgresCalendarRepository,
+        service::{CalendarService, CalendarStore},
     },
     postgres_test_support::PostgresFixture,
 };
 
-async fn service(test_name: &str) -> Option<(CalendarService, PostgresFixture)> {
+async fn service(
+    test_name: &str,
+) -> Option<(CalendarService<PostgresCalendarRepository>, PostgresFixture)> {
     let postgres = PostgresFixture::provision(test_name).await?;
-    let service = CalendarService::new(CalendarRepository::new(postgres.database().clone()));
+    let service =
+        CalendarService::new(PostgresCalendarRepository::new(postgres.database().clone()));
     Some((service, postgres))
 }
 
@@ -39,9 +44,7 @@ fn range(view: CalendarView, start: &str, end: &str) -> ListEventsQuery {
 
 #[tokio::test]
 async fn create_validation() {
-    let Some((service, postgres)) = service("calendar_create_validation").await else {
-        return;
-    };
+    let service = CalendarService::new(EmptyStore);
     assert_eq!(
         service.create_event(create_input("   ")).await,
         Err(CalendarError::Invalid("An event needs a title."))
@@ -53,8 +56,6 @@ async fn create_validation() {
         service.create_event(input).await,
         Err(CalendarError::Invalid("That is not a known event status."))
     );
-
-    postgres.cleanup().await;
 }
 
 #[tokio::test]
@@ -72,9 +73,7 @@ async fn storage_errors() {
 
 #[tokio::test]
 async fn range_validation() {
-    let Some((service, postgres)) = service("calendar_range_validation").await else {
-        return;
-    };
+    let service = CalendarService::new(EmptyStore);
     assert_eq!(
         service
             .events_in_range(range(
@@ -100,15 +99,11 @@ async fn range_validation() {
             "The range end must fall after the range start."
         ))
     );
-
-    postgres.cleanup().await;
 }
 
 #[tokio::test]
 async fn dst_boundaries() {
-    let Some((service, postgres)) = service("calendar_dst_boundaries").await else {
-        return;
-    };
+    let service = CalendarService::new(EmptyStore);
     let events = service
         .events_in_range(range(
             CalendarView::Day,
@@ -118,5 +113,40 @@ async fn dst_boundaries() {
         .await;
 
     assert_eq!(events, Ok(Vec::new()));
-    postgres.cleanup().await;
+}
+
+/// Pure validation tests must never acquire a database connection.
+struct EmptyStore;
+impl CalendarStore for EmptyStore {
+    async fn insert(&self, _: NewCalendarEvent<'_>) -> Result<CalendarEvent, CalendarError> {
+        panic!("invalid events must not reach persistence")
+    }
+    async fn in_range(&self, _: EventRange<'_>) -> Result<Vec<CalendarEvent>, CalendarError> {
+        Ok(Vec::new())
+    }
+}
+
+#[test]
+fn validated_event_preserves_trimmed_wire_values_and_normalizes_query_interval() {
+    let mut input = create_input("  Planning  ");
+    input.id = Some(" event-id ".into());
+    input.user_id = " owner ".into();
+    input.start_date = " 2026-06-22T09:00:00-05:00 ".into();
+    input.description = Some("  ".into());
+    input.status = Some(" scheduled ".into());
+    input.priority = Some(" high ".into());
+    let event = NewCalendarEvent::parse(&input).unwrap();
+    assert_eq!(event.id(), "event-id");
+    assert_eq!(event.user_id(), "owner");
+    assert_eq!(event.title(), "Planning");
+    assert_eq!(event.start_date(), "2026-06-22T09:00:00-05:00");
+    assert_eq!(event.end_date(), None);
+    assert_eq!(event.description(), None);
+    assert_eq!(event.status(), Some("scheduled"));
+    assert_eq!(event.priority(), Some("high"));
+    assert_eq!(event.starts_at().to_rfc3339(), "2026-06-22T14:00:00+00:00");
+    assert_eq!(
+        event.ends_at() - event.starts_at(),
+        chrono::Duration::minutes(1)
+    );
 }

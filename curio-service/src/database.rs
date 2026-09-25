@@ -1,7 +1,5 @@
 use std::{fmt, io, str::FromStr, time::Duration};
 
-use chrono::{DateTime, Utc};
-use serde::Serializer;
 use sqlx::{
     PgPool,
     migrate::{MigrateError, Migrator},
@@ -148,16 +146,6 @@ fn configuration_error(message: &'static str) -> sqlx::Error {
         io::ErrorKind::InvalidInput,
         message,
     )))
-}
-
-pub(crate) fn serialize_timestamp<S>(
-    value: &DateTime<Utc>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    serializer.serialize_str(&value.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string())
 }
 
 #[cfg(test)]

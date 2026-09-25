@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
-import { ArrowDown02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
+import { ArrowDown } from "lucide-react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 import { cn } from "@/lib/utils";
@@ -67,7 +66,7 @@ function ThreadScrollToBottom({
       type={asChild ? undefined : "button"}
       className={cn(
         !asChild &&
-          "absolute bottom-6 left-[50%] flex size-8 translate-x-[-50%] cursor-pointer items-center justify-center rounded-full border border-border bg-secondary text-muted-foreground shadow-sm transition-all hover:bg-border active:scale-95",
+          "focus-ring absolute bottom-4 left-[50%] flex size-8 translate-x-[-50%] cursor-pointer items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-md transition-colors hover:text-foreground",
         className,
       )}
       onClick={(event) => {
@@ -77,11 +76,10 @@ function ThreadScrollToBottom({
       {...props}
     >
       {children ?? (
-        <HugeiconsIcon
-          icon={ArrowDown02Icon}
-          strokeWidth={2.0}
-          className="size-4.5"
-        />
+        <>
+          <ArrowDown className="size-4" aria-hidden="true" />
+          <span className="sr-only">Scroll to latest message</span>
+        </>
       )}
     </Comp>
   );

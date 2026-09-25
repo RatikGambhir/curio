@@ -79,7 +79,11 @@ async fn verify_catalog(database: &Database) -> Result<(), &'static str> {
               'conversations',
               'messages',
               'calendar_events',
-              'sqlite_import_manifests'
+              'sqlite_import_manifests',
+              'document_files',
+              'document_file_versions',
+              'document_file_blobs',
+              'document_chunks'
           )
         "#,
     )
@@ -87,7 +91,7 @@ async fn verify_catalog(database: &Database) -> Result<(), &'static str> {
     .await
     .map_err(|_| "catalog verification failed")?;
 
-    if expected_tables != 5 {
+    if expected_tables != 9 {
         return Err("one or more expected application tables are missing");
     }
 
@@ -107,7 +111,11 @@ async fn verify_no_unknown_tables(database: &Database) -> Result<(), &'static st
               'conversations',
               'messages',
               'calendar_events',
-              'sqlite_import_manifests'
+              'sqlite_import_manifests',
+              'document_files',
+              'document_file_versions',
+              'document_file_blobs',
+              'document_chunks'
           )
         ORDER BY table_name
         "#,

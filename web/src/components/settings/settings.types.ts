@@ -26,7 +26,7 @@ export type SettingsTab = {
 
 export const SETTINGS_TABS: SettingsTab[] = [
   { id: "account", label: "Account", icon: UserRound },
-  { id: "customization", label: "Customization", icon: Palette },
+  { id: "customization", label: "Appearance", icon: Palette },
   { id: "history", label: "History & Sync", icon: Database },
   { id: "models", label: "Models", icon: Waypoints },
   { id: "api", label: "API Keys", icon: KeyRound },

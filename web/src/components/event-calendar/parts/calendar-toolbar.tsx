@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/utils";
 import { useCalendar } from "../hooks/use-calendar-context";
 import type { CalendarView } from "../types";
@@ -46,7 +47,7 @@ export function CalendarToolbar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col items-stretch gap-2 border-b border-border p-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between",
+        "flex min-w-0 flex-col items-stretch gap-2 border-b border-border px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5",
         className,
       )}
     >
@@ -56,7 +57,7 @@ export function CalendarToolbar({ className }: { className?: string }) {
         </Button>
         <Button
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           aria-label="Previous period"
           onClick={prev}
         >
@@ -64,47 +65,29 @@ export function CalendarToolbar({ className }: { className?: string }) {
         </Button>
         <Button
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           aria-label="Next period"
           onClick={next}
         >
           <ChevronRight className="size-4" />
         </Button>
-        <span className="ml-1 min-w-0 truncate text-sm font-semibold text-foreground">
+        <span
+          aria-live="polite"
+          className="ml-2 min-w-0 truncate font-display text-[1.125rem] leading-none text-foreground"
+        >
           {periodLabel(view, focusDate, visibleRange)}
         </span>
       </div>
 
       {availableViews.length > 1 ? (
-        // Plain-button segmented control (NOT shadcn ToggleGroup): Base UI's
-        // ToggleGroup is a multi-value model (`value: string[]`, `onValueChange:
-        // (string[], details) => void`) while Radix's `type="single"` is a string
-        // — so the single-select view switcher fails consumer-tsc on Base UI
-        // (F-cross-13). Mirrors gantt-timeline's zoom switcher; drops the
-        // `toggle-group` dep entirely. (v0.2.1)
-        <div
-          role="group"
-          aria-label="Calendar view"
-          className="grid w-full min-w-0 grid-cols-4 overflow-hidden rounded-md border border-border sm:inline-flex sm:w-auto"
-        >
-          {availableViews.map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={view === v}
-              aria-label={VIEW_LABELS[v]}
-              onClick={() => setView(v)}
-              className={cn(
-                "h-8 min-w-0 px-2 text-sm font-medium transition-colors sm:px-3",
-                view === v
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              {VIEW_LABELS[v]}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Calendar view"
+          name="event-calendar-view"
+          options={availableViews.map((v) => ({ value: v, label: VIEW_LABELS[v] }))}
+          value={view}
+          onValueChange={setView}
+          className="self-start sm:self-auto"
+        />
       ) : null}
     </div>
   );

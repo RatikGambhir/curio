@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
-import { NotebookPen } from "lucide-react";
+import { FolderTree, NotebookPen, SquarePen } from "lucide-react";
 
-import { NotesSidebar } from "@/components/notes/notes-sidebar";
+import {
+  ContextPane,
+  ContextPaneToggle,
+} from "@/components/app-shell/context-pane";
+import { NotesNav } from "@/components/notes/notes-nav";
 import { mockNoteFolders } from "@/components/notes/notes.mock-data";
 import { findNote } from "@/components/notes/notes.types";
 import type { NoteFolder, RichTextValue } from "@/components/notes/notes.types";
@@ -10,7 +14,9 @@ import {
   RICH_TEXT_EMPTY_VALUE,
   RichTextEditor,
 } from "@/components/rich-text-editor";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useContextPane } from "@/hooks/useContextPane";
 
 const createEmptyNoteBody = (): RichTextValue =>
   structuredClone(RICH_TEXT_EMPTY_VALUE);
@@ -22,6 +28,8 @@ const Notes = () => {
   );
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const selectedNote = findNote(folders, selectedNoteId);
+  const pane = useContextPane();
+  const { dismissOverlay } = pane;
 
   const patchNote = useCallback(
     (noteId: string, patch: { body?: RichTextValue; updatedAt?: string }) => {
@@ -59,7 +67,23 @@ const Notes = () => {
       ),
     );
     setSelectedNoteId(noteId);
-  }, []);
+    dismissOverlay();
+  }, [dismissOverlay]);
+
+  const handleSelectNote = useCallback(
+    (noteId: string) => {
+      setSelectedNoteId(noteId);
+      dismissOverlay();
+    },
+    [dismissOverlay],
+  );
+
+  const createInFirstFolder = () => {
+    const folderId = folders[0]?.id;
+    if (folderId) {
+      handleCreateNote(folderId);
+    }
+  };
 
   const handleBodyChange = useCallback(
     (body: RichTextValue) => {
@@ -80,63 +104,74 @@ const Notes = () => {
   );
 
   return (
-    <SidebarProvider className="h-screen w-full font-sans">
-      <NotesSidebar
-        folders={folders}
-        selectedNoteId={selectedNoteId}
-        onSelectNote={setSelectedNoteId}
-        onCreateNote={handleCreateNote}
-      />
-      <SidebarInset>
-        <div className="flex h-full w-full flex-col">
-          <PageHeader>
-            <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold text-foreground">
-                {selectedNote?.title ?? "Notes"}
-              </h1>
-              {selectedNote ? (
-                <p className="text-xs text-muted-foreground">
-                  Edited {selectedNote.updatedAt}
-                </p>
-              ) : null}
-            </div>
-          </PageHeader>
-          {selectedNote ? (
-            <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-              <RichTextEditor
-                // A fresh editor instance per note: selection, undo history
-                // and content stay isolated instead of relying on the
-                // controlled-value echo guard alone.
-                key={selectedNote.id}
-                value={selectedNote.body}
-                onChange={handleBodyChange}
-                onSave={handleSave}
-                autoFocus
-                className="flex min-h-0 flex-1 flex-col rounded-none border-0"
-                toolbarClassName="shrink-0"
-                containerClassName="max-h-none min-h-0 flex-1 overflow-y-auto px-6 py-6 md:px-10"
-                contentClassName="mx-auto min-h-full max-w-4xl"
-              />
-            </main>
-          ) : (
-            <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-5 md:px-8 md:py-6">
-              <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
-                <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-                  <NotebookPen className="size-5" />
-                </div>
-                <h1 className="text-lg font-semibold text-foreground">
-                  Pick a note to start writing
-                </h1>
-                <p className="max-w-md text-sm text-muted-foreground">
-                  Choose a note from a folder on the left, or create a new one.
-                  Notes are kept in memory for now and reset on reload.
-                </p>
-              </div>
-            </main>
-          )}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex min-h-0 flex-1">
+      <ContextPane
+        pane={pane}
+        title="Notebook"
+        description="Your note folders."
+        action={
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={createInFirstFolder}
+            disabled={folders.length === 0}
+            className="-mr-1"
+          >
+            <SquarePen aria-hidden="true" />
+            New
+          </Button>
+        }
+      >
+        <NotesNav
+          folders={folders}
+          selectedNoteId={selectedNoteId}
+          onSelectNote={handleSelectNote}
+          onCreateNote={handleCreateNote}
+        />
+      </ContextPane>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PageHeader
+          title={selectedNote?.title ?? "Notes"}
+          meta={selectedNote ? `Edited ${selectedNote.updatedAt}` : undefined}
+          leading={<ContextPaneToggle pane={pane} label="notebook" overlayIcon={FolderTree} />}
+        />
+        {selectedNote ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <RichTextEditor
+              // A fresh editor instance per note: selection, undo history
+              // and content stay isolated instead of relying on the
+              // controlled-value echo guard alone.
+              key={selectedNote.id}
+              value={selectedNote.body}
+              onChange={handleBodyChange}
+              onSave={handleSave}
+              autoFocus
+              className="flex min-h-0 flex-1 flex-col rounded-none border-0 bg-transparent"
+              toolbarClassName="shrink-0"
+              containerClassName="max-h-none min-h-0 flex-1 overflow-y-auto px-5 py-10 sm:px-10 lg:py-14"
+              contentClassName="mx-auto min-h-full max-w-[42rem]"
+            />
+          </div>
+        ) : (
+          <EmptyState
+            icon={NotebookPen}
+            title="Pick a page to start writing"
+            action={
+              <Button type="button" variant="outline" onClick={createInFirstFolder}>
+                <SquarePen aria-hidden="true" />
+                New note
+              </Button>
+            }
+            className="min-h-0 flex-1"
+          >
+            Choose a note from the notebook, or start a fresh one. Notes are
+            kept in memory for now and reset when you reload.
+          </EmptyState>
+        )}
+      </div>
+    </div>
   );
 };
 

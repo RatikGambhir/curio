@@ -12,63 +12,82 @@ type ProfileSetupStepperProps = {
   steps: readonly ProfileSetupStepMeta[];
 };
 
+/* The full step list, set on the ink page beside the form on wide screens. */
 export function ProfileSetupStepper({
   currentStep,
   steps,
 }: ProfileSetupStepperProps) {
   return (
-    <nav aria-label="Profile setup progress" className="w-full">
-      <ol className="flex w-full items-start gap-2 sm:gap-3">
-        {steps.map((step, index) => {
+    <nav aria-label="Profile setup progress">
+      <ol className="space-y-1">
+        {steps.map((step) => {
           const isCompleted = step.id < currentStep;
           const isActive = step.id === currentStep;
-          const isConnectorComplete = currentStep > step.id;
 
           return (
-            <li key={step.id} className="flex min-w-0 flex-1 items-start">
-              <div className="flex min-w-0 flex-col items-center gap-2 text-center">
+            <li
+              key={step.id}
+              aria-current={isActive ? "step" : undefined}
+              className="flex items-start gap-4 py-2"
+            >
+              <span
+                className={cn(
+                  "mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border font-mono text-2xs transition-colors",
+                  isCompleted &&
+                    "border-sidebar-primary bg-sidebar-primary text-sidebar-primary-foreground",
+                  isActive && "border-sidebar-foreground text-sidebar-foreground",
+                  !isCompleted &&
+                    !isActive &&
+                    "border-sidebar-border text-sidebar-muted-foreground",
+                )}
+              >
+                {isCompleted ? (
+                  <Check className="size-3.5" aria-label="Completed" />
+                ) : (
+                  step.id
+                )}
+              </span>
+              <span className="min-w-0">
                 <span
                   className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold transition-colors",
-                    isCompleted && "border-primary bg-primary text-primary-foreground",
-                    isActive && "border-primary bg-background text-primary",
-                    !isCompleted &&
-                      !isActive &&
-                      "border-border bg-background text-muted-foreground",
+                    "block text-sm font-medium",
+                    isActive || isCompleted
+                      ? "text-sidebar-foreground"
+                      : "text-sidebar-muted-foreground",
                   )}
                 >
-                  {isCompleted ? <Check className="size-4" /> : step.id}
+                  {step.title}
                 </span>
-                <div className="min-w-0 space-y-0.5">
-                  <p
-                    className={cn(
-                      "text-xs font-semibold",
-                      isActive || isCompleted
-                        ? "text-foreground"
-                        : "text-muted-foreground",
-                    )}
-                  >
-                    <span className="sm:hidden">{step.shortLabel}</span>
-                    <span className="hidden sm:inline">{step.title}</span>
-                  </p>
-                  <p className="hidden text-[11px] text-muted-foreground sm:block">
-                    {step.description}
-                  </p>
-                </div>
-              </div>
-              {index < steps.length - 1 ? (
-                <div
-                  className={cn(
-                    "mt-[1.1rem] ml-2 h-px flex-1 border-t sm:ml-3",
-                    isConnectorComplete ? "border-primary" : "border-border",
-                  )}
-                  aria-hidden="true"
-                />
-              ) : null}
+                <span className="mt-0.5 block text-xs text-sidebar-muted-foreground">
+                  {step.description}
+                </span>
+              </span>
             </li>
           );
         })}
       </ol>
     </nav>
+  );
+}
+
+/* A compact bar for narrow screens, where the ink page is hidden. */
+export function ProfileSetupProgress({
+  currentStep,
+  steps,
+}: ProfileSetupStepperProps) {
+  return (
+    <div className="lg:hidden" aria-hidden="true">
+      <div className="flex gap-1">
+        {steps.map((step) => (
+          <span
+            key={step.id}
+            className={cn(
+              "h-1 flex-1 rounded-full transition-colors",
+              step.id <= currentStep ? "bg-primary" : "bg-secondary",
+            )}
+          />
+        ))}
+      </div>
+    </div>
   );
 }

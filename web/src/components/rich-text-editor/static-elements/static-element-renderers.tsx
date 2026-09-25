@@ -47,7 +47,7 @@ export function StaticH1(props: StaticElementProps) {
     <h1
       {...spreadAttrs(props.attributes)}
       className={cn(
-        "mt-10 mb-4 text-4xl font-serif font-bold tracking-tight",
+        "mt-10 mb-4 text-4xl font-serif font-medium tracking-tight",
         props.className,
       )}
     >
@@ -61,7 +61,7 @@ export function StaticH2(props: StaticElementProps) {
     <h2
       {...spreadAttrs(props.attributes)}
       className={cn(
-        "mt-8 mb-3 text-3xl font-serif font-bold tracking-tight",
+        "mt-8 mb-3 text-3xl font-serif font-medium tracking-tight",
         props.className,
       )}
     >
@@ -74,7 +74,7 @@ export function StaticH3(props: StaticElementProps) {
   return (
     <h3
       {...spreadAttrs(props.attributes)}
-      className={cn("mt-6 mb-2 text-2xl font-serif font-bold", props.className)}
+      className={cn("mt-6 mb-2 text-2xl font-serif font-medium", props.className)}
     >
       {props.children}
     </h3>
@@ -86,7 +86,7 @@ export function StaticH4(props: StaticElementProps) {
     <h4
       {...spreadAttrs(props.attributes)}
       className={cn(
-        "mt-4 mb-2 text-xl font-serif font-semibold",
+        "mt-4 mb-2 text-xl font-serif font-medium",
         props.className,
       )}
     >

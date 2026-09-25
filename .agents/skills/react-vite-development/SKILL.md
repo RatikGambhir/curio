@@ -124,7 +124,8 @@ events:
 
 ## UI and domain invariants
 
-- Match the Tailwind 4, shadcn/Radix, semantic-token, and Inter Variable conventions already in use.
+- Match the Tailwind 4, shadcn/Radix, semantic-token, Lucide, and type-system conventions already in use: Schibsted Grotesk (`font-sans`) for interface text, Newsreader (`font-serif`/`font-display`) for long-form reading and display headings, JetBrains Mono (`font-mono`/`eyebrow`) for index marks and code.
+- Authenticated pages render inside the persistent `AppShell` layout route and start with `PageHeader`; page-owned secondary lists use `ContextPane`. Reuse `SegmentedControl`, `Notice`, and `EmptyState` before adding another variant of those patterns.
 - Consume semantic theme roles instead of hard-coded palette values, except for deliberate fixed domains such as syntax highlighting.
 - Prefer semantic HTML and native controls. Preserve labels, accessible names, keyboard behavior, focus visibility, reduced motion, and narrow/wide layout behavior.
 - Keep destructive and asynchronous actions guarded against duplicate submission and expose useful loading, empty, error, disabled, and retry states.

@@ -6,6 +6,8 @@ import {
   useLocation,
 } from "react-router-dom"
 
+import { CurioMark } from "@/components/brand/curio-mark"
+
 import {
   rootDestination,
   routesForTarget,
@@ -15,6 +17,7 @@ import {
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
 import type { AppTarget } from "@/platform/contracts"
 
+const AppShell = lazy(() => import("@/components/app-shell/app-shell"))
 const Atlas = lazy(() => import("@/pages/Atlas"))
 const Calendar = lazy(() => import("@/pages/Calendar"))
 const Chat = lazy(() => import("@/pages/Chat"))
@@ -88,25 +91,49 @@ function routeElement(route: AppRoute, target: AppTarget): ReactElement {
 
 function RouteLoadingState() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-sm text-muted-foreground">
-      Loading Curio…
+    <div
+      role="status"
+      className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background text-muted-foreground"
+    >
+      <CurioMark className="size-7 animate-pulse text-foreground" />
+      <span className="eyebrow">Loading Curio</span>
     </div>
   )
 }
 
 export function AppRoutes({ target }: { target: AppTarget }) {
   const routes = routesForTarget(target)
+  const standaloneRoutes = routes.filter((route) => route.layout === "standalone")
+  const shellRoutes = routes.filter((route) => route.layout === "app")
 
   return (
     <Suspense fallback={<RouteLoadingState />}>
       <Routes>
-        {routes.map((route) => (
+        {standaloneRoutes.map((route) => (
           <Route
             key={route.id}
             path={route.path}
             element={routeElement(route, target)}
           />
         ))}
+        {/* One shell for every product page: the spine, its collapsed state
+            and the content sheet persist across navigation, and only the page
+            inside the sheet suspends while its chunk loads. */}
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell />
+            </RequireAuth>
+          }
+        >
+          {shellRoutes.map((route) => (
+            <Route
+              key={route.id}
+              path={route.path}
+              element={routeElement(route, target)}
+            />
+          ))}
+        </Route>
         <Route path="*" element={<Navigate replace to="/" />} />
       </Routes>
     </Suspense>

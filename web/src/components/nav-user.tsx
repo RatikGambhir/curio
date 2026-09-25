@@ -1,21 +1,8 @@
-"use client"
-
 import { useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import {
-  BadgeCheck,
-  Bell,
-  ChevronsUpDown,
-  LogOut,
-  Settings2,
-  Sparkles,
-} from "lucide-react"
+import { ChevronsUpDown, LogOut, Palette, Settings2, UserRound } from "lucide-react"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,29 +19,21 @@ import {
 } from "@/components/ui/sidebar"
 import { useSidebar } from "@/components/ui/sidebar-context"
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser"
+import { initialsFor } from "@/lib/initials"
 
 export function NavUser() {
   const { isMobile } = useSidebar()
   const navigate = useNavigate()
   const { user, logoutUser } = useAuthenticatedUser()
+  const initials = useMemo(() => initialsFor(user?.name), [user?.name])
+
+  if (!user) {
+    return null
+  }
 
   const handleSignOut = () => {
     logoutUser()
     navigate("/login", { replace: true })
-  }
-
-  const initials = useMemo(() => {
-    const source = user?.name ?? "Curio User"
-    return source
-      .split(" ")
-      .map((part) => part.charAt(0))
-      .join("")
-      .slice(0, 2)
-      .toUpperCase()
-  }, [user?.name])
-
-  if (!user) {
-    return null
   }
 
   return (
@@ -64,63 +43,59 @@ export function NavUser() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              tooltip={user.name}
+              className="h-11 gap-2.5 px-1.5 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-foreground group-data-[collapsible=icon]:p-1!"
             >
-              <Avatar className="h-8 w-8 rounded-lg">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
+              <Avatar className="size-7 rounded-md">
+                <AvatarImage src={user.avatar} alt="" />
+                <AvatarFallback className="rounded-md bg-sidebar-accent font-mono text-2xs font-medium text-sidebar-foreground">
+                  {initials}
+                </AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
-                <span className="truncate text-xs">{user.email}</span>
-              </div>
-              <ChevronsUpDown className="ml-auto size-4" />
+              <span className="grid min-w-0 flex-1 text-left leading-tight">
+                <span className="truncate text-sm font-medium text-sidebar-foreground">
+                  {user.name}
+                </span>
+                <span className="truncate text-xs text-sidebar-muted-foreground">
+                  {user.email}
+                </span>
+              </span>
+              <ChevronsUpDown className="ml-auto size-3.5!" aria-hidden="true" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
+            className="w-(--radix-dropdown-menu-trigger-width) min-w-60"
+            side={isMobile ? "top" : "right"}
             align="end"
-            sideOffset={4}
+            sideOffset={8}
           >
-            <DropdownMenuLabel className="p-0 font-normal">
-              <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.email}</span>
-                </div>
-              </div>
+            <DropdownMenuLabel className="px-2 py-2 font-normal">
+              <span className="block truncate text-sm font-medium">{user.name}</span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {user.email}
+              </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Sparkles />
-                Upgrade to Pro
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BadgeCheck />
+              <DropdownMenuItem onSelect={() => navigate("/settings?tab=account")}>
+                <UserRound />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Bell />
-                Notifications
+              <DropdownMenuItem
+                onSelect={() => navigate("/settings?tab=customization")}
+              >
+                <Palette />
+                Appearance
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => navigate("/profile")}>
+              <DropdownMenuItem onSelect={() => navigate("/settings")}>
                 <Settings2 />
-                Settings
+                All settings
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={handleSignOut}>
               <LogOut />
-              Log out
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

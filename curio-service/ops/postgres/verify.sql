@@ -36,7 +36,11 @@ DECLARE
         'conversations',
         'messages',
         'calendar_events',
-        'sqlite_import_manifests'
+        'sqlite_import_manifests',
+        'document_files',
+        'document_file_versions',
+        'document_file_blobs',
+        'document_chunks'
     ];
     missing_objects text[];
     unknown_objects text[];
@@ -175,6 +179,15 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'required SQLx migration 202608310001 is not successful';
     END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM _sqlx_migrations
+        WHERE version = 202609250001
+          AND success
+    ) THEN
+        RAISE EXCEPTION 'required SQLx migration 202609250001 is not successful';
+    END IF;
 END
 $migration$;
 
@@ -192,6 +205,14 @@ FROM calendar_events
 UNION ALL
 SELECT 'conversations', pg_catalog.count(*)::bigint FROM conversations
 UNION ALL
+SELECT 'document_chunks', pg_catalog.count(*)::bigint FROM document_chunks
+UNION ALL
+SELECT 'document_file_blobs', pg_catalog.count(*)::bigint FROM document_file_blobs
+UNION ALL
+SELECT 'document_file_versions', pg_catalog.count(*)::bigint FROM document_file_versions
+UNION ALL
+SELECT 'document_files', pg_catalog.count(*)::bigint FROM document_files
+UNION ALL
 SELECT 'messages', pg_catalog.count(*)::bigint FROM messages
 UNION ALL
 SELECT 'users', pg_catalog.count(*)::bigint FROM users
@@ -206,6 +227,25 @@ SELECT 'calendar_events_without_user', pg_catalog.count(*)::bigint
 FROM calendar_events AS event
 LEFT JOIN users AS app_user ON app_user.id = event.user_id
 WHERE app_user.id IS NULL
+UNION ALL
+SELECT 'documents_without_owner', pg_catalog.count(*)::bigint
+FROM document_files AS document_file
+LEFT JOIN users AS app_user ON app_user.id = document_file.owner_id
+WHERE app_user.id IS NULL
+UNION ALL
+SELECT 'document_chunks_with_foreign_owner', pg_catalog.count(*)::bigint
+FROM document_chunks AS chunk
+JOIN document_files AS document_file ON document_file.id = chunk.file_id
+WHERE chunk.owner_id <> document_file.owner_id
+UNION ALL
+SELECT 'document_files_with_multiple_current_versions', pg_catalog.count(*)::bigint
+FROM (
+    SELECT file_id
+    FROM document_file_versions
+    WHERE is_current
+    GROUP BY file_id
+    HAVING pg_catalog.count(*) > 1
+) AS duplicated_current
 UNION ALL
 SELECT 'invalid_message_role', pg_catalog.count(*)::bigint
 FROM messages

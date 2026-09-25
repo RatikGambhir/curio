@@ -49,7 +49,7 @@ service changes.
                                       curio-service
                                     Axum + Tokio + SQLx
                                       /             \
-                              PostgreSQL      OpenAI Responses API
+                              PostgreSQL   OpenAI Responses + Embeddings
 
                  curio-workers: legacy Gemini + D1 + Queue pipeline
                  (kept in the repository, not called by either active client)
@@ -104,6 +104,7 @@ snapshots are not architectural source.
 | UI systems | Tailwind CSS 4, Radix/shadcn-style primitives, Plate, dnd-kit, React Flow |
 | Desktop | Tauri 2 with a Rust 2021 crate and Reqwest/Tokio bridge |
 | Service | Rust 2024 crate, Axum 0.8, Tokio 1, SQLx 0.8, Reqwest 0.12 |
+| Document parsing | pdf-extract/lopdf, docx-rust, tiktoken-rs (o200k), calamine, pptx-to-md, image (PNG), SHA-256 |
 | Active data/provider | PostgreSQL via SQLx; OpenAI Responses API via server-side Reqwest |
 | Legacy Workers | Cloudflare Workers/Wrangler, D1, Queues, Gemini |
 
@@ -144,14 +145,15 @@ browser CORS.
 ### Service
 
 `curio-service` is one process containing liveness, readiness, user, calendar,
-conversation history, and streaming chat routes. At startup it opens the
+documents, conversation history, and streaming chat routes. At startup it opens the
 configured PostgreSQL schema, verifies that the expected migration is already
 applied, constructs feature repositories, and merges the routers under one CORS
 layer. Schema changes run separately through `curio_db migrate`; the running
 Axum service does not perform DDL.
 
-The service calls the OpenAI Responses API for chat. Neither client receives the
-OpenAI API key.
+The service calls the OpenAI Responses API for chat and the Embeddings API for
+document chunks and semantic-search queries. Neither client receives the OpenAI
+API key.
 
 ## Frontend architecture
 
@@ -177,11 +179,16 @@ QueryClientProvider
 The root is not wrapped in `React.StrictMode`, the QueryClient uses default
 options, and there is no application-level React error boundary.
 
-Most authenticated product pages construct the common shell locally with
-`SidebarProvider`, `AppSidebar`, `SidebarInset`, and `PageHeader`.
-The shell is reused compositionally rather than mounted once above the router.
-Its width cookie is read, but the open/collapsed cookie is currently write-only,
-so collapse state can reset when a page-local shell remounts during navigation.
+Authenticated product pages render inside one persistent shell. `router.tsx`
+mounts `components/app-shell/app-shell.tsx` (lazy-loaded, behind `RequireAuth`)
+as a layout route for every manifest entry with `layout: "app"`; it composes
+`SidebarProvider`, the `AppSidebar` navigation spine, and `SidebarInset`, and
+suspends only the page inside the inset while its chunk loads. Pages begin with
+`PageHeader`; Chat and Notes add a page-owned `ContextPane` (inline at 64rem and
+wider, a sheet below) for their conversation and folder lists instead of
+replacing the spine. Because the shell is mounted once, its width and
+open/collapsed state survive navigation, and both cookies are read back on
+reload.
 
 ### Build-selected routing
 
@@ -197,6 +204,10 @@ to lazy-loaded pages and applies two guards:
 Vite and the target TypeScript configs resolve `@curio/router-runtime` to:
 
 - `router.web.tsx`: `BrowserRouter`, with a public Landing page at `/`.
+
+Each manifest entry also declares `layout`: `"app"` routes share the persistent
+shell described above; `"standalone"` routes (landing, login, verify-email,
+profile setup) own the whole window.
 - `router.desktop.tsx`: `HashRouter`, with `/` redirecting to `/home` or
   `/login` according to the local auth session.
 
@@ -211,7 +222,7 @@ identity verification.
 
 | Route | Main responsibility | Current data source/persistence |
 | --- | --- | --- |
-| `/` | Marketing landing page on web; auth-aware redirect on desktop | Static presentation |
+| `/` | Marketing landing page on web; auth-aware redirect on desktop | Static presentation; no remote media; the contact form is explicitly not connected and sends nothing |
 | `/login` | Email form and local session creation | Mock user in browser/WebView `localStorage` |
 | `/verify-email` | Placeholder | Redirects to `/login` |
 | `/profile-setup` | Four-step profile wizard | Component memory only; completion navigates home |
@@ -221,7 +232,7 @@ identity verification.
 | `/notes` | Folder/sidebar plus Plate rich-text editor | Mock seed cloned into component memory; no reload persistence |
 | `/vault` | Search/filter/pagination UI | Static mock records filtered in memory |
 | `/atlas` | React Flow knowledge graph | Static initial graph plus component state |
-| `/profile`, `/settings` | Shared settings page | Account tab writes the PostgreSQL-backed user profile; themes persist locally; most other tabs are construction/local state |
+| `/profile`, `/settings` | Shared settings page inside the shell; the open section is URL state (`?tab=`), defaulting to Account | Account tab writes the PostgreSQL-backed user profile; themes persist locally; most other tabs are construction/local state |
 
 Important consequences:
 
@@ -233,6 +244,7 @@ Important consequences:
   `listConversations` or `conversationMessages`; it initializes from
   `demo-data.ts`.
 - Notes, Vault, Atlas, and most Home data are not service resources yet.
+- The documents service routes exist, but no page calls them yet.
 
 ### Frontend dependency direction
 
@@ -439,7 +451,8 @@ reusable systems:
 
 | Area | Responsibility |
 | --- | --- |
-| `ui` | shadcn/Radix-style primitives and layout foundations |
+| `ui` | shadcn/Radix-style primitives and layout foundations, plus Curio's shared `SegmentedControl`, `Notice`, `EmptyState`, and `field-styles` |
+| `app-shell`, `brand` | Persistent authenticated shell, `ContextPane` secondary column, and the SVG `CurioMark`/`CurioWordmark` |
 | app shell files | Main sidebar, navigation groups, user menu, page header |
 | `task-card` | Canonical recursive `TaskItem` model, presentation, editing, permissions, color/time logic, and cross-surface clipboard format |
 | `event-calendar` | Month/week/day/agenda projections of `TaskItem[]`, occurrence/classification logic, headless parts, and opt-in editing extension |
@@ -460,20 +473,33 @@ stay outside them.
 
 ### Styling and themes
 
-The frontend uses Tailwind CSS 4, Inter Variable, semantic CSS variables, and
-shadcn-compatible aliases in `index.css`.
+The frontend uses Tailwind CSS 4, semantic CSS variables, and shadcn-compatible
+aliases in `index.css`. The visual language is a field notebook: warm paper
+surfaces, ink text, hairline rules rather than nested cards, and a dark
+navigation spine in both appearances. Type is self-hosted through Fontsource:
+Schibsted Grotesk for interface text (`font-sans`), Newsreader for display
+headings and long-form reading such as chat answers and notes (`font-serif`,
+`font-display`, `text-display-*`), and JetBrains Mono for index marks and code
+(`font-mono`, `eyebrow`). Lucide is the single icon set. `index.css` also
+defines the shared `focus-ring`, `ruled-paper`, and `rise-in` utilities; motion
+is CSS-only and collapses under `prefers-reduced-motion`.
 
 The color system has three layers:
 
 1. A theme seed (`--theme-hue`, `--theme-chroma`).
-2. A generated 50–950 tonal scale.
+2. Two ladders: a 50–950 tonal scale generated from the seed, and a fixed warm
+   `--neutral-*` paper ladder shared by every theme.
 3. Semantic roles such as background, foreground, primary, border, chart, and
-   sidebar tokens.
+   sidebar tokens. Surfaces, text, and rules come from the neutral ladder;
+   actions, selection marks, and highlights come from the seed scale. The spine
+   has its own `--text-on-sidebar*`, `--background-sidebar-*`, and
+   `--accent-on-sidebar` roles because it is dark in light mode.
 
-Light and dark appearance remap semantic roles onto the same scale. Components
+Light and dark appearance remap semantic roles onto the same ladders. Components
 should consume semantic roles instead of raw colors so custom themes and dark
 mode remain coherent. Fixed syntax-highlight colors are the deliberate
-exception.
+exception. Sage Green is the default theme; saved preferences for other themes
+are kept.
 
 `ThemeProvider` reads/writes a versioned local preference, follows system
 appearance when requested, applies the theme in a layout effect to avoid flash,
@@ -498,9 +524,13 @@ and supports a capped list of custom color seeds.
 - validates configured CORS origins as HTTP header values;
 - opens a schema-scoped PostgreSQL pool with bounded connection settings;
 - verifies the latest embedded PostgreSQL migration without applying DDL;
-- builds Calendar, User, and Chat feature repositories from database clones;
-- creates `ChatState` from OpenAI configuration and `ChatRepository`;
-- merges base, readiness, chat, calendar, and user routers;
+- delegates to each feature's `router` composition function;
+- composes `CalendarService`, `UserService`, and `ChatService` with cheaply cloned
+  PostgreSQL repositories; Chat also receives `OpenAiClient`;
+- composes the documents ingestion, job, search, and viewing services with
+  PostgreSQL store/index repositories, the documents OpenAI adapter, and the
+  LibreOffice converter from `DocumentsConfig`;
+- merges base, readiness, chat, calendar, user, and documents routers;
 - applies CORS to the combined application.
 
 The public `app()` helper is materially smaller: it returns only root, health,
@@ -531,6 +561,16 @@ request-wide tracing middleware.
 | `POST /v1/chat/stream` | No service middleware | PostgreSQL + OpenAI + normalized SSE |
 | `GET /v1/conversations` | No service middleware | All conversations, unbounded |
 | `GET /v1/conversations/{id}/messages` | No service middleware | Messages or empty list |
+| `POST /v1/documents/process` | Bearer; owner is bearer ID | Multipart `files` (PDF/DOCX, 50 MB total); parse, embed, and persist each file; per-file results |
+| `POST /v1/documents/jobs` | Bearer; owner is bearer ID | Multipart with exactly one file; `202 {jobId, filename}`; processing continues in the background |
+| `GET /v1/documents/jobs/{jobId}/events` | Bearer; job owner only | SSE `processing`, then one terminal `completed`/`skipped`/`failed` event; in-memory job state |
+| `GET /v1/documents` | Bearer; owner-scoped | `{documents}`: current, non-deleted files with current-version metadata |
+| `DELETE /v1/documents/{fileId}` | Bearer; owner-scoped | Soft delete; `204`, or `404` for missing/foreign files |
+| `GET /v1/documents/{fileId}/chunks` | Bearer; owner-scoped | `{chunks}` of the current version in chunk order |
+| `GET /v1/documents/{fileId}/text` | Bearer; owner-scoped | Canonical PDF/DOCX text re-extracted from stored bytes |
+| `GET /v1/documents/{fileId}/pdf` | Bearer; owner-scoped | `application/pdf` preview: stored PDF, LibreOffice conversion, or DOCX text fallback |
+| `POST /v1/documents/search/vector` | Bearer; owner-scoped | `queryText` (embedded server-side) or `queryEmbedding`, `limit` 1–100; cosine-distance hits |
+| `POST /v1/documents/search/keyword` | Bearer; owner-scoped | `queryText`, `limit` 1–100; PostgreSQL full-text hits with `ts_rank_cd` score |
 
 CORS allows exact configured origins, the GET/POST/PATCH/DELETE methods, and
 `Content-Type` plus `Authorization`. CORS controls browsers; it is not
@@ -554,29 +594,78 @@ The client route guard is therefore a UX boundary, not a security boundary.
 Production auth requires coordinated frontend tokens, service verification,
 route-wide enforcement, and data ownership migrations.
 
-### Backend module styles
+### Backend modules and composition
 
-Active persistence follows feature-local typed repositories:
+Calendar, User, and Chat use the same feature-local file names and dependency
+boundaries:
 
-| Area | Current organization |
+| File | Responsibility |
 | --- | --- |
-| Calendar | Feature-local router, handlers, typed models, service, repository, time rules, and error mapping |
-| Chat | Feature-local provider/protocol/orchestration plus typed `ChatRepository` records and SQL |
-| User | HTTP handlers plus typed `UserRepository`; the module also contains legacy non-persistent conversation placeholders |
-| Database | PostgreSQL pool configuration, migration execution/verification, readiness, and timestamp serialization; no feature SQL |
+| `mod.rs` | Composes the feature's concrete PostgreSQL/provider adapters, service, Axum state, and router |
+| `domain.rs` | Domain records, commands, validation, and lifecycle/error values; no Axum or SQLx dependencies |
+| `service.rs` | Application use cases and feature-specific persistence/provider ports |
+| `repository.rs` | `Postgres<Feature>Repository`, private SQLx row records, column/field enums, row conversion, transactions, and storage-error classification |
+| `handlers.rs` | HTTP extraction, auth/ownership, response envelopes, and domain-error-to-HTTP mapping |
 
-For new database-backed features, Calendar is the reference pattern:
+Domain records retain Serde naming and timestamp serialization annotations to
+preserve the wire contract without a duplicate DTO tree. `serialization.rs`
+owns the shared millisecond UTC formatter. Calendar additionally owns pure
+`time.rs` rules; Chat owns `protocol.rs` for Curio SSE and `openai.rs` for its
+provider adapter. User's non-persistent conversation placeholders live in
+`legacy.rs` and remain separate from Chat.
 
 ```text
-feature router
-  └─ handler: Axum extraction, auth/ownership, HTTP envelope
-       └─ service: validation, defaults, business rules, error classification
-            └─ repository: parameterized SQL and row mapping
-                 └─ Database: pool and migration lifecycle
+feature router (composition root)
+  └─ handlers: HTTP/SSE mapping and identity checks
+       └─ service: use cases depending on feature ports and domain values
+            ├─ PostgreSQL repository: implements the persistence port
+            │    ├─ query: shared enum-based SQL composition
+            │    └─ Database: pool and migration lifecycle
+            └─ provider/event sink adapters (Chat)
 ```
 
-Keep feature-specific SQL and transport DTO dependencies out of the central
-`Database` implementation.
+`CalendarStore`, `UserStore`, and `ChatStore` expose feature-specific operations,
+not generic CRUD. Services are generic over these ports and can run with small
+in-memory test doubles. Repository adapters translate SQLx errors into domain
+errors and log only sanitized diagnostics. The Chat provider and event sink are
+also replaceable through `ModelProvider` and `ChatEventSink`.
+
+### Reusable SQL composition
+
+`curio-service/src/query` exposes `SelectQuery`, `InsertQuery`, and `UpdateQuery`
+through `mod.rs`, with separate `select.rs`, `insert.rs`, `update.rs`, and private
+`bindings.rs` implementations. It adds no dependency or schema changes.
+
+Feature repositories define two related enums:
+
+- `SqlColumn` enums name code-owned columns for projections, predicates,
+  sorting, conflict targets, and `RETURNING`.
+- `SqlField` enums carry write values, such as `UserField::Email(&str)` or
+  `EventField::AllDay(bool)`. An exhaustive `FieldWriter` match maps each variant
+  and its typed payload to its column. INSERT and UPDATE both use
+  `.value(field)` or `.values(fields)`; callers never manually assign bind slots.
+
+SQLx's `PgArguments` encodes payloads and allocates PostgreSQL placeholders in
+one sequence, including UPDATE predicates. Encoding failures and the PostgreSQL
+parameter limit return errors at build time. Table names remain code-owned
+static strings. Column enums must map to trusted, correctly quoted identifiers;
+these helpers are not an authorization layer or a schema/type checker.
+
+SELECT supports optional AND filters, explicit `IS NULL`, array `ANY` (including
+empty arrays), enum sorting, and bound pagination. INSERT supports enum-based
+upsert assignments and `RETURNING`. UPDATE separates assignment composition from
+its filtered stage: there is no `build` before a required predicate. Empty or
+duplicate write fields are rejected. Explicit expression enums represent
+`CURRENT_TIMESTAMP`; runtime strings are always bound as data.
+
+Builders return a SQLx `QueryBuilder` for typed fetching or execution against a
+pool or transaction. Documents uses the builders for single-table version/blob
+writes and explicit, fully bound SQL constants for statements the builders
+intentionally do not model: joins, `FOR UPDATE` locks, `jsonb`/array casts,
+batched multi-row chunk inserts, and vector/full-text ranking. Feature repositories retain transaction boundaries,
+owner/resource scope, row mapping, and domain policy. The helper intentionally
+does not provide arbitrary SQL fragments, joins, generic CRUD, or implicit
+schema/migration management. Runnable examples live in `query/mod.rs`.
 
 ### PostgreSQL lifecycle and SQLite import boundary
 
@@ -621,6 +710,10 @@ Current application tables (in addition to SQLx's `_sqlx_migrations` metadata):
 | `messages` | User/assistant content, lifecycle status, provider/error IDs, and identity `sort_order`; cascades with conversation |
 | `users` | Profile keyed by user ID; email unique |
 | `calendar_events` | User-owned event with cascade delete, public date strings, and normalized range instants |
+| `document_files` | User-owned logical file with display name, JSON metadata, and soft-delete timestamp |
+| `document_file_versions` | Immutable content version per file (SHA-256, MIME type, size, number); a partial unique index allows one current version |
+| `document_file_blobs` | Original bytes (`bytea`) of each version |
+| `document_chunks` | Owner-denormalized chunk text, `real[]` embedding, generated English `tsvector`, token/page/offset metadata; cascades with its version |
 | `sqlite_import_manifests` | Redacted SQLite source hash, importer version/commit, completion time, and per-table counts |
 
 PostgreSQL stores audit and normalized-range instants as `timestamptz(3)` and
@@ -629,13 +722,22 @@ serializes public audit timestamps as millisecond RFC 3339 UTC strings.
 status/priority constraints live in the database. Calendar wire
 `start_date`/`end_date` strings remain text so date-only meaning is preserved.
 
-Static SQL uses `$n` parameters, `query_as`, and typed `FromRow` records. Chat
-start/finish mutations remain transactional. User upsert and calendar create
-use `INSERT ... RETURNING`. Conversation messages order by `created_at`, then
+Feature SQL uses the shared enum-based builders, bound `$n` parameters, and
+private typed `FromRow` records. Chat start/finish mutations remain transactional.
+User upsert and calendar create use `INSERT ... RETURNING`. Conversation messages
+order by `created_at`, then
 the explicit identity-backed `sort_order`, rather than an engine-specific
 implicit row identifier.
 
 ### Chat service flow
+
+`ChatService` orchestrates the conversation lifecycle through `ChatStore` and
+`ModelProvider`. Its `start` method returns a `ChatSession` only after the initial
+transaction commits; `run` consumes that session and delivers domain events to
+`ChatEventSink`. The HTTP adapter serializes those events into the existing SSE
+envelopes. `AssistantOutcome` carries completed, failed, or interrupted state
+and the corresponding response ID/error code, preventing invalid combinations
+at the persistence port.
 
 `POST /v1/chat/stream` follows a persistence-before-terminal-event rule:
 
@@ -687,19 +789,16 @@ Current chat limitations:
 ### Calendar vertical slice
 
 `calendar/mod.rs` constructs one `CalendarService` from one
-`CalendarRepository`, attaches it as Axum state, nests the event routes, and
+`PostgresCalendarRepository`, attaches it as Axum state, nests the event routes, and
 applies auth once.
 
-Layer responsibilities:
-
-- `models.rs`: public records, create/query inputs, repository insert input,
-  and allowed status/priority values.
-- `handlers.rs`: Axum extraction, owner check, response status/envelope.
-- `service.rs`: trimming, UUID generation, enum validation, temporal rules,
-  bounded-range policy, and SQL error classification.
-- `repository.rs`: insert/list SQL and one row mapper.
-- `time.rs`: public date parsing and normalized half-open intervals.
-- `error.rs`: stable domain errors mapped to JSON HTTP responses.
+Calendar validation lives in `domain.rs`: `NewCalendarEvent` can only be
+constructed through complete validation/normalization, and `EventRange`
+encapsulates owner identity and bounded half-open UTC endpoints. Their fields
+are private and repositories receive these validated values through the
+`CalendarStore` port. The service coordinates validation and persistence;
+handlers preserve owner checks and HTTP error mapping. Repository row records
+remain private to the PostgreSQL adapter.
 
 Calendar temporal invariants:
 
@@ -724,7 +823,8 @@ empty result because it does not join the users table.
 
 ### User and legacy placeholder routes
 
-`POST /v1/users` trims required values, converts a blank avatar to null,
+`UserService` validates a `UserProfile` before calling `UserStore`; the concrete
+adapter is `PostgresUserRepository`. `POST /v1/users` trims required values, converts a blank avatar to null,
 upserts by ID, returns `200` for create/update, maps duplicate email to
 `409`, and otherwise returns a sanitized error.
 
@@ -740,6 +840,7 @@ Error behavior is currently boundary-specific:
 | --- | --- |
 | Auth middleware | Empty `401` |
 | Calendar domain/storage | JSON `{ "error": "..." }` |
+| Documents domain/storage/provider | JSON `{ "error": "..." }`; batch uploads report per-file errors inside `200` |
 | User validation/conflict/storage | JSON `{ "error": "..." }` |
 | Axum extractor rejection | Framework-default response |
 | Chat/provider/storage after SSE starts | HTTP success stream with terminal `error` event |
@@ -749,6 +850,57 @@ Error behavior is currently boundary-specific:
 There is no common application error type or request-wide logging/correlation
 middleware. Structured diagnostics are currently targeted at startup,
 readiness, and chat provider/persistence failures.
+
+### Documents bounded context
+
+`curio-service/src/documents` ports the Quarry documents domain onto
+PostgreSQL. The bearer identity is the document owner for every route; request
+bodies cannot name an owner (`userId`-style multipart fields are rejected and
+search bodies deny unknown fields). Its subdomains keep Calendar's file roles:
+
+| Module | Responsibility |
+| --- | --- |
+| `mod.rs` | Composition root: builds adapters, services, the nested `/v1/documents` router, upload body limits, and the auth layer |
+| `domain.rs` | Shared kernel: `Document`/`DocumentChunk`, content-derived IDs, file policy, `DocumentError`, and the `Embedder`/`ImageDescriber` provider ports |
+| `formats/` | Synchronous PDF and DOCX parsers producing token-bounded (800 o200k tokens) chunks with exclusive UTF-8 byte offsets and PDF page ranges; image, PowerPoint, and spreadsheet extractors are ported but not wired to ingestion |
+| `ingestion/` | Multipart handlers, SSE job events, `IngestionService` (dedupe, blocking-thread parse, batched embedding, aggregate write), in-memory `DocumentJobService`, and pure persistence-invariant construction |
+| `store/` | The file/version/blob aggregate and its PostgreSQL adapter |
+| `index/` | Chunk rows plus the owner-scoped chunk read model and search SQL |
+| `search/` | `SearchService` over the `ChunkSearch` port; text queries are embedded server-side |
+| `viewing/` | `StoredDocumentService`: list, soft delete, chunks, raw text, and PDF previews with a bounded LibreOffice semaphore and LRU preview cache |
+| `openai.rs`, `office.rs` | Embeddings/image-description provider adapter and the time-limited `soffice` converter |
+
+Ingestion rules:
+
+- `documentId` is SHA-256 of owner and content hash; a per-process lock
+  serializes identical concurrent uploads for one owner.
+- An upload whose bytes match the owner's current, non-deleted version is
+  reported `skipped` with the existing `fileId`; different bytes create a new
+  file.
+- Parsing runs on a blocking thread, and each file runs in its own task, so a
+  parser panic fails only that file.
+- Chunks are embedded in batches of 64 with the configured embedding model.
+  Provider bodies are never returned or logged.
+- One transaction locks an existing file row, upserts the file, inserts or
+  reactivates the content version and blob, replaces the version's chunks,
+  marks it indexed, and reads the identity back. A stored document therefore
+  never lacks its index, unlike Quarry's separate SQLite and Helix writes.
+- PostgreSQL text cannot contain NUL, so chunk NUL bytes become spaces, which
+  preserves byte offsets.
+
+Search ranks only chunks of current versions of non-deleted files owned by the
+caller. Vector search computes exact cosine distance over `real[]` in SQL and
+skips embeddings of a different dimension; it needs no extension, but it scans
+the owner's chunks and suits modest corpora. Keyword search uses
+`websearch_to_tsquery('english', ...)` against a GIN-indexed generated
+`tsvector`.
+
+Documents errors use `{ "error": "..." }`: malformed multipart or a wrong
+file count `400`, validation `422`, oversized upload `413`, missing or foreign
+resources `404`, provider or preview-conversion failure `503`, and sanitized
+storage failure `500`. Batch processing returns `200` with per-file
+`success`/`skipped`/`error`; parse, embedding, owner/file conflict, and
+missing-profile failures are reported there rather than failing the request.
 
 ## Tauri desktop architecture
 
@@ -804,8 +956,9 @@ calling frontend plugin APIs; it must use the validated app command.
 The CSP permits application assets, Tauri IPC, and local development HMR. It
 does not grant the renderer general remote HTTP access. Images are limited to
 app/data/blob sources, and media/object/frame embedding is closed down.
-Shared task/rich-text components and the web Landing page can contain remote
-media URLs, so those assets are unsupported or blocked in the desktop target
+Shared task/rich-text components and the profile-setup avatar preview can
+contain remote media URLs, so those assets are unsupported or blocked in the
+desktop target
 until they are routed through an intentional native/cache capability and CSP
 review.
 
@@ -936,6 +1089,11 @@ fails.
 | `CURIO_CORS_ALLOWED_ORIGINS` | Service only | Exact comma-separated origins; local defaults |
 | `CURIO_SERVICE_ADDR` | Service process | Explicit bind; otherwise Railway `PORT`, then `127.0.0.1:3000` |
 | `RUST_LOG` | Service diagnostics | Optional `tracing_subscriber` filter; defaults to `curio_service=info` |
+| `OPENAI_EMBEDDING_MODEL` | Documents | Defaults to `text-embedding-3-small` |
+| `OPENAI_IMAGE_DESCRIPTION_MODEL` | Documents image extractor | Defaults to `gpt-5.5`; the extractor is not yet wired to ingestion |
+| `CURIO_DOCUMENT_CONCURRENCY` | Documents batch ingestion | Defaults to `8`; bounded from 1 through 32 |
+| `CURIO_DOCUMENT_JOB_RETENTION_SECONDS` | Documents background jobs | Defaults to `600`; bounded from 0 through 86400 |
+| `CURIO_SOFFICE` | Documents previews | Optional LibreOffice executable; otherwise `PATH` and common install paths are searched |
 
 ### Clients and desktop build
 
@@ -1066,15 +1224,15 @@ CI does not currently:
 
 Vitest covers:
 
-- route-manifest target/root behavior;
+- route-manifest target/root behavior and shell layout membership;
 - web and desktop transport status/chunks/query/auth/cancellation/error behavior;
 - JSON API success/error/empty-body handling;
 - Calendar resource requests and date-string preservation;
 - chat SSE fragmentation, UTF-8 boundaries, terminal rules, correlation, and
   transport failures;
 - local auth migration/normalization;
-- theme color math, palette/source consistency, contrast, storage, and custom
-  theme rules;
+- theme color math, palette/source consistency, the shared neutral ladder,
+  light/dark and spine contrast, storage, and custom theme rules;
 - per-user Home thought storage;
 - calendar classification/edit-date invariants and task-list/kanban adapters;
 - Notes lookup/data invariants.
@@ -1110,10 +1268,29 @@ Coverage includes:
 - user upsert and validation;
 - OpenAI provider SSE parsing and sanitized errors;
 - normalized chat streaming plus database history;
+- in-memory service tests for validation before persistence and Chat's initial/
+  terminal commit ordering, provider/storage failures, and interruption;
+- query-builder bind ordering, data-carrying field enums, dynamic field vectors,
+  NULLs, optional predicates, array filters, pagination, upserts, and scoped
+  updates, including PostgreSQL round trips and fallible encoders;
 - chat persistence after closing and reopening a pool on the same disposable
   schema;
 - calendar authentication/ownership, create/list, UUIDs, range overlap,
-  all-day/timed/milestone semantics, DST slack, and error statuses.
+  all-day/timed/milestone semantics, DST slack, and error statuses;
+- documents PDF/DOCX parsing and chunk offsets, persistence invariants,
+  in-memory ingestion/search/viewing services, job events and owner scoping,
+  embedding batching and sanitized provider errors, the LibreOffice timeout,
+  PostgreSQL aggregate writes (dedupe, versioning, ownership conflicts, soft
+  delete), and vector/keyword ranking;
+- the separate black-box `tests/documents.rs` target, which uses only the
+  public `documents::formats` API and the full router with a controllable mock
+  embeddings server: chunk contiguity/budget/UTF-8 boundaries and offsets that
+  index into `/text`, blank and corrupt files, in-batch and cross-owner dedupe,
+  upload validation and 413 limits, missing profiles, provider outages and
+  recovery, embedding batching, job completed/failed/skipped/replay/retention
+  streams, previews, delete visibility, full-text query syntax, search limits
+  and dimension mismatches, bearer validation on every route, owner isolation,
+  and CORS preflight.
 
 The feature-gated importer is the only service tool allowed to read a legacy
 SQLite snapshot; normal database-backed tests and runtime remain PostgreSQL-only.
@@ -1138,6 +1315,11 @@ middleware, and end-to-end client/service tests.
 - Service CORS reflects only exact configured web origins.
 - OpenAI errors are sanitized before becoming Curio SSE events.
 - Calendar data is checked against the bearer-derived owner ID.
+- Documents, document jobs, and search results are scoped to the bearer
+  identity in SQL or the job registry; foreign resources are indistinguishable
+  from missing ones (`404`).
+- Document previews and parser/converter failures return fixed messages;
+  LibreOffice output and provider bodies stay out of responses.
 - `ServiceConfig` uses a custom `Debug` implementation that redacts the OpenAI
   key and database URL.
 
@@ -1155,8 +1337,12 @@ middleware, and end-to-end client/service tests.
   URLs also lack an equivalent HTTP/HTTPS protocol allowlist.
 - The web transport does not independently enforce same-origin paths at
   runtime; current API callers use code-owned constants.
-- There is no service rate limiting, explicit project-level body-size policy,
-  structured audit log, or request correlation.
+- There is no service rate limiting, project-wide body-size policy (only the
+  documents upload routes set a 51 MB limit), structured audit log, or request
+  correlation.
+- Uploaded documents are parsed by third-party PDF/DOCX libraries inside the
+  service process; panics are contained per file, but there is no sandbox or
+  CPU/memory quota for hostile files.
 
 Do not describe the current system as production-authenticated until those gaps
 are addressed.
@@ -1168,8 +1354,8 @@ are addressed.
 3. Chat conversations are global; the frontend `userId` is ignored by the
    backend chat request.
 4. Stored conversation history is not sent back to OpenAI as context.
-5. Calendar is the most complete handler/service/repository/error vertical
-   slice; chat and user now keep persistence in typed feature repositories.
+5. Calendar, User, and Chat share domain/service/repository/handler boundaries;
+   their HTTP error envelopes and authorization policies remain feature-specific.
 6. Calendar only supports create and bounded list, so persisted entries must
    remain read-only in edit surfaces.
 7. The Calendar “Tasks” views are projections of calendar events. There is no
@@ -1190,13 +1376,24 @@ are addressed.
 15. `api/calendar.ts` imports status/priority types from a calendar UI module,
     so the current resource layer has an upward type dependency that cuts across
     the intended API-to-UI direction.
-16. Calendar-mode fetch/create failures are not surfaced consistently, and
-    Tasks projections cover only the most recently visible calendar range.
+16. Calendar-mode fetch failures show an inline notice with retry, but create
+    failures are not surfaced, and Tasks projections cover only the most
+    recently visible calendar range.
 17. Direct shared link/media rendering bypasses the platform capability, while
     desktop CSP blocks remote media that can appear in shared/web content.
 18. Web and desktop UI builds overwrite the same `web/dist`, and current mode
     files/Cargo environment propagation require release discipline.
 19. The checked-in local CORS example omits Vite's actual port 1420.
+20. Documents has no frontend client. The platform contract carries only JSON
+    request bodies, so uploads need a deliberate binary/multipart transport
+    capability on both the web and Tauri adapters before the UI can call
+    `/v1/documents/process`.
+21. Document job state is in process memory: restarts lose running jobs and
+    multiple replicas do not share job events.
+22. Vector search is an exact per-owner scan without an ANN index, and document
+    bytes live in PostgreSQL `bytea`; both limit corpus size.
+23. Image, PowerPoint, and spreadsheet extractors are ported but not reachable
+    from ingestion, which accepts only PDF and DOCX.
 
 This list is a guide for planning, not permission to mix unrelated refactors
 into feature work.
@@ -1207,7 +1404,8 @@ into feature work.
 
 1. Add the route metadata once in `route-manifest.ts`.
 2. Add the lazy page mapping in `router.tsx`.
-3. Reuse the common shell where appropriate.
+3. Set `layout: "app"` to render inside the persistent shell, and start the
+   page with `PageHeader`; use `"standalone"` only for full-window flows.
 4. Keep target differences in metadata or platform capabilities, not duplicated
    page trees.
 5. Add route-manifest tests when access or target behavior changes.

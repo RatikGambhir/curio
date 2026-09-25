@@ -1,26 +1,42 @@
+import { SearchX } from "lucide-react";
+
 import type { QAPair } from "@/components/vault/vault.types";
 import { VaultResultRow } from "@/components/vault/vault-result-row";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface VaultResultsListProps {
   items: QAPair[];
+  query: string;
+  onClearFilters: () => void;
 }
 
-export function VaultResultsList({ items }: VaultResultsListProps) {
+export function VaultResultsList({
+  items,
+  query,
+  onClearFilters,
+}: VaultResultsListProps) {
   if (items.length === 0) {
     return (
-      <div className="rounded-lg border border-border bg-card py-16 text-center">
-        <p className="text-muted-foreground">No results found</p>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Try adjusting your search or filters.
-        </p>
-      </div>
+      <EmptyState
+        icon={SearchX}
+        title="Nothing in the vault matches"
+        action={
+          <Button type="button" variant="outline" onClick={onClearFilters}>
+            Clear search and filters
+          </Button>
+        }
+        className="border-t border-border py-20"
+      >
+        Try a shorter phrase, or look across every category.
+      </EmptyState>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="border-t border-border">
       {items.map((item) => (
-        <VaultResultRow key={item.id} item={item} />
+        <VaultResultRow key={item.id} item={item} query={query} />
       ))}
     </div>
   );

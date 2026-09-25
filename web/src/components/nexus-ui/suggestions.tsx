@@ -10,16 +10,16 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const suggestionVariants = cva(
-  "h-8 gap-1.5 rounded-full px-4 text-sm font-normal shadow-none outline-0 transition-all duration-150 focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]",
+  "h-8 gap-1.5 rounded-md px-3 text-[0.8125rem] font-normal shadow-none",
   {
     variants: {
       variant: {
         filled:
-          "border-none bg-muted text-foreground hover:bg-border",
+          "border-none bg-secondary text-foreground hover:bg-secondary-hover",
         outline:
-          "border border-input bg-transparent text-foreground hover:bg-muted",
+          "border border-border bg-card text-secondary-foreground hover:border-border-strong hover:bg-card hover:text-foreground",
         ghost:
-          "border-none bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+          "border-none bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground",
       },
     },
     defaultVariants: {

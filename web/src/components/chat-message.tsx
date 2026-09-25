@@ -28,7 +28,7 @@ function AssistantThinkingIndicator() {
 
   return (
     <TextShimmer
-      className="text-sm font-normal text-muted-foreground"
+      className="font-serif text-[1.0625rem] italic text-muted-foreground"
       duration={1.6}
       aria-live="polite"
     >
@@ -40,7 +40,7 @@ function AssistantThinkingIndicator() {
 function AssistantErrorMessage({ value }: Pick<ChatMessage, "value">) {
   return (
     <div
-      className="flex items-start gap-2 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/6 px-4 py-3 font-sans text-sm text-foreground"
       role="alert"
     >
       <AlertTriangle
@@ -48,8 +48,8 @@ function AssistantErrorMessage({ value }: Pick<ChatMessage, "value">) {
         aria-hidden="true"
       />
       <div>
-        <p className="font-semibold">Response unavailable</p>
-        <p className="mt-1 text-destructive/90">{value}</p>
+        <p className="font-medium">Curio couldn&rsquo;t answer that</p>
+        <p className="mt-1 text-muted-foreground">{value}</p>
       </div>
     </div>
   )
@@ -74,7 +74,7 @@ export function AssistantMessage({
   return (
     <Message from="assistant">
       <MessageStack>
-        <MessageContent className={status === "error" ? "px-0" : undefined}>
+        <MessageContent>
           {status === "error" ? (
             <AssistantErrorMessage value={value} />
           ) : hasContent ? (

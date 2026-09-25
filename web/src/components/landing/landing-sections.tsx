@@ -1,14 +1,17 @@
-import { ChevronDown } from "lucide-react";
-
-import curioLogo from "@/assets/curio-logo.png";
-import { Button } from "@/components/ui/button";
+import { useState, type FormEvent } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  ArrowRight,
+  BookOpen,
+  CalendarDays,
+  ChevronDown,
+  Globe,
+  MessageSquare,
+  NotebookPen,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+
+import { CurioMark, CurioWordmark } from "@/components/brand/curio-mark";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,303 +20,368 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Notice } from "@/components/ui/notice";
 import { Textarea } from "@/components/ui/textarea";
-import { HyperText } from "@/components/ui/hypertext";
-import {cn} from "@/lib/utils.ts";
-import {useEffect, useRef} from "react";
 
-export type BookPage = {
-  left: string;
-  right: string;
-};
-
-export type FeatureTile = {
-  title: string;
-  subtitle?: string;
-  description: string;
-  className: string;
-};
-
-type LandingNavbarProps = {
+type LandingHeaderProps = {
   onContactClick: () => void;
   onWebClick: () => void;
   onDesktopClick: () => void;
 };
 
-export function LandingNavbar({
+export function LandingHeader({
   onContactClick,
   onWebClick,
   onDesktopClick,
-}: LandingNavbarProps) {
+}: LandingHeaderProps) {
   return (
-    <nav className="animate-in fade-in-0 slide-in-from-top-2 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 duration-500 md:px-8">
-      <div className="h-10 w-10 rounded-md object-contain md:h-12 md:w-12">
+    <header className="sticky top-0 z-30 border-b border-border/70 bg-background/90 backdrop-blur-md">
+      <div className="mx-auto flex h-16 w-full max-w-[76rem] items-center justify-between gap-4 px-5 sm:px-8">
+        <Link to="/" aria-label="Curio home" className="focus-ring rounded-sm">
+          <CurioWordmark className="text-base text-foreground" />
+        </Link>
 
+        <nav aria-label="Primary" className="flex items-center gap-1 sm:gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+                Platforms
+                <ChevronDown className="size-3.5" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem onSelect={onWebClick}>Web</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onDesktopClick}>Desktop</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="ghost" size="sm" onClick={onContactClick}>
+            Contact
+          </Button>
+          <Button asChild size="sm" className="ml-1">
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </nav>
       </div>
-
-      <div className="flex items-center gap-2 md:gap-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="gap-1">
-              Platforms
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 rounded-xl">
-            <DropdownMenuItem
-              onClick={onDesktopClick}
-              className="data-[highlighted]:bg-transparent data-[highlighted]:text-inherit hover:-translate-y-0.5"
-            >
-              Desktop
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onWebClick}
-              className="data-[highlighted]:bg-transparent data-[highlighted]:text-inherit hover:-translate-y-0.5"
-            >
-              Web
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Button variant="ghost" onClick={onContactClick}>
-          Contact
-        </Button>
-      </div>
-    </nav>
+    </header>
   );
 }
 
-interface HeroSectionProps {
-  className?: string;
-}
-
-export const HeroSection = ({ className }: HeroSectionProps) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.playbackRate = 0.40; // 0.5 = half speed, 0.75 = subtle slow
-    }
-  }, []);
+/* A drawing of Curio at work, built from the same tokens and type as the app
+   rather than a screenshot, so it stays true to whichever theme is active. */
+function ProductSketch() {
   return (
-      <section
-          className={cn(
-              "flex min-h-screen items-center justify-between py-14",
-              className,
-          )}
-      >
-        <div className="flex flex-col gap-3 px-[10%] lg:w-[50%] lg:pr-0">
-          <h1
-              className="animate-in fade-in-0 slide-in-from-bottom-4 mb-2 text-5xl font-semibold tracking-tight duration-500 md:text-7xl"
-              style={{ fontFamily: "var(--font-serif)" }}
+    <figure
+      role="img"
+      aria-label="A Curio conversation, with the answer filed into the vault"
+      className="relative"
+    >
+      <div className="overflow-hidden rounded-xl border border-border-strong bg-sidebar shadow-xl">
+        <div className="flex">
+          <div
+            aria-hidden="true"
+            className="hidden w-14 shrink-0 flex-col items-center gap-3 py-4 text-sidebar-muted-foreground sm:flex"
           >
-            <span className="flex items-end gap-[0.32em] leading-none">
-              <span>curio</span>
-              <span className="relative mb-[0.04em] block h-[1.2em] w-[0.96em] shrink-0">
-                <img
-                  src={curioLogo}
-                  alt="Curio logo"
-                  className="absolute bottom-0 left-1/2 h-full w-auto max-w-none -translate-x-1/2 object-contain"
-                />
+            <CurioMark className="size-5 text-sidebar-foreground" />
+            <span className="mt-3 h-7 w-7 rounded-md bg-sidebar-accent" />
+            <span className="h-7 w-7 rounded-md" />
+            <span className="h-7 w-7 rounded-md" />
+            <span className="h-7 w-7 rounded-md" />
+          </div>
+          <div className="min-w-0 flex-1 rounded-l-lg bg-card sm:my-1.5">
+            <div className="flex h-11 items-center gap-3 border-b border-border px-5">
+              <span className="font-display text-[1.0625rem] text-foreground">
+                Why do leaves turn red?
               </span>
-            </span>
-          </h1>
-
-            <h2
-                className="animate-in fade-in-0 slide-in-from-bottom-4 mb-5 text-2xl tracking-tight duration-500 md:text-2xl"
-                style={{ fontFamily: "var(--font-serif)" }}
-            >
-              For every question, there&apos;s an{" "}
-              <HyperText
-                as="span"
-                startOnView={true}
-                animateOnHover={false}
-                duration={2000}
-                preserveCase={true}
-                className="inline align-baseline text-inherit"
-                letterClassName="align-baseline font-inherit"
-              >
-                answer
-              </HyperText>
-            </h2>
-
-
-          <div className="flex flex-col gap-4 font-medium md:flex-row">
-            <div className="animate-in fade-in-0 slide-in-from-bottom-2 flex flex-col items-center justify-center gap-4 duration-1000 sm:flex-row">
-              <Button
-                  size="lg"
-                  className="h-14 rounded-xl px-8 text-lg transition-transform duration-200 hover:-translate-y-0.5"
-              >
-                Start Exploring
-              </Button>
-              <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-14 rounded-xl bg-card px-8 text-lg transition-transform duration-200 hover:-translate-y-0.5"
-              >
-                See How It Works
-              </Button>
+            </div>
+            <div className="space-y-5 px-5 py-6">
+              <p className="ml-auto w-fit max-w-[80%] rounded-xl rounded-br-sm bg-secondary px-3.5 py-2 text-[0.8125rem] text-foreground">
+                Why do some leaves turn red instead of yellow?
+              </p>
+              <div className="font-serif text-[0.9375rem] leading-relaxed text-foreground">
+                <p>
+                  Yellow was there all summer, hidden under chlorophyll. Red is
+                  new: as nights cool, some trees{" "}
+                  <mark className="rounded-[2px] bg-accent-subtle px-0.5 text-inherit">
+                    make anthocyanins
+                  </mark>{" "}
+                  to shield leaves while they reclaim nutrients.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
+                <BookOpen className="size-3.5 text-primary" aria-hidden="true" />
+                <span>Kept in Vault</span>
+                <span className="rounded-sm border border-border px-1.5 font-mono text-2xs">
+                  botany
+                </span>
+                <span className="rounded-sm border border-border px-1.5 font-mono text-2xs">
+                  autumn
+                </span>
+              </div>
             </div>
           </div>
         </div>
-        <div className="relative hidden h-[720px] w-[45%] overflow-hidden rounded-l-full bg-black lg:block">
-          <video
-              autoPlay
-              ref={videoRef}
-              loop
-              muted
-              playsInline
-              data-wf-ignore="true"
-              data-object-fit="cover"
-              className="h-full w-full rounded-tl-xl object-cover"
-          >
-            <source src="https://deifkwefumgah.cloudfront.net/shadcnblocks/block/video-1.mp4" type="video/mp4" />
-          </video>
-        </div>
-      </section>
-  );
-};
-
-export function AppPreviewSection() {
-  return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 md:px-8 ">
-      <Card className="animate-in fade-in-0 slide-in-from-bottom-6 overflow-hidden rounded-[1.75rem] border-border/80 bg-card/80 p-3 shadow-xl duration-700 transition-all hover:-translate-y-0.5 hover:shadow-2xl">
-        <img
-          src="https://images.unsplash.com/photo-1719938073286-437141b562e9?auto=format&fit=crop&w=1600&q=80"
-          alt="Curio desktop preview"
-          className="h-[260px] w-full rounded-2xl object-cover md:h-[560px]"
-        />
-      </Card>
-    </section>
+      </div>
+      <div
+        aria-hidden="true"
+        className="absolute -bottom-24 -left-8 hidden w-56 rotate-[-2deg] rounded-lg border border-border bg-card p-4 shadow-lg md:block"
+      >
+        <p className="eyebrow text-muted-foreground">Seedling thought</p>
+        <p
+          className="ruled-paper mt-2 pt-2 font-display text-[0.9375rem] italic leading-7 text-foreground [--rule-gap:1.75rem]"
+        >
+          Do evergreens do this too? Look into it.
+        </p>
+      </div>
+    </figure>
   );
 }
 
-type FeatureGridSectionProps = {
-  features: FeatureTile[];
-};
-
-export function FeatureGridSection({ features }: FeatureGridSectionProps) {
+export function HeroSection({ onHowItWorks }: { onHowItWorks: () => void }) {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 md:px-8">
-      <div className="grid auto-rows-[220px] grid-cols-1 gap-5 md:grid-cols-3 md:auto-rows-[220px]">
-        {features.map((feature, index) => (
-          <Card
-            key={feature.title}
-            style={{ animationDelay: `${index * 80}ms` }}
-            className={`animate-in fade-in-0 zoom-in-95 rounded-3xl bg-card/90 shadow-sm duration-500 transition-all hover:-translate-y-1 hover:shadow-lg ${feature.className}`}
-          >
-            <CardHeader>
-              <CardTitle className="text-3xl md:text-4xl">{feature.title}</CardTitle>
-              {feature.subtitle ? (
-                <p className="text-lg text-foreground">{feature.subtitle}</p>
-              ) : null}
-            </CardHeader>
-            <CardContent>
-              <CardDescription className="text-base md:text-3xl/none">
-                {feature.description}
-              </CardDescription>
-            </CardContent>
-          </Card>
-        ))}
+    <section className="mx-auto grid w-full max-w-[76rem] items-center gap-x-16 gap-y-16 px-5 pb-24 pt-14 sm:px-8 md:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-40 lg:pt-24">
+      <div className="max-w-xl">
+        <p className="eyebrow rise-in text-muted-foreground">
+          A knowledge notebook
+        </p>
+        <h1 className="rise-in mt-5 font-display text-display-xl text-foreground [--rise-index:1]">
+          For every question, an answer worth&nbsp;keeping.
+        </h1>
+        <p className="rise-in mt-6 max-w-lg text-lg leading-relaxed text-secondary-foreground [--rise-index:2]">
+          Curio answers what you ask, then files it with your notes, plans and
+          saved answers, so what you learn today is still there next month.
+        </p>
+        <div className="rise-in mt-9 flex flex-col gap-3 sm:flex-row [--rise-index:3]">
+          <Button asChild size="lg">
+            <Link to="/login">
+              Start exploring
+              <ArrowRight aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" size="lg" onClick={onHowItWorks}>
+            See how it works
+          </Button>
+        </div>
+      </div>
+      <div className="rise-in [--rise-index:2]">
+        <ProductSketch />
       </div>
     </section>
   );
 }
 
-type BookSectionProps = {
-  page: BookPage;
-  onNextPage: () => void;
-};
+const STEPS = [
+  {
+    title: "Ask anything",
+    description:
+      "Get a clear answer, then keep the ones worth keeping as part of a history you can search.",
+  },
+  {
+    title: "Find it again",
+    description:
+      "Search every note, topic and answer in one place and go straight back to what mattered.",
+  },
+  {
+    title: "Connect ideas",
+    description:
+      "Link notes and answers over time so what you learn gains structure you can reuse.",
+  },
+  {
+    title: "Keep learning",
+    description:
+      "Turn everyday questions into lasting understanding, in a vault that compounds as you use it.",
+  },
+];
 
-export function BookSection({ page, onNextPage }: BookSectionProps) {
+export function HowItWorksSection() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-6 pb-20 md:px-8">
-      <Card className="animate-in fade-in-0 slide-in-from-bottom-6 rounded-3xl border-border/70 bg-accent/30 p-0 shadow-lg duration-700">
-        <div className="grid min-h-[250px] grid-cols-1 overflow-hidden rounded-3xl md:grid-cols-2">
-          <div className="border-border/70 p-8 md:border-r md:p-12">
-            <p className="text-4xl tracking-tight md:text-5xl/none">{page.left}</p>
-          </div>
-          <div className="flex flex-col justify-between p-8 md:p-12">
-            <p className="text-4xl tracking-tight md:text-5xl/none">{page.right}</p>
-            <div className="mt-8 flex justify-end">
-              <Button variant="ghost" onClick={onNextPage}>
-                Click to turn page
-              </Button>
-            </div>
-          </div>
+    <section
+      id="how-it-works"
+      aria-labelledby="how-it-works-title"
+      className="scroll-mt-20 border-t border-border bg-card"
+    >
+      <div className="mx-auto w-full max-w-[76rem] px-5 py-20 sm:px-8 lg:py-28">
+        <div className="max-w-3xl">
+          <p className="eyebrow text-muted-foreground">How it works</p>
+          <h2
+            id="how-it-works-title"
+            className="mt-4 font-display text-display-lg text-foreground"
+          >
+            Questions in. Understanding out.
+          </h2>
         </div>
-      </Card>
+        <ol className="mt-14 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((step, index) => (
+            <li key={step.title} className="border-t border-foreground/80 pt-5">
+              <span className="font-mono text-xs tabular-nums text-primary">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <h3 className="mt-5 font-display text-display-sm text-foreground">
+                {step.title}
+              </h3>
+              <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted-foreground">
+                {step.description}
+              </p>
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }
 
-type ContactSectionProps = {
-  className?: string;
-};
+const SURFACES = [
+  {
+    icon: MessageSquare,
+    name: "Chat",
+    description: "Ask, follow up, and watch the answer stream in as it's written.",
+  },
+  {
+    icon: NotebookPen,
+    name: "Notes",
+    description: "A rich-text notebook with folders, headings, code and tables.",
+  },
+  {
+    icon: CalendarDays,
+    name: "Calendar",
+    description: "Month, week, day and agenda views, with tasks as a list or a board.",
+  },
+  {
+    icon: BookOpen,
+    name: "Vault",
+    description: "Every answer you kept, searchable by phrase and category.",
+  },
+  {
+    icon: Globe,
+    name: "Atlas",
+    description: "A map of how your ideas connect, drawn as you link them.",
+  },
+];
 
-export function ContactSection({ className }: ContactSectionProps) {
+export function SurfacesSection() {
+  return (
+    <section aria-labelledby="surfaces-title" className="border-t border-border">
+      <div className="mx-auto grid w-full max-w-[76rem] gap-x-16 gap-y-10 px-5 py-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-28">
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <p className="eyebrow text-muted-foreground">Inside Curio</p>
+          <h2
+            id="surfaces-title"
+            className="mt-4 font-display text-display-lg text-foreground"
+          >
+            One notebook, five ways in.
+          </h2>
+          <p className="mt-5 max-w-md text-lg leading-relaxed text-secondary-foreground">
+            The same workspace on the web and on your desktop, with a single
+            place for what you ask, write and plan.
+          </p>
+        </div>
+        <ul className="border-t border-border">
+          {SURFACES.map(({ icon: Icon, name, description }) => (
+            <li
+              key={name}
+              className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-4 border-b border-border py-6"
+            >
+              <span className="flex size-10 items-center justify-center rounded-md bg-secondary text-foreground">
+                <Icon className="size-[1.125rem]" aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block font-display text-display-sm text-foreground">
+                  {name}
+                </span>
+                <span className="mt-1 block text-[0.9375rem] leading-relaxed text-muted-foreground">
+                  {description}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+export function ContactSection() {
+  const [submitted, setSubmitted] = useState(false);
+
+  // No contact endpoint exists yet; say so instead of pretending to send.
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitted(true);
+  };
+
   return (
     <section
       id="contact"
-      className={cn("mx-auto w-full max-w-5xl scroll-mt-8 px-6 pb-20", className)}
+      aria-labelledby="contact-title"
+      className="scroll-mt-20 border-t border-border bg-card"
     >
-      <Card className="animate-in fade-in-0 slide-in-from-bottom-6 rounded-3xl bg-card p-4 duration-700 md:p-6">
-        <CardHeader className="text-center">
-          <CardTitle className="text-4xl md:text-6xl">Get in Touch</CardTitle>
-          <CardDescription className="mx-auto max-w-2xl text-base md:text-3xl/none">
-            Have questions about Curio? We&apos;d love to hear from you.
-          </CardDescription>
-        </CardHeader>
+      <div className="mx-auto grid w-full max-w-[76rem] gap-x-16 gap-y-10 px-5 py-20 sm:px-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:py-28">
+        <div>
+          <p className="eyebrow text-muted-foreground">Contact</p>
+          <h2
+            id="contact-title"
+            className="mt-4 font-display text-display-lg text-foreground"
+          >
+            Get in touch.
+          </h2>
+          <p className="mt-5 max-w-md text-lg leading-relaxed text-secondary-foreground">
+            Questions about Curio, ideas for it, or something that broke. We
+            read everything.
+          </p>
+        </div>
 
-        <CardContent>
-          <form className="space-y-5">
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" placeholder="Your name" className="h-12" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  className="h-12"
-                />
-              </div>
-            </div>
-
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="subject">Subject</Label>
-              <Input id="subject" placeholder="What&apos;s this about?" className="h-12" />
+              <Label htmlFor="contact-name">Name</Label>
+              <Input id="contact-name" autoComplete="name" placeholder="Your name" className="h-11" />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="message">Message</Label>
-              <Textarea
-                id="message"
-                placeholder="Tell us more..."
-                className="min-h-48 resize-none"
+              <Label htmlFor="contact-email">Email</Label>
+              <Input
+                id="contact-email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="h-11"
               />
             </div>
-
-            <Button
-              type="submit"
-              size="lg"
-              className="h-12 w-full rounded-xl transition-transform duration-200 hover:-translate-y-0.5"
-            >
-              Send Message
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact-subject">Subject</Label>
+            <Input id="contact-subject" placeholder="What’s this about?" className="h-11" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact-message">Message</Label>
+            <Textarea
+              id="contact-message"
+              placeholder="Tell us more…"
+              className="min-h-40 resize-y"
+            />
+          </div>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <Button type="submit" size="lg">
+              Send message
             </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+          {submitted ? (
+            <Notice title="This form isn’t connected yet">
+              Nothing was sent. Messages will reach us once the contact service
+              is live.
+            </Notice>
+          ) : null}
+        </form>
+      </div>
     </section>
   );
 }
 
 export function LandingFooter() {
   return (
-    <footer className="pb-10 text-center text-sm text-muted-foreground md:text-base">
-      <p>© 2026 Curio. All rights reserved.</p>
+    <footer className="border-t border-border">
+      <div className="mx-auto flex w-full max-w-[76rem] flex-col items-start justify-between gap-4 px-5 py-10 text-sm text-muted-foreground sm:flex-row sm:items-center sm:px-8">
+        <CurioWordmark className="text-base text-foreground" />
+        <p>© 2026 Curio. All rights reserved.</p>
+      </div>
     </footer>
   );
 }

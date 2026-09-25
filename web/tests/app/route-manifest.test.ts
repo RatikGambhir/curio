@@ -23,6 +23,28 @@ describe("shared route manifest", () => {
     )
   })
 
+  it("keeps every authenticated product page inside the persistent shell", () => {
+    const shellRoutes = routeManifest
+      .filter((route) => route.layout === "app")
+      .map((route) => route.id)
+
+    expect(shellRoutes).toEqual([
+      "home",
+      "chat",
+      "calendar",
+      "notes",
+      "vault",
+      "atlas",
+      "profile",
+      "settings",
+    ])
+    expect(
+      routeManifest.every(
+        (route) => route.layout === "standalone" || route.access === "authenticated",
+      ),
+    ).toBe(true)
+  })
+
   it("uses a landing root on web and an auth-aware app root on desktop", () => {
     expect(rootDestination("web", false)).toBe("landing")
     expect(rootDestination("desktop", false)).toBe("/login")

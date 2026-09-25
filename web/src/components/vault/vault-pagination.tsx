@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface VaultPaginationProps {
   currentPage: number;
@@ -19,59 +20,68 @@ export function VaultPagination({
   endIndex,
   onPageChange,
 }: VaultPaginationProps) {
-  if (totalItems <= 5) {
+  if (totalPages <= 1) {
     return null;
   }
 
   return (
-    <div className="mt-8 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
-      <div className="text-muted-foreground text-sm">
-        Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems}
-      </div>
+    <nav
+      aria-label="Vault pages"
+      className="mt-8 flex flex-col-reverse items-center justify-between gap-4 sm:flex-row"
+    >
+      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+        {startIndex + 1}–{Math.min(endIndex, totalItems)} of {totalItems}
+      </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         <Button
           type="button"
-          variant="outline"
-          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          variant="ghost"
+          size="sm"
+          onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="h-10 rounded-lg"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft aria-hidden="true" />
           Previous
         </Button>
 
-        <div className="flex items-center gap-1">
+        <ol className="flex items-center gap-1">
           {Array.from({ length: totalPages }, (_, index) => {
             const page = index + 1;
             const isActive = currentPage === page;
 
             return (
-              <Button
-                key={page}
-                type="button"
-                size="icon"
-                variant={isActive ? "default" : "outline"}
-                onClick={() => onPageChange(page)}
-                className="size-10 rounded-lg"
-              >
-                {page}
-              </Button>
+              <li key={page}>
+                <button
+                  type="button"
+                  onClick={() => onPageChange(page)}
+                  aria-current={isActive ? "page" : undefined}
+                  aria-label={`Page ${page}`}
+                  className={cn(
+                    "focus-ring flex size-8 items-center justify-center rounded-md font-mono text-xs tabular-nums transition-colors",
+                    isActive
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  {page}
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ol>
 
         <Button
           type="button"
-          variant="outline"
-          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          variant="ghost"
+          size="sm"
+          onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="h-10 rounded-lg"
         >
           Next
-          <ChevronRight className="size-4" />
+          <ChevronRight aria-hidden="true" />
         </Button>
       </div>
-    </div>
+    </nav>
   );
 }

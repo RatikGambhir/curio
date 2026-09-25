@@ -4,7 +4,10 @@ use axum::{
     http::{Request, StatusCode, header},
     response::Response,
 };
-use curio_service::{app_with_database, config::ServiceConfig};
+use curio_service::{
+    app_with_database,
+    config::{DocumentsConfig, ServiceConfig},
+};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -23,6 +26,7 @@ async fn calendar_app(test_name: &str) -> Option<(Router, PostgresFixture)> {
             database_max_connections: 5,
             database_acquire_timeout_seconds: 5,
             cors_allowed_origins: vec!["http://localhost:5173".to_owned()],
+            documents: DocumentsConfig::default(),
         },
         postgres.database().clone(),
     );

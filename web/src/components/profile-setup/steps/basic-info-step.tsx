@@ -24,12 +24,12 @@ export function BasicInfoStep({
 }: BasicInfoStepProps) {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center">
-        <Avatar className="size-16 border border-border">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <Avatar className="size-16 rounded-lg">
           {formData.avatar ? (
             <AvatarImage src={formData.avatar} alt="Profile avatar preview" />
           ) : null}
-          <AvatarFallback className="bg-secondary text-secondary-foreground">
+          <AvatarFallback className="rounded-lg bg-accent-subtle font-mono text-sm text-foreground">
             {avatarInitials}
           </AvatarFallback>
         </Avatar>
@@ -53,7 +53,7 @@ export function BasicInfoStep({
         <div className="space-y-2">
           <Label htmlFor="name">
             Full name
-            <span className="text-destructive">*</span>
+            <span className="text-destructive" aria-hidden="true">*</span>
           </Label>
           <Input
             id="name"
@@ -61,6 +61,7 @@ export function BasicInfoStep({
             placeholder="Curio Member"
             onChange={(event) => onFieldChange("name", event.target.value)}
             aria-invalid={Boolean(errors.name)}
+            aria-required="true"
             aria-describedby={errors.name ? "profile-name-error" : undefined}
           />
           {errors.name ? (
@@ -73,7 +74,7 @@ export function BasicInfoStep({
         <div className="space-y-2">
           <Label htmlFor="username">
             Username
-            <span className="text-destructive">*</span>
+            <span className="text-destructive" aria-hidden="true">*</span>
           </Label>
           <Input
             id="username"
@@ -81,6 +82,7 @@ export function BasicInfoStep({
             placeholder="curio_member"
             onChange={(event) => onFieldChange("username", event.target.value)}
             aria-invalid={Boolean(errors.username)}
+            aria-required="true"
             aria-describedby={
               errors.username ? "profile-username-error" : undefined
             }

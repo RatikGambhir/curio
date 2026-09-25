@@ -23,7 +23,7 @@ export function ContactStep({
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="email">
           Email
-          <span className="text-destructive">*</span>
+          <span className="text-destructive" aria-hidden="true">*</span>
         </Label>
         <Input
           id="email"

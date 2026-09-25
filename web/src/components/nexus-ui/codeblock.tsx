@@ -9,8 +9,7 @@
  * [Streamdown](https://streamdown.ai/docs/components#inline-code).
  */
 
-import { HugeiconsIcon } from "@hugeicons/react";
-import { Copy01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
+import { Check, Copy } from "lucide-react";
 import { code as codeHighlighter } from "@streamdown/code";
 import type { Element as HastElement } from "hast";
 import {
@@ -220,7 +219,7 @@ function CodeBlockCopyButton({
         type="button"
         data-checked={checked || undefined}
         className={cn(
-          "relative flex size-7 cursor-pointer items-center justify-center rounded-lg text-ring hover:text-foreground",
+          "focus-ring relative flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
           className,
         )}
         aria-label={checked ? "Copied" : "Copy code"}
@@ -228,17 +227,9 @@ function CodeBlockCopyButton({
       >
         <span className="flex size-5 items-center justify-center">
           {checked ? (
-            <HugeiconsIcon
-              icon={Tick02Icon}
-              strokeWidth={1.75}
-              className="size-4.5"
-            />
+            <Check className="size-4 text-primary" aria-hidden="true" />
           ) : (
-            <HugeiconsIcon
-              icon={Copy01Icon}
-              strokeWidth={1.75}
-              className="size-4"
-            />
+            <Copy className="size-4" aria-hidden="true" />
           )}
         </span>
       </button>

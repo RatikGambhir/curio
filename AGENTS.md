@@ -139,7 +139,7 @@ Keep loading, empty, error, disabled, cancellation, and retry states explicit fo
 
 ### Styling and interaction
 
-Follow Tailwind CSS 4, shadcn/Radix primitives, Inter Variable, and semantic CSS theme tokens. Preserve keyboard behavior, focus, accessible names, reduced motion, contrast, text zoom/reflow, and responsive reachability. Avoid hard-coded brand/palette values where a semantic role exists.
+Follow Tailwind CSS 4, shadcn/Radix primitives, the Curio type system (Schibsted Grotesk for interface text, Newsreader for reading and display text, JetBrains Mono for index marks and code), Lucide icons, and semantic CSS theme tokens. Preserve keyboard behavior, focus, accessible names, reduced motion, contrast, text zoom/reflow, and responsive reachability. Avoid hard-coded brand/palette values where a semantic role exists.
 
 Never put secrets in `VITE_*`. `VITE_CURIO_SERVICE_URL` is public build-time configuration. Production builds require HTTPS unless the documented local debug opt-in is deliberately used.
 

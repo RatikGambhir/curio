@@ -43,6 +43,19 @@ The service binds `CURIO_SERVICE_ADDR` (default `127.0.0.1:3000`) and requires
 `CURIO_DB_MAX_CONNECTIONS` and `CURIO_DB_ACQUIRE_TIMEOUT_SECONDS`; keep the sum
 of every replica's pool below the database connection limit.
 
+Documents ingestion embeds chunks with `OPENAI_EMBEDDING_MODEL` (default
+`text-embedding-3-small`) through the same `OPENAI_API_KEY` and
+`OPENAI_BASE_URL`. `CURIO_DOCUMENT_CONCURRENCY` (1–32, default 8) bounds how
+many uploads one batch request parses and embeds at once, and
+`CURIO_DOCUMENT_JOB_RETENTION_SECONDS` (default 600) controls how long finished
+background-job status stays subscribable. Jobs live in process memory, so run a
+single replica or accept that a job's events are only available from the
+replica that started it. Office previews use LibreOffice when `CURIO_SOFFICE`
+names its executable or `soffice`/`libreoffice` is found on `PATH`; without it,
+DOCX previews fall back to a text-rendered PDF and other Office formats return
+`503`. Uploads are limited to 50 MB per request and are stored in PostgreSQL,
+so size the database volume for retained document bytes.
+
 The service writes compact structured diagnostics to standard error. Its
 default filter is `curio_service=info`; set `RUST_LOG` to another
 `tracing_subscriber` filter when a deployment needs different verbosity. Chat

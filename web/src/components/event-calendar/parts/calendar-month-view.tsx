@@ -222,7 +222,7 @@ export function CalendarMonthView({ className }: { className?: string }) {
           <div
             key={d.toISOString()}
             role="columnheader"
-            className="border-r border-border px-2 py-1.5 text-xs font-medium text-muted-foreground last:border-r-0"
+            className="eyebrow border-r border-border px-2 py-2 text-muted-foreground last:border-r-0"
           >
             {format(d, "EEE")}
           </div>

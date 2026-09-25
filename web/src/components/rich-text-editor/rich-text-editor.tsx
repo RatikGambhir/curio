@@ -112,9 +112,8 @@ export function RichTextEditor(props: RichTextEditorProps) {
           <PlateContent
             placeholder={placeholder}
             className={cn(
-              "min-h-50 focus:outline-none",
-              "prose prose-sm dark:prose-invert max-w-none",
-              "[&_:where(p,h1,h2,h3,h4)]:my-0",
+              "curio-rich-text min-h-50 max-w-none focus:outline-none",
+              "[&>:first-child]:mt-0",
               contentClassName
             )}
             onKeyDown={handleKeyDown}
@@ -125,9 +124,9 @@ export function RichTextEditor(props: RichTextEditorProps) {
         {!readOnly ? <FloatingToolbar /> : null}
 
         {!readOnly && onSave ? (
-          <div className="border-t border-border bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
+          <div className="border-t border-border px-5 py-2 text-xs text-muted-foreground">
             Press{" "}
-            <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.85em]">
+            <kbd className="rounded-sm border border-border bg-secondary px-1.5 py-0.5 font-mono text-2xs">
               {SAVE_KEY_DESCRIPTOR}
             </kbd>{" "}
             to save

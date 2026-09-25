@@ -1,14 +1,7 @@
 use axum::response::sse::Event;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct ChatStreamRequest {
-    pub conversation_id: String,
-    pub user_message_id: String,
-    pub assistant_message_id: String,
-    pub prompt: String,
-}
+pub use super::domain::ChatTurn as ChatStreamRequest;
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

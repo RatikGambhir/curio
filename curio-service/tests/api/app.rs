@@ -6,7 +6,10 @@ use axum::{
     response::IntoResponse,
     routing::post,
 };
-use curio_service::{app, app_with_database, config::ServiceConfig};
+use curio_service::{
+    app, app_with_database,
+    config::{DocumentsConfig, ServiceConfig},
+};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tokio::task::JoinHandle;
@@ -69,6 +72,7 @@ fn test_config(openai_base_url: String, postgres: &PostgresFixture) -> ServiceCo
         database_max_connections: 5,
         database_acquire_timeout_seconds: 5,
         cors_allowed_origins: vec!["http://localhost:5173".to_owned()],
+        documents: DocumentsConfig::default(),
     }
 }
 

@@ -1,9 +1,9 @@
-"use client"
-
-import { ChevronLeft, ChevronRight, Search, Shapes } from "lucide-react"
+import { ChevronRight, Search, X } from "lucide-react"
 import type { ComponentType } from "react"
 import { Link, NavLink, useLocation } from "react-router-dom"
 
+import { CurioMark } from "@/components/brand/curio-mark"
+import { EmptyState } from "@/components/ui/empty-state"
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -32,10 +32,13 @@ export type AppNavigationGroup = {
   title: string
   icon: AppNavigationIcon
   items: AppNavigationLink[]
+  /** Shown in the submenu while the group has no entries. */
+  emptyMessage: string
 }
 
 export type AppNavigationSection = {
-  label: string
+  /** Omitted for a lead section that needs no heading. */
+  label?: string
   items: Array<AppNavigationLink | AppNavigationGroup>
 }
 
@@ -50,37 +53,33 @@ export function PlatformHeader() {
     <div className="flex h-full w-full min-w-0 items-center gap-2 px-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
       <Link
         to="/home"
-        aria-label="Go to Curio home"
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden"
+        aria-label="Curio home"
+        className="focus-ring flex min-w-0 flex-1 items-center gap-2.5 rounded-md py-1 pl-1 text-sidebar-foreground group-data-[collapsible=icon]:hidden"
       >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-xs">
-          <Shapes className="size-4" aria-hidden="true" />
-        </span>
-        <span className="grid min-w-0 flex-1 text-left leading-tight">
-          <span className="truncate text-sm font-semibold">Curio</span>
-          <span className="truncate text-[0.6875rem] text-sidebar-foreground/65">
-            Knowledge workspace
-          </span>
+        <CurioMark className="size-[1.375rem] text-sidebar-foreground" />
+        <span className="font-display text-[1.375rem] leading-none tracking-[-0.01em]">
+          Curio
         </span>
       </Link>
-      <SidebarTrigger className="ml-auto shrink-0 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground group-data-[collapsible=icon]:mx-auto" />
+      <SidebarTrigger className="ml-auto shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-hover hover:text-sidebar-foreground group-data-[collapsible=icon]:mx-auto" />
     </div>
   )
 }
 
 export function SidebarSearch() {
   return (
-    <SidebarGroup className="pb-1 pt-2 group-data-[collapsible=icon]:px-2">
+    <SidebarGroup className="pb-2 pt-3 group-data-[collapsible=icon]:px-2">
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton
             asChild
+            variant="outline"
             tooltip="Search knowledge"
-            className="h-9 border border-sidebar-border bg-card/70 shadow-xs hover:bg-card group-data-[collapsible=icon]:size-8!"
+            className="h-9 hover:bg-sidebar-accent"
           >
-            <Link to="/vault" aria-label="Search knowledge">
+            <Link to="/vault">
               <Search aria-hidden="true" />
-              <span className="text-sidebar-foreground/65">Search knowledge…</span>
+              <span>Search knowledge</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -102,9 +101,11 @@ export function NavMain({
 }) {
   const location = useLocation()
 
-  return sections.map((section) => (
-    <SidebarGroup key={section.label}>
-      <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+  return sections.map((section, index) => (
+    <SidebarGroup key={section.label ?? index} className="py-1.5">
+      {section.label ? (
+        <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
+      ) : null}
       <SidebarMenu>
         {section.items.map((item) => {
           if (isNavigationGroup(item)) {
@@ -115,7 +116,6 @@ export function NavMain({
                 <SidebarMenuButton
                   type="button"
                   tooltip={item.title}
-                  isActive={isOpen}
                   aria-expanded={isOpen}
                   aria-controls={`sidebar-submenu-${item.id}`}
                   onClick={() => onGroupToggle(item.id)}
@@ -125,7 +125,7 @@ export function NavMain({
                   <ChevronRight
                     aria-hidden="true"
                     className={cn(
-                      "ml-auto transition-transform group-data-[collapsible=icon]:hidden",
+                      "ml-auto size-3.5! transition-transform duration-200 group-data-[collapsible=icon]:hidden",
                       isOpen && "rotate-180",
                     )}
                   />
@@ -134,13 +134,13 @@ export function NavMain({
             )
           }
 
+          const isActive =
+            location.pathname === item.url ||
+            location.pathname.startsWith(`${item.url}/`)
+
           return (
             <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton
-                tooltip={item.title}
-                isActive={location.pathname === item.url}
-                asChild
-              >
+              <SidebarMenuButton tooltip={item.title} isActive={isActive} asChild>
                 <NavLink to={item.url} onClick={onNavigate}>
                   <item.icon aria-hidden="true" size={16} />
                   <span>{item.title}</span>
@@ -168,20 +168,46 @@ export function NavSubmenu({
       id={`sidebar-submenu-${group.id}`}
       className={cn("flex h-full min-h-0 flex-col", className)}
     >
-      <div className="flex h-(--app-header-height) shrink-0 items-center border-b border-border px-3">
+      <div className="flex h-(--app-header-height) shrink-0 items-center gap-2 border-b border-border pl-4 pr-3">
+        <h2 className="min-w-0 flex-1 truncate font-display text-[1.25rem] leading-none text-foreground">
+          {group.title}
+        </h2>
         <button
           type="button"
           onClick={onBack}
-          className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="focus-ring flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
-          <ChevronLeft className="size-4" aria-hidden="true" />
-          <span className="sr-only">Back to main navigation</span>
+          <X className="size-4" aria-hidden="true" />
+          <span className="sr-only">Close {group.title}</span>
         </button>
-        <h2 className="ml-2 truncate text-sm font-semibold text-foreground">
-          {group.title}
-        </h2>
       </div>
-      <div className="min-h-0 flex-1" />
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {group.items.length > 0 ? (
+          <ul className="flex flex-col gap-0.5">
+            {group.items.map((item) => (
+              <li key={item.url}>
+                <Link
+                  to={item.url}
+                  onClick={onBack}
+                  className="focus-ring flex items-start gap-3 rounded-md px-2.5 py-2 transition-colors hover:bg-accent"
+                >
+                  <item.icon aria-hidden="true" size={16} />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{item.title}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {item.description}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState title={`Nothing in ${group.title} yet`} className="py-16">
+            {group.emptyMessage}
+          </EmptyState>
+        )}
+      </div>
     </div>
   )
 }

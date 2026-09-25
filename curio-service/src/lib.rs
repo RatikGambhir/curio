@@ -3,6 +3,9 @@ pub mod chat;
 pub mod config;
 pub mod database;
 pub mod diagnostics;
+pub mod documents;
+pub mod query;
+mod serialization;
 mod user;
 
 #[cfg(test)]
@@ -19,17 +22,15 @@ use axum::{
     http::{StatusCode, header},
     middleware::{self, Next},
     response::Response,
-    routing::{get, post},
+    routing::get,
 };
 use http::HeaderValue;
 use serde::Serialize;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    chat::{ChatState, repository::ChatRepository},
     config::ServiceConfig,
     database::{Database, DatabaseOptions},
-    user::repository::UserRepository,
 };
 
 #[derive(Clone, Debug)]
@@ -40,6 +41,10 @@ pub struct CurrentUser {
 impl CurrentUser {
     pub(crate) fn owns(&self, user_id: &str) -> bool {
         self.id == user_id.trim()
+    }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.id
     }
 }
 
@@ -86,23 +91,20 @@ pub fn app_with_database(config: ServiceConfig, database: Database) -> Router {
             http::Method::DELETE,
         ])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
-    let calendar_api_routes = calendar::api_routes(database.clone());
-    let user_api_routes = user::api_routes(UserRepository::new(database.clone()));
-    let chat_state = ChatState::new(
+    let calendar_routes = calendar::router(database.clone());
+    let user_routes = user::router(database.clone());
+    let document_routes = documents::router(
+        database.clone(),
+        config.openai_api_key.clone(),
+        config.openai_base_url.clone(),
+        &config.documents,
+    );
+    let chat_routes = chat::router(
+        database.clone(),
         config.openai_api_key,
         config.openai_model,
         config.openai_base_url,
-        ChatRepository::new(database.clone()),
     );
-
-    let chat_routes = Router::new()
-        .route("/v1/chat/stream", post(chat::stream_chat))
-        .route("/v1/conversations", get(chat::list_conversations))
-        .route(
-            "/v1/conversations/{id}/messages",
-            get(chat::conversation_messages),
-        )
-        .with_state(chat_state);
 
     let readiness_route = Router::new()
         .route("/ready", get(readiness))
@@ -111,14 +113,15 @@ pub fn app_with_database(config: ServiceConfig, database: Database) -> Router {
     base_router()
         .merge(readiness_route)
         .merge(chat_routes)
-        .merge(calendar_api_routes)
-        .merge(user_api_routes)
+        .merge(calendar_routes)
+        .merge(user_routes)
+        .merge(document_routes)
         .layer(cors)
 }
 
 fn base_router() -> Router {
     let protected_routes = Router::new()
-        .nest("/user", user::routes())
+        .nest("/user", user::legacy_router())
         .route_layer(middleware::from_fn(auth));
 
     Router::new()

@@ -1,10 +1,13 @@
 import { useState, type CSSProperties, type FormEvent } from "react"
 import { Check, Monitor, Moon, Plus, Sun, X } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  SegmentedControl,
+  type SegmentedOption,
+} from "@/components/ui/segmented-control"
 import { normalizeHexColor } from "@/features/theme/color"
 import {
   APPEARANCE_OPTIONS,
@@ -18,18 +21,22 @@ import {
 import { useTheme } from "@/hooks/useTheme"
 import { cn } from "@/lib/utils"
 
-const APPEARANCE_ICONS: Record<Appearance, LucideIcon> = {
+const APPEARANCE_ICONS = {
   light: Sun,
   dark: Moon,
   system: Monitor,
-}
+} as const
+
+const APPEARANCE_SEGMENTS: SegmentedOption<Appearance>[] = APPEARANCE_OPTIONS.map(
+  (option) => ({ ...option, icon: APPEARANCE_ICONS[option.value] }),
+)
 
 /* Deliberately none of the built-in hues, so the first thing the picker offers
    is visibly a colour of the user's own rather than a shade of a shipped theme. */
 const INITIAL_DRAFT_COLOR = "#7c5cd6"
 
-/* A miniature of the app shell — rail, header, card, buttons — so an option
-   shows how its palette lands on real surfaces rather than as loose chips.
+/* A miniature of the app shell — spine, header, sheet, buttons — so an option
+   shows how its ink lands on real surfaces rather than as loose chips.
    Restating the seed on a nested `.curio-theme` element re-derives the whole
    palette for this subtree, which is what lets an unselected theme be previewed
    without duplicating any colour values in TypeScript. */
@@ -44,24 +51,28 @@ function ThemeMiniature({
     <span
       className={cn(
         THEME_CLASS,
-        "flex h-24 overflow-hidden rounded-md bg-sidebar",
+        "flex h-24 overflow-hidden rounded-md border border-border bg-sidebar",
         appearance === "dark" && "dark",
       )}
       style={themeSeedStyle(theme) as CSSProperties}
     >
-      <span className="flex w-9 flex-col gap-1.5 p-2">
-        <span className="h-1.5 rounded-full bg-primary" />
-        <span className="h-1.5 rounded-full bg-sidebar-accent" />
-        <span className="h-1.5 rounded-full bg-sidebar-accent" />
+      <span className="flex w-10 flex-col gap-1.5 p-2 pt-3">
+        <span className="h-1 w-4 rounded-full bg-sidebar-foreground/70" />
+        <span className="mt-1 flex h-2 items-center gap-1 rounded-sm bg-sidebar-accent pl-0.5">
+          <span className="h-1.5 w-0.5 rounded-full bg-sidebar-primary" />
+        </span>
+        <span className="h-2 rounded-sm" />
+        <span className="h-2 rounded-sm" />
       </span>
 
-      <span className="m-1 ml-0 flex flex-1 flex-col gap-2 rounded-md border border-border bg-card p-2.5 shadow-sm">
-        <span className="h-1.5 w-1/2 rounded-full bg-foreground/60" />
-        <span className="flex-1 space-y-2 rounded-md border border-border bg-card p-2 shadow-sm">
+      <span className="flex flex-1 flex-col gap-2 rounded-l-md bg-card p-2.5">
+        <span className="h-1.5 w-1/2 rounded-full bg-foreground/70" />
+        <span className="flex-1 space-y-1.5 border-t border-border pt-2">
           <span className="block h-1 w-3/4 rounded-full bg-muted-foreground/40" />
-          <span className="flex gap-1.5">
-            <span className="h-3.5 w-9 rounded bg-primary" />
-            <span className="h-3.5 w-9 rounded bg-secondary" />
+          <span className="block h-1 w-1/2 rounded-full bg-accent-subtle" />
+          <span className="flex gap-1.5 pt-0.5">
+            <span className="h-3.5 w-9 rounded-sm bg-primary" />
+            <span className="h-3.5 w-9 rounded-sm border border-border-strong bg-card" />
           </span>
         </span>
       </span>
@@ -95,17 +106,17 @@ function ThemeOption({
         />
         <span
           className={cn(
-            "block rounded-md border-2 border-border bg-card p-3 transition-colors",
-            "hover:border-primary/40",
-            "peer-checked:border-primary",
-            "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
+            "block rounded-lg border border-border bg-card p-2.5 transition-[border-color,box-shadow] duration-150",
+            "hover:border-border-strong",
+            "peer-checked:border-primary peer-checked:shadow-[0_0_0_1px_var(--primary)]",
+            "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
           )}
         >
           <ThemeMiniature theme={theme} appearance={appearance} />
 
-          <span className="mt-3 flex items-start justify-between gap-2">
+          <span className="mt-2.5 flex items-start justify-between gap-2 px-0.5">
             <span className="block min-w-0">
-              <span className="block truncate text-sm font-semibold text-card-foreground">
+              <span className="block truncate text-sm font-medium text-card-foreground">
                 {theme.label}
               </span>
               <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -115,11 +126,11 @@ function ThemeOption({
 
             <span
               className={cn(
-                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-primary-foreground",
+                "mt-0.5 flex size-4.5 shrink-0 items-center justify-center rounded-full border border-border-strong text-primary-foreground",
                 isSelected && "border-primary bg-primary",
               )}
             >
-              {isSelected && <Check className="size-3.5" />}
+              {isSelected && <Check className="size-3" aria-hidden="true" />}
             </span>
           </span>
         </span>
@@ -131,7 +142,7 @@ function ThemeOption({
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${theme.label} theme`}
-          className="absolute right-4 top-4 flex size-6 items-center justify-center rounded-full border border-border bg-card/90 text-muted-foreground shadow-xs transition-colors hover:bg-destructive hover:text-destructive-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="focus-ring absolute right-3.5 top-3.5 flex size-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-destructive hover:text-destructive-foreground"
         >
           <X className="size-3.5" />
         </button>
@@ -243,17 +254,15 @@ export function ThemePicker() {
   } = useTheme()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <fieldset>
-        <legend className="text-sm font-semibold text-card-foreground">
-          Theme
-        </legend>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Curio builds a full palette from a single colour, so every surface,
-          control and chart moves together.
+        <legend className="eyebrow text-muted-foreground">Ink</legend>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+          The paper stays the same; the colour you pick becomes every action,
+          selection mark and highlight in Curio.
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {themes.map((theme) => (
             <ThemeOption
               key={theme.id}
@@ -274,43 +283,20 @@ export function ThemePicker() {
       </fieldset>
 
       <fieldset>
-        <legend className="text-sm font-semibold text-card-foreground">
-          Appearance
-        </legend>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <legend className="eyebrow text-muted-foreground">Light and dark</legend>
+        <p className="mt-2 text-sm text-muted-foreground">
           Choose a fixed appearance, or follow your operating system.
         </p>
 
-        <div className="mt-4 inline-flex gap-1 rounded-full border border-border bg-muted p-1">
-          {APPEARANCE_OPTIONS.map((option) => {
-            const Icon = APPEARANCE_ICONS[option.value]
-            const isSelected = option.value === appearance
-
-            return (
-              <label key={option.value} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="curio-appearance"
-                  value={option.value}
-                  checked={isSelected}
-                  onChange={() => setAppearance(option.value)}
-                  className="peer sr-only"
-                />
-                <span
-                  className={cn(
-                    "flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-muted-foreground transition-colors",
-                    "hover:text-foreground",
-                    "peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm",
-                    "peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50",
-                  )}
-                >
-                  <Icon className="size-4" />
-                  {option.label}
-                </span>
-              </label>
-            )
-          })}
-        </div>
+        <SegmentedControl
+          label="Appearance"
+          name="curio-appearance"
+          options={APPEARANCE_SEGMENTS}
+          value={appearance}
+          onValueChange={setAppearance}
+          size="default"
+          className="mt-4"
+        />
 
         {appearance === "system" && (
           <p className="mt-3 text-xs text-muted-foreground">

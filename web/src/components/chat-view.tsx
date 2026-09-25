@@ -6,38 +6,29 @@ import {
   ThreadContent,
   ThreadScrollToBottom,
 } from "@/components/nexus-ui/thread"
+import { EmptyState } from "@/components/ui/empty-state"
 import type { ChatMessage } from "@/features/chat/types"
 
 type ChatViewProps = {
   messages: ChatMessage[]
 }
 
-function ChatViewEmpty() {
-  return (
-    <div className="flex h-full items-center justify-center p-8 text-center">
-      <div className="space-y-3">
-        <div className="flex justify-center text-muted-foreground">
-          <MessageSquare className="size-12" />
-        </div>
-        <div className="space-y-1">
-          <h3 className="font-medium text-sm">Start a conversation</h3>
-          <p className="text-sm text-muted-foreground">
-            Type a message below to begin chatting
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function ChatView({ messages }: ChatViewProps) {
   if (messages.length === 0) {
-    return <ChatViewEmpty />
+    return (
+      <EmptyState
+        icon={MessageSquare}
+        title="Nothing said yet"
+        className="h-full"
+      >
+        Write below to begin this conversation.
+      </EmptyState>
+    )
   }
 
   return (
     <Thread className="h-full">
-      <ThreadContent className="px-2 py-6 md:px-4">
+      <ThreadContent className="mx-auto max-w-[44rem] gap-8 px-5 py-8 sm:px-8">
         {messages.map((message) => (
           <ChatMessageItem key={message.id} {...message} />
         ))}

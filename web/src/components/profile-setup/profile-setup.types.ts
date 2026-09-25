@@ -28,7 +28,7 @@ export type ProfileSetupStepMeta = {
 export const PROFILE_SETUP_STEPS: readonly ProfileSetupStepMeta[] = [
   {
     id: 1,
-    title: "Basic Info",
+    title: "Basic info",
     description: "Add your profile basics and an optional avatar.",
     shortLabel: "Basic",
   },

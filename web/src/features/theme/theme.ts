@@ -56,28 +56,28 @@ export const BUILTIN_THEMES: readonly ThemeDefinition[] = [
   {
     id: "sage",
     label: "Sage Green",
-    description: "Calm garden greens on pale linen.",
+    description: "Moss-green ink on warm paper.",
     color: "#7da25d",
     origin: "builtin",
   },
   {
     id: "sky",
     label: "Cool Sky Blue",
-    description: "Crisp cobalt blues on cool white.",
+    description: "Fountain-pen cobalt on warm paper.",
     color: "#1b8ae4",
     origin: "builtin",
   },
   {
     id: "steel",
     label: "Cool Steel",
-    description: "Restrained blue-greys on brushed steel.",
+    description: "Quiet slate marks on warm paper.",
     color: "#6b8394",
     origin: "builtin",
   },
   {
     id: "charcoal",
     label: "Charcoal Blue",
-    description: "Sophisticated charcoal-navy on cool linen.",
+    description: "Blue-grey pencil on warm paper.",
     color: "#678498",
     origin: "builtin",
   },
@@ -90,17 +90,19 @@ export const APPEARANCE_OPTIONS: readonly AppearanceOption[] = [
 ]
 
 /* Light rather than system: the app shipped light-only until now, so following
-   the OS would silently move existing users into a palette they never chose. */
+   the OS would silently move existing users into a palette they never chose.
+   Sage is the default because its moss green is the one ink that belongs to
+   Curio's garden vocabulary; a saved preference for any other theme is kept. */
 export const DEFAULT_THEME_PREFERENCE: ThemePreference = {
-  themeId: "steel",
+  themeId: "sage",
   appearance: "light",
   customThemes: [],
 }
 
 export const PREFERS_DARK_QUERY = "(prefers-color-scheme: dark)"
 
-/* Cool Steel, matching the `:root` fallback in index.css. */
-export const DEFAULT_SEED: ThemeSeed = { hue: 239.12, chroma: 0.0338 }
+/* Sage Green, matching the `:root` fallback in index.css. */
+export const DEFAULT_SEED: ThemeSeed = { hue: 131.69, chroma: 0.0828 }
 
 function isAppearance(value: unknown): value is Appearance {
   return APPEARANCE_OPTIONS.some((option) => option.value === value)

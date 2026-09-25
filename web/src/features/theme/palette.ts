@@ -59,19 +59,20 @@ export const SCALE: Record<ScaleStep, ScaleStop> = {
 
 /* What each step is for. Mirrors the role mappings in index.css and is shown
    next to the swatches in settings, so the guidance lives with the colours
-   rather than in a document nobody opens. */
+   rather than in a document nobody opens. Surfaces and text come from the
+   fixed paper ladder, so the seed only has to supply ink. */
 export const SCALE_USAGE: Record<ScaleStep, string> = {
-  50: "Page background",
-  100: "Sidebar, subtle controls",
-  200: "Borders, selected items",
-  300: "Strong borders, secondary surfaces",
-  400: "Muted accent, dark-mode actions",
+  50: "Faint tints",
+  100: "Highlights and selected marks",
+  200: "Dark-mode pressed action",
+  300: "Dark-mode action hover",
+  400: "Dark-mode action, navigation marker",
   500: "Brand accent",
-  600: "Primary action",
+  600: "Primary action and links",
   700: "Primary hover",
-  800: "Primary pressed, secondary text",
-  900: "Dark elevated surfaces",
-  950: "Dark page and chrome, headings and body text",
+  800: "Primary pressed, dark-mode highlight",
+  900: "Deep tints",
+  950: "Text on dark-mode actions",
 }
 
 export function scaleColor(seed: ThemeSeed, step: ScaleStep): Oklch {

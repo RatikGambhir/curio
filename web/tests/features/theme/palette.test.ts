@@ -292,9 +292,14 @@ describe("semantic roles", () => {
     }
   })
 
-  it("remaps the roles for dark rather than redefining the scale", () => {
+  it("remaps the roles for dark rather than redefining the ladders", () => {
     for (const step of SCALE_STEPS) {
       expect(darkTokens.has(`--scale-${step}`)).toBe(false)
+    }
+    for (const name of lightTokens.keys()) {
+      if (name.startsWith("--neutral-")) {
+        expect(darkTokens.has(name), `${name} is redefined in dark`).toBe(false)
+      }
     }
 
     for (const role of [
@@ -316,6 +321,12 @@ describe("semantic roles", () => {
       "--primary-pressed",
       "--accent-brand",
       "--accent-subtle",
+      "--background-sidebar-hover",
+      "--background-sidebar-selected",
+      "--text-on-sidebar",
+      "--text-on-sidebar-muted",
+      "--border-sidebar",
+      "--accent-on-sidebar",
     ]) {
       expect(lightTokens.has(role), `${role} in light`).toBe(true)
       expect(darkTokens.has(role), `${role} in dark`).toBe(true)
@@ -350,14 +361,16 @@ describe("contrast", () => {
   const PAIRS: [foreground: string, background: string, floor: number][] = [
     ["--text-primary", "--background-page", STRONG_TEXT],
     ["--text-primary", "--background-card", STRONG_TEXT],
-    ["--text-primary", "--background-sidebar", STRONG_TEXT],
     ["--text-secondary", "--background-card", BODY_TEXT],
     ["--text-secondary", "--background-selected", BODY_TEXT],
     ["--text-secondary", "--background-secondary", BODY_TEXT],
     ["--text-secondary", "--background-hover", BODY_TEXT],
     ["--text-muted", "--background-page", BODY_TEXT],
     ["--text-muted", "--background-card", BODY_TEXT],
-    ["--text-muted", "--background-sidebar", BODY_TEXT],
+    ["--text-muted", "--background-secondary", BODY_TEXT],
+    ["--text-on-sidebar", "--background-sidebar", STRONG_TEXT],
+    ["--text-on-sidebar", "--background-sidebar-selected", BODY_TEXT],
+    ["--text-on-sidebar-muted", "--background-sidebar", BODY_TEXT],
     ["--text-on-primary", "--primary", BODY_TEXT],
     ["--text-on-primary", "--primary-hover", BODY_TEXT],
     ["--text-on-primary", "--primary-pressed", BODY_TEXT],

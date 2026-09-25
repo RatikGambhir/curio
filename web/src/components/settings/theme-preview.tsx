@@ -1,6 +1,3 @@
-import { CalendarDays, NotebookPen, Sparkles } from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-
 import { Button } from "@/components/ui/button"
 import {
   SCALE_STEPS,
@@ -44,37 +41,9 @@ const BUTTON_ROWS: ButtonRow[] = [
   },
 ]
 
-type SampleCard = {
-  icon: LucideIcon
-  title: string
-  body: string
-  className: string
-}
-
-const SAMPLE_CARDS: SampleCard[] = [
-  {
-    icon: NotebookPen,
-    title: "Capture a note",
-    body: "Everything you write stays searchable in one place.",
-    className: "bg-secondary text-secondary-foreground",
-  },
-  {
-    icon: CalendarDays,
-    title: "Plan your week",
-    body: "Events, tasks and reminders share a single calendar.",
-    className: "bg-secondary-hover text-secondary-foreground",
-  },
-  {
-    icon: Sparkles,
-    title: "Ask your vault",
-    body: "Answers pulled straight from what you already saved.",
-    className: "bg-primary text-primary-foreground",
-  },
-]
-
-/* The eleven steps every other colour in the app is mapped from. Painted with
-   the scale utilities rather than the computed hexes so the strip is a reading
-   of the live palette; the hex is only the label. */
+/* The eleven steps of ink the seed generates. Painted with the scale utilities
+   rather than the computed hexes so the strip is a reading of the live palette;
+   the hex is only the label. */
 const SCALE_SWATCHES: Record<(typeof SCALE_STEPS)[number], string> = {
   50: "bg-scale-50",
   100: "bg-scale-100",
@@ -95,19 +64,19 @@ function ScaleStrip() {
 
   return (
     <div>
-      <div className="flex gap-1 overflow-hidden rounded-lg">
+      <div className="flex gap-1 overflow-x-auto pb-1">
         {SCALE_STEPS.map((step) => (
-          <div key={step} className="flex-1" title={SCALE_USAGE[step]}>
+          <div key={step} className="min-w-10 flex-1" title={SCALE_USAGE[step]}>
             <div
               className={cn(
-                "h-10 rounded-md border border-border",
+                "h-10 rounded-sm shadow-[inset_0_0_0_1px_oklch(0_0_0/0.06)]",
                 SCALE_SWATCHES[step],
               )}
             />
-            <p className="mt-1.5 text-center text-[0.6875rem] font-semibold text-muted-foreground">
+            <p className="mt-1.5 text-center font-mono text-2xs text-foreground">
               {step}
             </p>
-            <p className="text-center font-mono text-[0.625rem] text-muted-foreground/70 uppercase">
+            <p className="text-center font-mono text-[0.625rem] uppercase text-muted-foreground">
               {hexes[step].slice(1)}
             </p>
           </div>
@@ -156,39 +125,27 @@ function ButtonMatrix() {
 
 export function ThemePreview() {
   return (
-    <div className="space-y-6 border border-border bg-background p-5">
+    <section aria-labelledby="theme-preview-title" className="space-y-8">
       <div>
-        <h3 className="text-sm font-semibold text-foreground">Preview</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          How the selected theme renders Curio&rsquo;s controls and surfaces.
+        <h3 id="theme-preview-title" className="eyebrow text-muted-foreground">
+          Preview
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          How the selected ink renders Curio&rsquo;s controls in every state.
         </p>
-      </div>
-
-      <ButtonMatrix />
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        {SAMPLE_CARDS.map((card) => (
-          <div
-            key={card.title}
-            className={cn("rounded-xl p-4 shadow-sm", card.className)}
-          >
-            <span className="flex size-8 items-center justify-center rounded-lg bg-card/25">
-              <card.icon className="size-4" />
-            </span>
-            <p className="mt-3 text-sm font-semibold">{card.title}</p>
-            <p className="mt-1 text-xs opacity-80">{card.body}</p>
-          </div>
-        ))}
+        <div className="mt-4 rounded-lg border border-border bg-background p-5">
+          <ButtonMatrix />
+        </div>
       </div>
 
       <div>
-        <h4 className="text-sm font-semibold text-foreground">Scale</h4>
-        <p className="mt-1 mb-3 text-sm text-muted-foreground">
-          Surfaces come from the pale end, actions from the middle, type from the
-          dark end. Hover a step to see what it drives.
+        <h3 className="eyebrow text-muted-foreground">Ink scale</h3>
+        <p className="mt-2 mb-4 text-sm text-muted-foreground">
+          Actions come from the middle of the scale, highlights from the pale
+          end. Hover a step to see what it drives.
         </p>
         <ScaleStrip />
       </div>
-    </div>
+    </section>
   )
 }

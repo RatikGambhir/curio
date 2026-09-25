@@ -1,40 +1,44 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
-import { AppSidebar } from "@/components/app-sidebar";
+import { PageHeader } from "@/components/page-header";
+import { VaultCategoryFilter } from "@/components/vault/vault-category-filter";
 import {
   VAULT_ITEMS_PER_PAGE,
   VAULT_MOCK_DATA,
 } from "@/components/vault/vault.mock-data";
-import { VaultFilterBar } from "@/components/vault/vault-filter-bar";
 import { VaultPagination } from "@/components/vault/vault-pagination";
 import { VaultResultsList } from "@/components/vault/vault-results-list";
 import { VaultSearchBar } from "@/components/vault/vault-search-bar";
-import { PageHeader } from "@/components/page-header";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+
+const ALL_CATEGORIES = "All";
 
 const Vault = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES);
   const [currentPage, setCurrentPage] = useState(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const categories = useMemo(
-    () => ["All", ...new Set(VAULT_MOCK_DATA.map((item) => item.category))],
-    [],
-  );
+  const categories = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of VAULT_MOCK_DATA) {
+      counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+    }
+    return [
+      { name: ALL_CATEGORIES, count: VAULT_MOCK_DATA.length },
+      ...Array.from(counts, ([name, count]) => ({ name, count })),
+    ];
+  }, []);
 
   const filteredData = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
     return VAULT_MOCK_DATA.filter((item) => {
-      const normalizedQuery = searchQuery.trim().toLowerCase();
       const matchesSearch =
         normalizedQuery.length === 0 ||
         item.question.toLowerCase().includes(normalizedQuery) ||
         item.answer.toLowerCase().includes(normalizedQuery);
       const matchesCategory =
-        selectedCategory === "All" || item.category === selectedCategory;
+        selectedCategory === ALL_CATEGORIES || item.category === selectedCategory;
 
       return matchesSearch && matchesCategory;
     });
@@ -44,7 +48,6 @@ const Vault = () => {
     1,
     Math.ceil(filteredData.length / VAULT_ITEMS_PER_PAGE),
   );
-
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const startIndex = (safeCurrentPage - 1) * VAULT_ITEMS_PER_PAGE;
   const endIndex = startIndex + VAULT_ITEMS_PER_PAGE;
@@ -60,54 +63,69 @@ const Vault = () => {
     setCurrentPage(1);
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    scrollRef.current?.scrollTo({ top: 0 });
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory(ALL_CATEGORIES);
+    setCurrentPage(1);
+  };
+
+  const resultLabel = `${filteredData.length} ${
+    filteredData.length === 1 ? "entry" : "entries"
+  }`;
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex h-full w-full flex-col">
-          <PageHeader />
+    <>
+      <PageHeader title="Vault" meta={`${VAULT_MOCK_DATA.length} saved answers`} />
 
-          <main className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-[1200px] px-6 pb-8 pt-2">
-              <section className="mb-8 space-y-4">
-                <VaultSearchBar
-                  value={searchQuery}
-                  onValueChange={handleSearchChange}
-                />
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[72rem] px-5 pb-16 pt-8 sm:px-8 lg:px-12 lg:pt-10">
+          <section aria-label="Search the vault" className="rise-in space-y-4">
+            <p className="max-w-2xl font-display text-xl italic leading-snug text-muted-foreground">
+              Every answer you chose to keep, searchable in one place.
+            </p>
+            <VaultSearchBar
+              value={searchQuery}
+              onValueChange={handleSearchChange}
+            />
+            <VaultCategoryFilter
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onCategoryChange={handleCategoryChange}
+            />
+          </section>
 
-                <VaultFilterBar
-                  showFilters={showFilters}
-                  categories={categories}
-                  selectedCategory={selectedCategory}
-                  onToggleFilters={() => setShowFilters((prev) => !prev)}
-                  onCategoryChange={handleCategoryChange}
-                />
-              </section>
+          <p
+            aria-live="polite"
+            className="eyebrow mt-10 mb-3 text-muted-foreground"
+          >
+            {resultLabel}
+            {totalPages > 1 ? ` · page ${safeCurrentPage} of ${totalPages}` : null}
+          </p>
 
-              <div className="mb-4 text-sm text-muted-foreground">
-                {filteredData.length} {filteredData.length === 1 ? "result" : "results"}
-                {filteredData.length > VAULT_ITEMS_PER_PAGE ? (
-                  <span className="ml-2">
-                    • Page {safeCurrentPage} of {totalPages}
-                  </span>
-                ) : null}
-              </div>
+          <div className="rise-in [--rise-index:1]">
+            <VaultResultsList
+              items={paginatedData}
+              query={searchQuery}
+              onClearFilters={clearFilters}
+            />
+          </div>
 
-              <VaultResultsList items={paginatedData} />
-
-              <VaultPagination
-                currentPage={safeCurrentPage}
-                totalPages={totalPages}
-                totalItems={filteredData.length}
-                startIndex={startIndex}
-                endIndex={endIndex}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          </main>
+          <VaultPagination
+            currentPage={safeCurrentPage}
+            totalPages={totalPages}
+            totalItems={filteredData.length}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            onPageChange={handlePageChange}
+          />
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+    </>
   );
 };
 

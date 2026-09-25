@@ -5,6 +5,7 @@ export type UpcomingItem = {
   time: string;
   dateTime: string;
   duration: string;
+  /** A semantic colour utility for the item's marker, e.g. `bg-destructive`. */
   dotClassName: string;
 };
 
@@ -13,6 +14,4 @@ export type Cultivation = {
   updated: string;
   tags: readonly string[];
   icon: LucideIcon;
-  iconClassName: string;
-  imageSrc?: string;
 };

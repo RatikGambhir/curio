@@ -26,23 +26,24 @@ const streamdownPlugins = { cjk, code, math, mermaid } as const;
 // They are expressed here as explicit descendant selectors instead, which also
 // re-adds the list/quote spacing that Tailwind's preflight resets.
 const messageMarkdownProseClasses = [
-  "max-w-none text-foreground text-sm font-normal leading-6.5",
+  // Answers are read, not scanned, so they are set in the reading serif.
+  "max-w-none font-serif text-foreground text-[1.0625rem] font-normal leading-[1.7]",
   // headings
-  "[&_:is(h1,h2,h3,h4,h5,h6)]:mt-6 [&_:is(h1,h2,h3,h4,h5,h6)]:mb-2 [&_:is(h1,h2,h3,h4,h5,h6)]:font-[450] [&_:is(h1,h2,h3,h4,h5,h6)]:leading-6 [&_:is(h1,h2,h3,h4,h5,h6):first-child]:mt-0",
-  "[&_h1]:text-xl [&_h2]:text-lg [&_h2]:tracking-[-0.45px] [&_h3]:text-base [&_h3]:tracking-[-0.4px] [&_h4]:text-sm [&_h5]:text-xs [&_h6]:text-xs",
+  "[&_:is(h1,h2,h3,h4,h5,h6)]:mt-7 [&_:is(h1,h2,h3,h4,h5,h6)]:mb-2 [&_:is(h1,h2,h3,h4,h5,h6)]:font-medium [&_:is(h1,h2,h3,h4,h5,h6)]:leading-snug [&_:is(h1,h2,h3,h4,h5,h6):first-child]:mt-0",
+  "[&_h1]:text-2xl [&_h2]:text-xl [&_h2]:tracking-[-0.01em] [&_h3]:text-lg [&_h4]:text-base [&_h5]:text-sm [&_h6]:text-sm",
   // heading links
   "[&_:is(h1,h2,h3,h4,h5,h6)_a]:text-inherit [&_:is(h1,h2,h3,h4,h5,h6)_a]:no-underline [&_:is(h1,h2,h3,h4,h5,h6)_a]:shadow-none",
   // body text
   "[&_p]:my-3 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0",
   // links
-  "[&_[data-streamdown=link]]:font-normal [&_[data-streamdown=link]]:text-foreground [&_[data-streamdown=link]]:underline [&_[data-streamdown=link]]:underline-offset-2",
+  "[&_[data-streamdown=link]]:font-normal [&_[data-streamdown=link]]:text-primary [&_[data-streamdown=link]]:underline [&_[data-streamdown=link]]:decoration-primary/40 [&_[data-streamdown=link]]:underline-offset-3",
   // strong
-  "[&_[data-streamdown=strong]]:font-[550] [&_[data-streamdown=strong]]:text-foreground",
+  "[&_[data-streamdown=strong]]:font-semibold [&_[data-streamdown=strong]]:text-foreground",
   // lists
   "[&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-5",
   "[&_li]:my-1 [&_li]:pl-1 [&_li]:marker:text-muted-foreground/50 [&_li_:is(ul,ol)]:my-1",
   // blockquotes and rules
-  "[&_blockquote]:my-3 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground",
+  "[&_blockquote]:my-4 [&_blockquote]:border-l-2 [&_blockquote]:border-accent-brand/50 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-secondary-foreground",
   "[&_hr]:my-6 [&_hr]:border-border",
 ] as const;
 
@@ -90,8 +91,8 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(function Message(
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
         className={cn(
-          "group/message flex w-full max-w-[90%] items-start gap-2",
-          from === "user" ? "ms-auto" : "me-auto",
+          "group/message flex w-full items-start gap-2",
+          from === "user" ? "ms-auto max-w-[85%]" : "me-auto",
           className,
         )}
         {...props}
@@ -131,10 +132,10 @@ function MessageContent({ className, ...props }: MessageContentProps) {
     <div
       data-slot="message-content"
       className={cn(
-        "rounded-2xl text-sm leading-6.5 text-foreground",
+        "text-foreground",
         from === "user"
-          ? "w-fit bg-secondary px-4 py-2"
-          : "mb-1 w-full bg-transparent px-2",
+          ? "w-fit whitespace-pre-wrap rounded-xl rounded-br-sm bg-secondary px-4 py-2.5 text-[0.9375rem] leading-6"
+          : "mb-1 w-full bg-transparent",
         className,
       )}
       {...props}
@@ -160,7 +161,7 @@ function MessageMarkdown({
         }: React.HTMLAttributes<HTMLElement>) => (
           <code
             className={cn(
-              "rounded-md border-none bg-muted px-1.5 py-0.5 font-mono text-xs font-[450]",
+              "rounded-sm border-none bg-secondary px-1.5 py-0.5 font-mono text-[0.8125em] font-normal",
               className,
             )}
             data-slot="message-markdown-inline-code"
@@ -173,7 +174,7 @@ function MessageMarkdown({
           <div
             data-slot="message-markdown-table-wrap"
             className={[
-              "my-6 overflow-hidden rounded-2xl border border-border bg-muted dark:border-accent dark:bg-background",
+              "my-6 overflow-hidden rounded-lg border border-border font-sans",
               "[&_tbody_tr:first-child_td:first-child]:rounded-ss-xl",
               "[&_tbody_tr:first-child_td:last-child]:rounded-se-xl",
               "[&_tbody_tr:last-child_td:first-child]:rounded-es-xl",
@@ -182,7 +183,7 @@ function MessageMarkdown({
           >
             <table
               data-slot="message-markdown-table"
-              className="w-full border-separate border-spacing-0 border-none bg-muted text-sm dark:bg-background"
+              className="w-full border-separate border-spacing-0 border-none bg-secondary text-sm"
               {...props}
             />
           </div>
@@ -190,14 +191,14 @@ function MessageMarkdown({
         th: (props: React.ThHTMLAttributes<HTMLTableCellElement>) => (
           <th
             data-slot="message-markdown-th"
-            className="border-none px-5 py-2 text-start text-[13px] font-normal! text-muted-foreground! dark:bg-background"
+            className="border-none px-4 py-2 text-start text-[0.8125rem] font-medium! text-muted-foreground!"
             {...props}
           />
         ),
         td: (props: React.TdHTMLAttributes<HTMLTableCellElement>) => (
           <td
             data-slot="message-markdown-td"
-            className="border-0 border-accent bg-card px-5 py-3 text-[13px] text-foreground dark:bg-card [tr:not(:first-child)_&]:border-t"
+            className="border-0 border-border bg-card px-4 py-2.5 text-[0.8125rem] text-foreground [tr:not(:first-child)_&]:border-t"
             {...props}
           />
         ),
@@ -288,7 +289,7 @@ function MessageAction({
         <TooltipTrigger asChild>
           <Comp data-slot="message-action" {...props} />
         </TooltipTrigger>
-        <TooltipContent className="rounded-full" side={side}>
+        <TooltipContent side={side}>
           {content}
           {shortcut ? <Kbd className="rounded-md!">{shortcut}</Kbd> : null}
         </TooltipContent>

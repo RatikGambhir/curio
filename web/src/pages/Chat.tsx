@@ -1,14 +1,20 @@
-import { AnimatePresence, motion } from "framer-motion"
 import { useState } from "react"
+import { History, SquarePen } from "lucide-react"
+
+import {
+  ContextPane,
+  ContextPaneToggle,
+} from "@/components/app-shell/context-pane"
+import { ChatComposer } from "@/components/chat-composer"
 import { ChatEmptyState } from "@/components/chat-empty-state"
-import { ChatPrompt } from "@/components/chat-prompt"
-import { ChatSidebar } from "@/components/chat-sidebar"
-import { PageHeader } from "@/components/page-header"
+import { ChatHistory } from "@/components/chat-history"
 import { ChatView } from "@/components/chat-view"
+import { PageHeader } from "@/components/page-header"
+import { Button } from "@/components/ui/button"
 import { demoChats, demoMessagesByChatId } from "@/features/chat/demo-data"
 import type { ChatListItem } from "@/features/chat/types"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useChat } from "@/hooks/useChat"
+import { useContextPane } from "@/hooks/useContextPane"
 
 function buildChatTitle(text: string) {
   const normalized = text.trim().replace(/\s+/g, " ")
@@ -30,9 +36,18 @@ const Chat = () => {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const isNewChat = selectedChatId === null
   const { cancelStream, isStreaming, sendMessage } = useChat()
+  const pane = useContextPane()
   const messages = selectedChatId ? messagesByChatId[selectedChatId] ?? [] : []
+  const selectedChat = chats.find((chat) => chat.id === selectedChatId)
+
   const handleStartNewChat = () => {
     setSelectedChatId(null)
+    pane.dismissOverlay()
+  }
+
+  const handleSelectChat = (chatId: string) => {
+    setSelectedChatId(chatId)
+    pane.dismissOverlay()
   }
 
   const upsertChatMeta = (chatId: string, text: string) => {
@@ -82,59 +97,80 @@ const Chat = () => {
     upsertChatMeta(selectedChatId, text)
   }
 
+  const newChatButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      disabled={isNewChat}
+      onClick={handleStartNewChat}
+      className="-mr-1"
+    >
+      <SquarePen aria-hidden="true" />
+      New
+    </Button>
+  )
+
   return (
-    <SidebarProvider className="h-screen w-full font-sans">
-      <ChatSidebar
-        chats={chats}
-        selectedChatId={selectedChatId}
-        isNewChat={isNewChat}
-        onSelectChat={setSelectedChatId}
-        onStartNewChat={handleStartNewChat}
-      />
-      <SidebarInset>
-        <div className="flex h-full w-full flex-col">
-          <PageHeader />
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-5 md:px-8 md:py-6">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {isNewChat ? (
-                <motion.div
-                  key="new-chat"
-                  className="relative z-10 flex h-full w-full flex-col"
-                  initial={{ opacity: 0, y: 20, scale: 0.985 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -16, scale: 0.99 }}
-                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <ChatEmptyState
-                    disabled={isStreaming}
-                    onSubmit={handleCreateChat}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={selectedChatId ?? "thread"}
-                  className="relative z-10 mx-auto flex h-full w-full max-w-3xl flex-col gap-3"
-                  initial={{ opacity: 0, y: 24, scale: 0.99 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -16, scale: 0.995 }}
-                  transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="min-h-0 flex-1 overflow-hidden">
-                    <ChatView messages={messages} />
-                  </div>
-                  <ChatPrompt
-                    disabled={isStreaming}
-                    isStreaming={isStreaming}
-                    onStop={() => cancelStream(selectedChatId ?? undefined)}
-                    onSubmit={handleSendMessage}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+    <div className="flex min-h-0 flex-1">
+      <ContextPane
+        pane={pane}
+        title="Conversations"
+        description="Your recent conversations with Curio."
+        action={newChatButton}
+      >
+        <ChatHistory
+          chats={chats}
+          selectedChatId={selectedChatId}
+          onSelectChat={handleSelectChat}
+        />
+      </ContextPane>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <PageHeader
+          title={selectedChat?.title ?? "Chat"}
+          meta={isStreaming ? "Writing…" : undefined}
+          leading={<ContextPaneToggle pane={pane} label="conversations" overlayIcon={History} />}
+          actions={
+            pane.open && pane.isInline ? null : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={isNewChat}
+                onClick={handleStartNewChat}
+                aria-label="New chat"
+                title="New chat"
+              >
+                <SquarePen aria-hidden="true" />
+              </Button>
+            )
+          }
+        />
+
+        {isNewChat ? (
+          <ChatEmptyState disabled={isStreaming} onSubmit={handleCreateChat} />
+        ) : (
+          <div
+            key={selectedChatId}
+            className="rise-in flex min-h-0 flex-1 flex-col"
+          >
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ChatView messages={messages} />
+            </div>
+            <div className="mx-auto w-full max-w-[44rem] px-5 pb-5 sm:px-8 sm:pb-6">
+              <ChatComposer
+                disabled={isStreaming}
+                isStreaming={isStreaming}
+                placeholder="Ask a follow-up"
+                onStop={() => cancelStream(selectedChatId ?? undefined)}
+                onSubmit={handleSendMessage}
+              />
+            </div>
           </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        )}
+      </div>
+    </div>
   )
 }
 

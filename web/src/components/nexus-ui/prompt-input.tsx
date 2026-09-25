@@ -78,7 +78,7 @@ function PromptInput({
           role="group"
           aria-label="Chat input"
           className={cn(
-            "relative flex h-auto w-full cursor-text flex-col gap-0 overflow-hidden rounded-3xl border border-border bg-card dark:border-border/50 dark:bg-input/30",
+            "relative flex h-auto w-full cursor-text flex-col gap-0 overflow-hidden rounded-xl border border-border-strong bg-card",
             className,
           )}
           onClick={handleClick}
@@ -131,7 +131,7 @@ const PromptInputTextarea = React.forwardRef<
         aria-label="Message input"
         placeholder="How can I help you today?"
         className={cn(
-          "min-h-14 w-full resize-none border-0 bg-transparent px-4 py-4 text-sm leading-6 font-normal text-foreground shadow-none outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent",
+          "min-h-14 w-full resize-none rounded-none border-0 bg-transparent px-4 pt-4 pb-2 text-[0.9375rem] leading-6 font-normal text-foreground shadow-none outline-none placeholder:text-muted-foreground hover:border-0 focus-visible:ring-0 focus-visible:ring-offset-0",
           className,
         )}
         onKeyDown={handleKeyDown}
@@ -200,7 +200,7 @@ function PromptInputAction({
       <TooltipTrigger asChild>
         <Comp {...props} />
       </TooltipTrigger>
-      <TooltipContent className="rounded-full" side={side}>
+      <TooltipContent side={side}>
         {content}
         {shortcut ? <Kbd className="rounded-md!">{shortcut}</Kbd> : null}
       </TooltipContent>

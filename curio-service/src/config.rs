@@ -1,7 +1,92 @@
-use std::{env, fmt};
+use std::{env, fmt, path::PathBuf};
 
 const DEFAULT_MAX_CONNECTIONS: u32 = 10;
 const DEFAULT_ACQUIRE_TIMEOUT_SECONDS: u64 = 10;
+const DEFAULT_EMBEDDING_MODEL: &str = "text-embedding-3-small";
+const DEFAULT_IMAGE_DESCRIPTION_MODEL: &str = "gpt-5.5";
+const DEFAULT_DOCUMENT_CONCURRENCY: u32 = 8;
+const DEFAULT_COMPLETED_JOB_RETENTION_SECONDS: u64 = 10 * 60;
+const OFFICE_EXECUTABLE_CANDIDATES: [&str; 6] = [
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    "/Applications/LibreOfficeDev.app/Contents/MacOS/soffice",
+    "/opt/homebrew/bin/soffice",
+    "/usr/local/bin/soffice",
+    "/usr/bin/soffice",
+    "/usr/bin/libreoffice",
+];
+
+/// Documents ingestion, embedding, and preview settings.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocumentsConfig {
+    pub embedding_model: String,
+    pub image_description_model: String,
+    pub max_concurrent_documents: usize,
+    pub completed_job_retention_seconds: u64,
+    /// LibreOffice executable used for Office previews; DOCX falls back to a
+    /// text-rendered PDF when it is absent.
+    pub office_executable: Option<PathBuf>,
+}
+
+impl Default for DocumentsConfig {
+    fn default() -> Self {
+        Self {
+            embedding_model: DEFAULT_EMBEDDING_MODEL.to_owned(),
+            image_description_model: DEFAULT_IMAGE_DESCRIPTION_MODEL.to_owned(),
+            max_concurrent_documents: DEFAULT_DOCUMENT_CONCURRENCY as usize,
+            completed_job_retention_seconds: DEFAULT_COMPLETED_JOB_RETENTION_SECONDS,
+            office_executable: None,
+        }
+    }
+}
+
+impl DocumentsConfig {
+    pub fn from_env() -> Result<Self, ConfigError> {
+        Ok(Self {
+            embedding_model: optional("OPENAI_EMBEDDING_MODEL")
+                .unwrap_or_else(|| DEFAULT_EMBEDDING_MODEL.to_owned()),
+            image_description_model: optional("OPENAI_IMAGE_DESCRIPTION_MODEL")
+                .unwrap_or_else(|| DEFAULT_IMAGE_DESCRIPTION_MODEL.to_owned()),
+            max_concurrent_documents: bounded_u32(
+                "CURIO_DOCUMENT_CONCURRENCY",
+                DEFAULT_DOCUMENT_CONCURRENCY,
+                1,
+                32,
+            )? as usize,
+            completed_job_retention_seconds: bounded_u64(
+                "CURIO_DOCUMENT_JOB_RETENTION_SECONDS",
+                DEFAULT_COMPLETED_JOB_RETENTION_SECONDS,
+                0,
+                24 * 60 * 60,
+            )?,
+            office_executable: resolve_office_executable(),
+        })
+    }
+}
+
+fn resolve_office_executable() -> Option<PathBuf> {
+    if let Some(configured) = optional("CURIO_SOFFICE") {
+        return Some(PathBuf::from(configured));
+    }
+    env::var_os("PATH")
+        .and_then(|path| {
+            env::split_paths(&path)
+                .flat_map(|directory| [directory.join("soffice"), directory.join("libreoffice")])
+                .find(|candidate| candidate.is_file())
+        })
+        .or_else(|| {
+            OFFICE_EXECUTABLE_CANDIDATES
+                .into_iter()
+                .map(PathBuf::from)
+                .find(|candidate| candidate.is_file())
+        })
+}
+
+fn optional(variable: &'static str) -> Option<String> {
+    env::var(variable)
+        .ok()
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+}
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct ServiceConfig {
@@ -13,6 +98,7 @@ pub struct ServiceConfig {
     pub database_max_connections: u32,
     pub database_acquire_timeout_seconds: u64,
     pub cors_allowed_origins: Vec<String>,
+    pub documents: DocumentsConfig,
 }
 
 impl fmt::Debug for ServiceConfig {
@@ -30,6 +116,7 @@ impl fmt::Debug for ServiceConfig {
                 &self.database_acquire_timeout_seconds,
             )
             .field("cors_allowed_origins", &self.cors_allowed_origins)
+            .field("documents", &self.documents)
             .finish()
     }
 }
@@ -104,6 +191,7 @@ impl ServiceConfig {
                 .filter(|origin| !origin.is_empty())
                 .map(str::to_owned)
                 .collect(),
+            documents: DocumentsConfig::from_env()?,
         })
     }
 }
@@ -180,6 +268,7 @@ mod tests {
             database_max_connections: 5,
             database_acquire_timeout_seconds: 10,
             cors_allowed_origins: vec!["http://localhost:5173".to_owned()],
+            documents: super::DocumentsConfig::default(),
         };
 
         let output = format!("{config:?}");

@@ -1,27 +1,34 @@
-mod commands;
-mod queries;
-pub(crate) mod repository;
+//! User composition root; legacy placeholders remain isolated in `legacy`.
+mod domain;
+mod handlers;
+mod legacy;
+mod repository;
+mod service;
 
 use axum::{
     Router, middleware,
     routing::{get, post},
 };
 
-use self::repository::UserRepository;
+use self::{repository::PostgresUserRepository, service::UserService};
+use crate::database::Database;
 
-pub fn routes() -> Router {
+type Service = UserService<PostgresUserRepository>;
+
+pub(crate) fn legacy_router() -> Router {
     Router::new()
-        .route("/conversations", post(commands::create_conversation))
+        .route("/conversations", post(legacy::create_conversation))
         .route(
             "/conversations/{id}",
-            get(queries::get_conversation).post(commands::update_conversation),
+            get(legacy::get_conversation).post(legacy::update_conversation),
         )
 }
 
 /// Authenticated user API routes backed by the database.
-pub fn api_routes(repository: UserRepository) -> Router {
+pub(crate) fn router(database: Database) -> Router {
+    let service = UserService::new(PostgresUserRepository::new(database));
     Router::new()
-        .route("/v1/users", post(commands::save_user))
+        .route("/v1/users", post(handlers::save_user))
         .route_layer(middleware::from_fn(crate::auth))
-        .with_state(repository)
+        .with_state(service)
 }

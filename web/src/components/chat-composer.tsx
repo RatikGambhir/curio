@@ -61,7 +61,7 @@ export function ChatComposer({
     <PromptInput
       onSubmit={submitText}
       className={cn(
-        "shadow-sm transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:shadow-md",
+        "shadow-md transition-[border-color,box-shadow] duration-150 focus-within:border-ring/70 focus-within:shadow-lg",
         className,
       )}
     >
@@ -81,7 +81,7 @@ export function ChatComposer({
               variant="ghost"
               size="icon-sm"
               aria-label="Attach files"
-              className="rounded-lg text-muted-foreground hover:translate-y-0 hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground"
             >
               <Paperclip className="size-4 stroke-[1.7]" />
             </Button>
@@ -96,9 +96,9 @@ export function ChatComposer({
                 size="icon-sm"
                 aria-label="Stop generating"
                 onClick={onStop}
-                className="rounded-lg bg-foreground text-background hover:translate-y-0 hover:bg-foreground/85"
+                className="bg-foreground text-background hover:bg-foreground/85"
               >
-                <Square className="size-3.5 fill-current" />
+                <Square className="size-3 fill-current" />
               </Button>
             </PromptInputAction>
           ) : (
@@ -112,7 +112,7 @@ export function ChatComposer({
                 aria-label="Send message"
                 disabled={!text.trim() || disabled}
                 onClick={submitText}
-                className="rounded-lg bg-foreground text-background hover:translate-y-0 hover:bg-foreground/85 disabled:opacity-30"
+                className="disabled:bg-secondary disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none"
               >
                 <ArrowUp className="size-4 stroke-2" />
               </Button>

@@ -1,5 +1,8 @@
 use crate::{
-    chat::{protocol::ChatStreamRequest, repository::ChatRepository},
+    chat::{
+        domain::AssistantOutcome, protocol::ChatStreamRequest, repository::PostgresChatRepository,
+        service::ChatStore,
+    },
     postgres_test_support::PostgresFixture,
 };
 
@@ -21,16 +24,22 @@ async fn completed_conversation_survives_pool_reconnect_with_tied_ordering() {
     else {
         return;
     };
-    let repository = ChatRepository::new(postgres.database().clone());
+    let repository = PostgresChatRepository::new(postgres.database().clone());
     repository.begin_chat(&request()).await.unwrap();
     repository
-        .complete_assistant(&request(), "Hello back", "response-1")
+        .finish_assistant(
+            &request(),
+            "Hello back",
+            AssistantOutcome::Completed {
+                response_id: "response-1",
+            },
+        )
         .await
         .unwrap();
 
     postgres.database().close().await;
     let reopened_database = postgres.reconnect().await;
-    let reopened_repository = ChatRepository::new(reopened_database.clone());
+    let reopened_repository = PostgresChatRepository::new(reopened_database.clone());
 
     assert_eq!(
         reopened_repository
@@ -71,10 +80,16 @@ async fn failed_assistant_is_stored_once_with_buffered_content() {
     else {
         return;
     };
-    let repository = ChatRepository::new(postgres.database().clone());
+    let repository = PostgresChatRepository::new(postgres.database().clone());
     repository.begin_chat(&request()).await.unwrap();
     repository
-        .fail_assistant(&request(), "partial response", "provider_error")
+        .finish_assistant(
+            &request(),
+            "partial response",
+            AssistantOutcome::Failed {
+                code: "provider_error",
+            },
+        )
         .await
         .unwrap();
 
@@ -97,7 +112,7 @@ async fn readiness_and_conversation_cascade_are_enforced() {
     else {
         return;
     };
-    let repository = ChatRepository::new(postgres.database().clone());
+    let repository = PostgresChatRepository::new(postgres.database().clone());
     postgres.database().readiness().await.unwrap();
     repository.begin_chat(&request()).await.unwrap();
 
@@ -124,4 +139,57 @@ fn assert_millisecond_utc(timestamp: &str) {
     );
     assert_eq!(&timestamp[19..20], ".");
     assert_eq!(&timestamp[23..], "Z");
+}
+
+#[tokio::test]
+async fn duplicate_message_rolls_back_the_entire_new_conversation() {
+    let Some(postgres) = PostgresFixture::provision("chat_begin_rollback").await else {
+        return;
+    };
+    let repository = PostgresChatRepository::new(postgres.database().clone());
+    repository.begin_chat(&request()).await.unwrap();
+    let mut conflicting = request();
+    conflicting.conversation_id = "must-not-persist".into();
+    conflicting.assistant_message_id = "new-assistant".into();
+    assert!(repository.begin_chat(&conflicting).await.is_err());
+    assert_eq!(repository.list_conversations().await.unwrap().len(), 1);
+    assert!(
+        repository
+            .conversation_messages("must-not-persist")
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    postgres.cleanup().await;
+}
+
+#[tokio::test]
+async fn assistant_update_requires_matching_message_and_conversation() {
+    let Some(postgres) = PostgresFixture::provision("chat_finish_scope").await else {
+        return;
+    };
+    let repository = PostgresChatRepository::new(postgres.database().clone());
+    repository.begin_chat(&request()).await.unwrap();
+    let mut mismatched = request();
+    mismatched.conversation_id = "different-conversation".into();
+    assert!(
+        repository
+            .finish_assistant(
+                &mismatched,
+                "incorrect",
+                AssistantOutcome::Completed {
+                    response_id: "incorrect"
+                }
+            )
+            .await
+            .is_err()
+    );
+    let messages = repository
+        .conversation_messages("conversation-1")
+        .await
+        .unwrap();
+    assert_eq!(messages[1].status, "pending");
+    assert_eq!(messages[1].content, "");
+    assert_eq!(messages[1].response_id, None);
+    postgres.cleanup().await;
 }

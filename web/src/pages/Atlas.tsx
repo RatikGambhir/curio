@@ -1,7 +1,9 @@
 import {
   addEdge,
   Background,
+  BackgroundVariant,
   Controls,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
@@ -13,35 +15,42 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback } from "react";
 
-import { AppSidebar } from "@/components/app-sidebar";
 import { PageHeader } from "@/components/page-header";
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar";
+
+/* Edges run left to right, so every node takes input on its left edge and
+   gives output on its right; the default top/bottom handles made horizontal
+   links loop back on themselves. */
+const horizontal = {
+  sourcePosition: Position.Right,
+  targetPosition: Position.Left,
+} as const;
 
 const initialNodes: Node[] = [
   {
     id: "curio",
     type: "input",
-    position: { x: 80, y: 120 },
+    position: { x: 0, y: 120 },
     data: { label: "Curio" },
+    ...horizontal,
   },
   {
     id: "vault",
-    position: { x: 360, y: 40 },
+    position: { x: 300, y: 30 },
     data: { label: "Vault" },
+    ...horizontal,
   },
   {
     id: "chat",
-    position: { x: 360, y: 200 },
+    position: { x: 300, y: 210 },
     data: { label: "Chat" },
+    ...horizontal,
   },
   {
     id: "insight",
     type: "output",
-    position: { x: 640, y: 120 },
+    position: { x: 600, y: 120 },
     data: { label: "Insight" },
+    ...horizontal,
   },
 ];
 
@@ -70,31 +79,30 @@ function AtlasCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
+      defaultEdgeOptions={{ type: "smoothstep" }}
       fitView
+      fitViewOptions={{ padding: 0.35 }}
     >
-      <Background />
-      <Controls />
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1.25} />
+      <Controls showInteractive={false} position="bottom-right" />
     </ReactFlow>
   );
 }
 
 const Atlas = () => {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex h-full w-full flex-col">
-          <PageHeader />
-          <main className="min-h-0 flex-1 px-4 pb-4">
-            <div className="h-full w-full overflow-hidden rounded-lg border border-border bg-background">
-              <ReactFlowProvider>
-                <AtlasCanvas />
-              </ReactFlowProvider>
-            </div>
-          </main>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <PageHeader title="Atlas" meta="Starter map · not saved" />
+      <div className="relative min-h-0 flex-1">
+        <ReactFlowProvider>
+          <AtlasCanvas />
+        </ReactFlowProvider>
+        <p className="pointer-events-none absolute left-5 top-4 max-w-xs text-sm text-muted-foreground">
+          Drag between handles to connect ideas. Changes last until you leave
+          the page.
+        </p>
+      </div>
+    </>
   );
 };
 

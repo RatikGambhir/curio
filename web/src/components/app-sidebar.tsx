@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Globe,
   House,
+  Inbox,
   LibraryBig,
   MessageSquare,
   NotebookPen,
@@ -19,7 +20,6 @@ import {
   type AppNavigationSection,
 } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
-import { MailCheckIcon } from "@/components/ui/mail-check"
 import {
   Sidebar,
   SidebarContent,
@@ -31,7 +31,6 @@ import { useSidebar } from "@/components/ui/sidebar-context"
 
 const appNavigationSections: AppNavigationSection[] = [
   {
-    label: "Overview",
     items: [
       {
         title: "Home",
@@ -47,8 +46,10 @@ const appNavigationSections: AppNavigationSection[] = [
       {
         id: "inbox",
         title: "Inbox",
-        icon: MailCheckIcon,
+        icon: Inbox,
         items: [],
+        emptyMessage:
+          "Messages and shared items will collect here once Inbox is connected.",
       },
       {
         title: "Notes",
@@ -72,9 +73,11 @@ const appNavigationSections: AppNavigationSection[] = [
         title: "Explore",
         icon: LibraryBig,
         items: [],
+        emptyMessage:
+          "Collections and suggested reading will appear here as your vault grows.",
       },
       {
-        title: "Vaults",
+        title: "Vault",
         url: "/vault",
         icon: BookOpen,
         description: "Browse your saved knowledge.",
@@ -141,9 +144,11 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
         <SidebarHeader className="h-(--app-header-height) shrink-0 justify-center border-b border-sidebar-border p-0">
           <PlatformHeader />
         </SidebarHeader>
-        <SidebarContent className="pt-0">
+        <SidebarContent className="gap-0 pt-0">
           {isMobile && openGroup ? (
-            <NavSubmenu group={openGroup} onBack={closeSubmenu} />
+            <div className="min-h-0 flex-1 bg-card text-card-foreground">
+              <NavSubmenu group={openGroup} onBack={closeSubmenu} />
+            </div>
           ) : (
             <>
               <SidebarSearch />
@@ -156,7 +161,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
             </>
           )}
         </SidebarContent>
-        <SidebarFooter className="border-t border-sidebar-border">
+        <SidebarFooter className="border-t border-sidebar-border p-2">
           <NavUser />
         </SidebarFooter>
         <SidebarRail />
@@ -165,7 +170,7 @@ export function AppSidebar({ ...props }: ComponentProps<typeof Sidebar>) {
       {!isMobile && openGroup ? (
         <aside
           aria-label={`${openGroup.title} submenu`}
-          className="fixed bottom-0 top-(--app-titlebar-height) z-[15] w-[19rem] animate-in overflow-hidden rounded-tr-[0.875rem] border-r border-t border-border bg-card text-card-foreground shadow-lg duration-200 fade-in-0 slide-in-from-left-2"
+          className="fixed inset-y-0 z-30 w-[19rem] animate-in overflow-hidden rounded-r-xl border-r border-border bg-card text-card-foreground shadow-xl duration-200 fade-in-0 slide-in-from-left-2"
           style={{
             left:
               state === "collapsed"

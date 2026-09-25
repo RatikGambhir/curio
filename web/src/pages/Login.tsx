@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { AuthLayout } from "@/components/auth/auth-layout";
 import { EmailLoginForm } from "@/components/auth/email-login-form";
 import { useAuthenticatedUser } from "@/hooks/useAuthenticatedUser";
 import { validateEmail } from "@/lib/validators/auth";
-import curioLogo from "../assets/curio-logo.png";
 
 function Login() {
   const navigate = useNavigate();
@@ -26,25 +26,29 @@ function Login() {
   };
 
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-8 bg-muted/30 px-4">
-      <img
-        src={curioLogo}
-        alt="Curio Logo"
-        className="mb-8 w-64 h-auto"
-        style={{ mixBlendMode: "multiply" }}
-      />
-      <EmailLoginForm
-        email={email}
-        error={emailError}
-        onEmailChange={(nextEmail) => {
-          setEmail(nextEmail);
-          if (emailError) {
-            setEmailError(null);
-          }
-        }}
-        onSubmit={handleEmailSubmit}
-      />
-    </div>
+    <AuthLayout statement="For every question, an answer worth keeping.">
+      <p className="eyebrow text-muted-foreground">Sign in</p>
+      <h1 className="mt-3 font-display text-display-md text-foreground">
+        Welcome back.
+      </h1>
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        Enter your email to open your workspace. This build uses a local
+        development session, so no password is needed.
+      </p>
+      <div className="mt-8">
+        <EmailLoginForm
+          email={email}
+          error={emailError}
+          onEmailChange={(nextEmail) => {
+            setEmail(nextEmail);
+            if (emailError) {
+              setEmailError(null);
+            }
+          }}
+          onSubmit={handleEmailSubmit}
+        />
+      </div>
+    </AuthLayout>
   );
 }
 

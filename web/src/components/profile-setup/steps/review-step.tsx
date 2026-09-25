@@ -13,63 +13,79 @@ const renderValue = (value: string) => value.trim() || NOT_PROVIDED;
 const renderUsername = (value: string) =>
   value.trim() ? `@${value.trim()}` : NOT_PROVIDED;
 
+function ReviewGroup({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: { label: string; value: string }[];
+}) {
+  return (
+    <section className="border-t border-border pt-4">
+      <h3 className="eyebrow text-muted-foreground">{title}</h3>
+      <dl className="mt-3 grid grid-cols-[6.5rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
+        {rows.map((row) => (
+          <div key={row.label} className="contents">
+            <dt className="text-muted-foreground">{row.label}</dt>
+            <dd
+              className={
+                row.value === NOT_PROVIDED
+                  ? "italic text-muted-foreground"
+                  : "break-words text-foreground"
+              }
+            >
+              {row.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export function ReviewStep({ formData, avatarInitials }: ReviewStepProps) {
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-4 rounded-xl border border-border bg-muted/40 p-4">
-        <Avatar className="size-14 border border-border">
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Avatar className="size-14 rounded-lg">
           {formData.avatar ? (
             <AvatarImage src={formData.avatar} alt="Profile avatar preview" />
           ) : null}
-          <AvatarFallback className="bg-secondary text-secondary-foreground">
+          <AvatarFallback className="rounded-lg bg-accent-subtle font-mono text-sm text-foreground">
             {avatarInitials}
           </AvatarFallback>
         </Avatar>
 
         <div className="min-w-0">
-          <p className="text-base font-semibold text-foreground">
+          <p className="truncate font-display text-display-sm text-foreground">
             {renderValue(formData.name)}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="truncate text-sm text-muted-foreground">
             {renderUsername(formData.username)}
           </p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <section className="space-y-2 rounded-xl border border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground">Basic info</h3>
-          <p className="text-sm text-muted-foreground">
-            Bio: {renderValue(formData.bio)}
-          </p>
-        </section>
-
-        <section className="space-y-2 rounded-xl border border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground">Contact</h3>
-          <p className="text-sm text-muted-foreground">
-            Email: {renderValue(formData.email)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Phone: {renderValue(formData.phone)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Location: {renderValue(formData.location)}
-          </p>
-        </section>
-
-        <section className="space-y-2 rounded-xl border border-border p-4 md:col-span-2">
-          <h3 className="text-sm font-semibold text-foreground">Social links</h3>
-          <p className="text-sm text-muted-foreground">
-            Website: {renderValue(formData.website)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            X: {renderValue(formData.twitter)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            LinkedIn: {renderValue(formData.linkedin)}
-          </p>
-        </section>
-      </div>
+      <ReviewGroup
+        title="About"
+        rows={[{ label: "Bio", value: renderValue(formData.bio) }]}
+      />
+      <ReviewGroup
+        title="Contact"
+        rows={[
+          { label: "Email", value: renderValue(formData.email) },
+          { label: "Phone", value: renderValue(formData.phone) },
+          { label: "Location", value: renderValue(formData.location) },
+        ]}
+      />
+      <ReviewGroup
+        title="Links"
+        rows={[
+          { label: "Website", value: renderValue(formData.website) },
+          { label: "X", value: renderValue(formData.twitter) },
+          { label: "LinkedIn", value: renderValue(formData.linkedin) },
+        ]}
+      />
     </div>
   );
 }

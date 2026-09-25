@@ -1,32 +1,37 @@
-import { Card } from "@/components/ui/card";
+import { HighlightMatch } from "@/components/vault/highlight-match";
 import type { QAPair } from "@/components/vault/vault.types";
+import { Badge } from "@/components/ui/badge";
+
+const ENTRY_DATE = new Intl.DateTimeFormat(undefined, {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
 
 interface VaultResultRowProps {
   item: QAPair;
+  query: string;
 }
 
-export function VaultResultRow({ item }: VaultResultRowProps) {
+/* A question and its kept answer, read left to right like a two-column index
+   entry on wide screens and stacked on narrow ones. */
+export function VaultResultRow({ item, query }: VaultResultRowProps) {
   return (
-    <Card className="h-auto gap-0 rounded-lg border-border px-5 py-5 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
-      <div className="grid h-auto grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-6">
-        <div className="space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="whitespace-normal break-words text-xl font-semibold leading-tight text-foreground">
-              {item.question}
-            </h3>
-            <span className="bg-muted text-muted-foreground shrink-0 rounded px-2 py-0.5 text-xs font-medium">
-              {item.category}
-            </span>
-          </div>
-          <p className="text-muted-foreground text-xs">{item.date}</p>
-        </div>
-
-        <div className="h-auto lg:border-l lg:border-border lg:pl-6">
-          <p className="text-muted-foreground whitespace-normal break-words text-lg leading-relaxed">
-            {item.answer}
-          </p>
-        </div>
-      </div>
-    </Card>
+    <article className="grid gap-x-10 gap-y-3 border-b border-border py-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <header className="min-w-0">
+        <h2 className="font-display text-[1.3125rem] leading-snug text-foreground">
+          <HighlightMatch text={item.question} query={query} />
+        </h2>
+        <p className="mt-2.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="tag">{item.category.toLowerCase()}</Badge>
+          <time dateTime={item.date} className="font-mono tabular-nums">
+            {ENTRY_DATE.format(new Date(`${item.date}T00:00:00`))}
+          </time>
+        </p>
+      </header>
+      <p className="min-w-0 text-[0.9375rem] leading-relaxed text-secondary-foreground">
+        <HighlightMatch text={item.answer} query={query} />
+      </p>
+    </article>
   );
 }

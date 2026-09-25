@@ -3,26 +3,31 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Colour is defined in three layers, and only the middle one decides how the
-   app looks.
+/* Curio's design language is a field notebook: warm paper, ink-dark type, ruled
+   hairlines instead of boxes, a serif for anything meant to be read and a mono
+   for the index marks — times, dates, counts — that sit beside it. One colour
+   is allowed to be vivid, and the user chooses it.
+
+   Colour is defined in layers, and only the roles decide how the app looks.
 
    1. The seed. One hue plus one chroma, which ThemeProvider writes onto <html>
       as `--theme-hue` and `--theme-chroma`. Adding a theme is adding a colour,
       not a block of CSS; see features/theme/theme.ts.
 
-   2. The scale — `--scale-50` through `--scale-950`. Eleven steps generated
-      from the seed, with lightness pinned per step and chroma held as a
-      multiple of the seed's, so every theme gets the same tonal ladder and text
-      contrast does not depend on which colour was picked. Sage Green, Cool Sky
-      Blue, Cool Steel and Charcoal Blue are all just seeds on this one ladder; see
-      features/theme/palette.ts, which holds the same numbers for tests.
+   2. Two ladders. `--scale-50` … `--scale-950` is generated from the seed, with
+      lightness pinned per step and chroma held as a multiple of the seed's, so
+      every theme gets the same tonal ladder; see features/theme/palette.ts,
+      which holds the same numbers for tests. `--neutral-0` … `--neutral-975` is
+      the paper: a fixed warm grey shared by every theme. Themes change the ink,
+      not the paper — surfaces, text and rules come from the neutral ladder, and
+      only actions, selection marks and highlights come from the seed.
 
    3. Semantic roles — `--background-page`, `--text-primary`, `--primary` and
       friends. These name what a colour is *for*, and are the only layer that
       differs between light and dark: dark mode remaps the roles onto the far
-      end of the same scale rather than generating new colours. Components read
-      roles, never scale steps, so they never know whether they are green or
-      blue. The shadcn token names below are aliases onto these roles.
+      end of the same ladders rather than generating new colours. Components read
+      roles, never ladder steps. The shadcn token names below are aliases onto
+      these roles.
 
    The palette lives on `.curio-theme` rather than `:root` because a custom
    property inherits the value it already resolved to. Tokens defined on `:root`
@@ -32,34 +37,51 @@
    the whole palette. `.dark` on the same element selects the dark roles. */
 
 :root {
-  /* Mirrors the default entry in the theme registry — Cool Steel — so the first
+  /* Mirrors the default entry in the theme registry — Sage Green — so the first
      paint is correct before any JS runs. ThemeProvider overwrites both on mount,
      and palette.test.ts fails if these drift from the registry. */
-  --theme-hue: 239.12;
-  --theme-chroma: 0.0338;
+  --theme-hue: 131.69;
+  --theme-chroma: 0.0828;
 
-  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-serif: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: JetBrains Mono, Courier New, monospace;
-  --radius: 0.35rem;
+  /* Schibsted Grotesk carries the interface: a newspaper grotesque, compact and
+     sturdy at 13–15px. Newsreader carries what is meant to be read — titles,
+     answers, notes — with optical sizing so the same family works as a 64px
+     display and a 16px paragraph. JetBrains Mono sets index marks and code. */
+  --font-sans: "Schibsted Grotesk Variable", ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: "Newsreader Variable", "Iowan Old Style", "Palatino Linotype",
+    Georgia, serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo,
+    Consolas, monospace;
+
+  --radius: 0.375rem;
   --tracking-normal: 0em;
-  --spacing: 0.23rem;
-  --shadow-x: 0px;
-  --shadow-y: 1px;
-  --shadow-blur: 2px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.04;
-  --shadow-color: #1a1f2e;
-  --shadow-2xs: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.02);
-  --shadow-xs: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.02);
-  --shadow-sm: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 1px 2px -1px hsl(225 27.7778% 14.1176% / 0.04);
-  --shadow: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 1px 2px -1px hsl(225 27.7778% 14.1176% / 0.04);
-  --shadow-md: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 2px 4px -1px hsl(225 27.7778% 14.1176% / 0.04);
-  --shadow-lg: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 4px 6px -1px hsl(225 27.7778% 14.1176% / 0.04);
-  --shadow-xl: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.04), 0px 8px 10px -1px hsl(225 27.7778% 14.1176% / 0.04);
-  --shadow-2xl: 0px 1px 2px 0px hsl(225 27.7778% 14.1176% / 0.10);
+
+  /* Motion. One curve for things arriving, one for things leaving; durations
+     are short because the app is a tool, not a presentation. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 360ms;
+
+  /* Elevation is reserved for things that float above the page — menus,
+     popovers, dialogs, the composer. Resting surfaces are separated by rules
+     and tone, not shadow. */
+  --shadow-color: 70 30% 12%;
+  --shadow-2xs: 0 1px 0 hsl(var(--shadow-color) / 0.04);
+  --shadow-xs: 0 1px 1px hsl(var(--shadow-color) / 0.05);
+  --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06),
+    0 1px 1px hsl(var(--shadow-color) / 0.03);
+  --shadow: 0 1px 3px hsl(var(--shadow-color) / 0.07),
+    0 1px 2px hsl(var(--shadow-color) / 0.04);
+  --shadow-md: 0 4px 10px -2px hsl(var(--shadow-color) / 0.08),
+    0 2px 4px -2px hsl(var(--shadow-color) / 0.05);
+  --shadow-lg: 0 14px 32px -12px hsl(var(--shadow-color) / 0.22),
+    0 3px 8px -3px hsl(var(--shadow-color) / 0.08);
+  --shadow-xl: 0 24px 56px -20px hsl(var(--shadow-color) / 0.3),
+    0 6px 14px -6px hsl(var(--shadow-color) / 0.1);
+  --shadow-2xl: 0 36px 80px -28px hsl(var(--shadow-color) / 0.38);
 
   /* Code syntax tokens. Six well-separated hues are needed to tell keywords
      from strings from numbers, which a single-seed palette cannot supply, so
@@ -67,14 +89,14 @@
   --code-keyword: oklch(0.4800 0.1200 285.0000);
   --code-string: oklch(0.4900 0.0900 152.0000);
   --code-number: oklch(0.5100 0.1100 62.0000);
-  --code-comment: oklch(0.6000 0.0180 264.0000);
+  --code-comment: oklch(0.5600 0.0180 75.0000);
   --code-function: oklch(0.4900 0.1050 235.0000);
   --code-attr: oklch(0.5100 0.1250 22.0000);
-  --code-punctuation: oklch(0.4400 0.0200 264.0000);
+  --code-punctuation: oklch(0.4400 0.0120 75.0000);
 }
 
-/* Layer 2: the scale. Shared by light and dark — appearance changes which steps
-   the roles point at, not what the steps are. */
+/* Layer 2: the ladders. Shared by light and dark — appearance changes which
+   steps the roles point at, not what the steps are. */
 .curio-theme {
   --scale-50: oklch(0.9618 calc(var(--theme-chroma) * 0.114) var(--theme-hue));
   --scale-100: oklch(0.9242 calc(var(--theme-chroma) * 0.244) var(--theme-hue));
@@ -89,27 +111,56 @@
   --scale-950: oklch(0.1832 calc(var(--theme-chroma) * 0.237) var(--theme-hue));
 }
 
-/* Layer 3: semantic roles, light. Large surfaces take the palest steps so the
-   interface reads as tinted rather than painted; cards stay pure white to give
-   the tint something neutral to sit against. */
+/* The paper. A warm grey with barely enough chroma to read as paper rather
+   than screen, drifting slightly warmer toward the ink end. Fixed for every
+   theme, so a cobalt or a moss seed lands on the same page. */
 .curio-theme {
-  --background-page: var(--scale-50);
-  --background-sidebar: var(--scale-100);
-  --background-card: oklch(1.0000 0 0);
-  --background-secondary: var(--scale-100);
-  --background-hover: var(--scale-200);
-  --background-pressed: var(--scale-300);
-  --background-selected: var(--scale-200);
+  --neutral-0: oklch(0.993 0.003 85);
+  --neutral-50: oklch(0.975 0.006 85);
+  --neutral-100: oklch(0.953 0.008 85);
+  --neutral-150: oklch(0.93 0.009 85);
+  --neutral-200: oklch(0.9 0.01 85);
+  --neutral-300: oklch(0.835 0.011 82);
+  --neutral-400: oklch(0.72 0.012 80);
+  --neutral-500: oklch(0.6 0.012 78);
+  --neutral-600: oklch(0.515 0.012 75);
+  --neutral-700: oklch(0.415 0.011 72);
+  --neutral-800: oklch(0.325 0.01 70);
+  --neutral-850: oklch(0.285 0.009 70);
+  --neutral-900: oklch(0.245 0.008 70);
+  --neutral-925: oklch(0.215 0.008 70);
+  --neutral-950: oklch(0.19 0.007 70);
+  --neutral-975: oklch(0.165 0.006 70);
+}
 
-  --text-primary: var(--scale-950);
-  --text-secondary: var(--scale-800);
-  /* Step 700, not 600: muted text also has to survive the sidebar, which is a
-     step darker than the page, and 600 falls to 4.1:1 there. */
-  --text-muted: var(--scale-700);
-  --text-on-primary: oklch(1.0000 0 0);
+/* Layer 3: semantic roles, light. Content sits on the lightest sheet; panes
+   and gutters one step down on the page tone; the navigation spine is ink —
+   the notebook's binding — in both appearances. */
+.curio-theme {
+  --background-page: var(--neutral-50);
+  --background-card: var(--neutral-0);
+  --background-secondary: var(--neutral-100);
+  --background-hover: var(--neutral-150);
+  --background-pressed: var(--neutral-200);
+  --background-selected: var(--neutral-150);
 
-  --border-subtle: var(--scale-200);
-  --border-strong: var(--scale-300);
+  --text-primary: var(--neutral-950);
+  --text-secondary: var(--neutral-700);
+  --text-muted: var(--neutral-600);
+  --text-on-primary: var(--neutral-0);
+
+  --border-subtle: var(--neutral-200);
+  --border-strong: var(--neutral-300);
+
+  /* The spine. Its own text and interaction roles, because it is dark while
+     the page is light. */
+  --background-sidebar: var(--neutral-900);
+  --background-sidebar-hover: var(--neutral-850);
+  --background-sidebar-selected: var(--neutral-800);
+  --text-on-sidebar: var(--neutral-50);
+  --text-on-sidebar-muted: var(--neutral-400);
+  --border-sidebar: var(--neutral-850);
+  --accent-on-sidebar: var(--scale-400);
 
   /* Step 600 rather than the brand step 500: white text on 500 measures about
      3.5:1 in every palette, short of the 4.5:1 needed for a button label, while
@@ -120,6 +171,7 @@
   --primary-pressed: var(--scale-800);
 
   --accent-brand: var(--scale-500);
+  /* A highlighter stroke: the seed at its palest, for selected rows and marks. */
   --accent-subtle: var(--scale-100);
 
   /* shadcn aliases. Everything below restates a role under the name the
@@ -144,14 +196,13 @@
      `hover:bg-accent` appears on most controls — so it aliases the selected
      background. The vivid brand step is `--accent-brand`. */
   --accent: var(--background-selected);
-  --accent-foreground: var(--text-secondary);
-  --destructive: oklch(0.5624 0.1743 26.1433);
-  --destructive-foreground: oklch(1.0000 0 0);
+  --accent-foreground: var(--text-primary);
+  --destructive: oklch(0.5500 0.1650 29.0000);
+  --destructive-foreground: oklch(0.9930 0.0030 85.0000);
   --border: var(--border-subtle);
-  /* Shares the border tone rather than the surface tone: `--input` is spent as
-     `border-input` on every field, plus the switch's off-track and the
-     button-group divider, all of which vanish when it matches the card. */
-  --input: var(--border-subtle);
+  /* The strong border tone: `--input` is spent as `border-input` on every
+     field, which needs to read as an edge against the lightest sheet. */
+  --input: var(--border-strong);
   --ring: var(--primary);
   --chart-1: var(--scale-700);
   --chart-2: var(--scale-600);
@@ -159,37 +210,46 @@
   --chart-4: var(--scale-400);
   --chart-5: var(--scale-300);
   --sidebar: var(--background-sidebar);
-  --sidebar-foreground: var(--text-primary);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--text-on-primary);
-  --sidebar-accent: var(--background-selected);
-  --sidebar-accent-foreground: var(--text-secondary);
-  --sidebar-border: var(--border-subtle);
-  --sidebar-ring: var(--primary);
+  --sidebar-foreground: var(--text-on-sidebar);
+  --sidebar-muted-foreground: var(--text-on-sidebar-muted);
+  --sidebar-primary: var(--accent-on-sidebar);
+  --sidebar-primary-foreground: var(--background-sidebar);
+  --sidebar-accent: var(--background-sidebar-selected);
+  --sidebar-hover: var(--background-sidebar-hover);
+  --sidebar-accent-foreground: var(--text-on-sidebar);
+  --sidebar-border: var(--border-sidebar);
+  --sidebar-ring: var(--accent-on-sidebar);
 }
 
-/* The same roles against the dark end of the same scale. Only the mappings
-   change; the scale itself is untouched. The sidebar stays on the page tone
-   while cards — including the main inset — lift by one step, preserving the
-   same chrome/content hierarchy as light mode. The action steps run the other
+/* The same roles against the dark end of the same ladders. Only the mappings
+   change; the ladders themselves are untouched. Panes sit on the page tone
+   while the content sheet lifts by one step, and the spine sinks one below
+   both, preserving the light-mode hierarchy. The action steps run the other
    way: hover and pressed get lighter, because on a dark surface that is what
    reads as closer. */
 .curio-theme.dark {
-  --background-page: var(--scale-950);
-  --background-sidebar: var(--scale-950);
-  --background-card: var(--scale-900);
-  --background-secondary: var(--scale-800);
-  --background-hover: var(--scale-700);
-  --background-pressed: var(--scale-600);
-  --background-selected: var(--scale-800);
+  --background-page: var(--neutral-950);
+  --background-card: var(--neutral-925);
+  --background-secondary: var(--neutral-900);
+  --background-hover: var(--neutral-850);
+  --background-pressed: var(--neutral-800);
+  --background-selected: var(--neutral-850);
 
-  --text-primary: var(--scale-50);
-  --text-secondary: var(--scale-100);
-  --text-muted: var(--scale-300);
+  --text-primary: var(--neutral-50);
+  --text-secondary: var(--neutral-150);
+  --text-muted: var(--neutral-400);
   --text-on-primary: var(--scale-950);
 
-  --border-subtle: var(--scale-800);
-  --border-strong: var(--scale-700);
+  --border-subtle: var(--neutral-850);
+  --border-strong: var(--neutral-800);
+
+  --background-sidebar: var(--neutral-975);
+  --background-sidebar-hover: var(--neutral-900);
+  --background-sidebar-selected: var(--neutral-850);
+  --text-on-sidebar: var(--neutral-100);
+  --text-on-sidebar-muted: var(--neutral-500);
+  --border-sidebar: var(--neutral-925);
+  --accent-on-sidebar: var(--scale-400);
 
   --primary: var(--scale-400);
   --primary-hover: var(--scale-300);
@@ -198,8 +258,8 @@
   --accent-brand: var(--scale-400);
   --accent-subtle: var(--scale-800);
 
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(1.0000 0 0);
+  --destructive: oklch(0.6800 0.1650 27.0000);
+  --destructive-foreground: oklch(0.1650 0.0060 70.0000);
   --chart-1: var(--scale-500);
   --chart-2: var(--scale-400);
   --chart-3: var(--scale-300);
@@ -208,29 +268,31 @@
 }
 
 .dark {
-  --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.02);
-  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.02);
-  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 1px 2px -1px hsl(0 0% 0% / 0.04);
-  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 1px 2px -1px hsl(0 0% 0% / 0.04);
-  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 2px 4px -1px hsl(0 0% 0% / 0.04);
-  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 4px 6px -1px hsl(0 0% 0% / 0.04);
-  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.04), 0px 8px 10px -1px hsl(0 0% 0% / 0.04);
-  --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.10);
+  --shadow-color: 0 0% 0%;
+  --shadow-2xs: 0 1px 0 hsl(var(--shadow-color) / 0.2);
+  --shadow-xs: 0 1px 1px hsl(var(--shadow-color) / 0.25);
+  --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.3);
+  --shadow: 0 1px 3px hsl(var(--shadow-color) / 0.35);
+  --shadow-md: 0 4px 10px -2px hsl(var(--shadow-color) / 0.4);
+  --shadow-lg: 0 14px 32px -12px hsl(var(--shadow-color) / 0.6),
+    0 0 0 1px hsl(0 0% 100% / 0.03);
+  --shadow-xl: 0 24px 56px -20px hsl(var(--shadow-color) / 0.7),
+    0 0 0 1px hsl(0 0% 100% / 0.04);
+  --shadow-2xl: 0 36px 80px -28px hsl(var(--shadow-color) / 0.75);
 
   --code-keyword: oklch(0.7900 0.1100 285.0000);
   --code-string: oklch(0.7800 0.0900 152.0000);
   --code-number: oklch(0.8100 0.1000 68.0000);
-  --code-comment: oklch(0.6400 0.0150 264.0000);
+  --code-comment: oklch(0.6600 0.0150 75.0000);
   --code-function: oklch(0.7900 0.0950 235.0000);
   --code-attr: oklch(0.7700 0.1100 25.0000);
-  --code-punctuation: oklch(0.7400 0.0150 264.0000);
+  --code-punctuation: oklch(0.7400 0.0120 75.0000);
 }
 
 @theme inline {
-  /* The raw scale, so a surface that genuinely needs a named step — the palette
-     swatches in settings, say — can reach one without inventing a role. Prefer
-     the role tokens below for anything the themes should be able to remap. */
+  /* The raw seed scale, so a surface that genuinely needs a named step — the
+     palette swatches in settings, say — can reach one without inventing a role.
+     Prefer the role tokens below for anything the themes should remap. */
   --color-scale-50: var(--scale-50);
   --color-scale-100: var(--scale-100);
   --color-scale-200: var(--scale-200);
@@ -277,9 +339,11 @@
   --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -288,8 +352,26 @@
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* Type scale. The display sizes are the serif's; interface text stays on the
+     Tailwind defaults. Each display step carries its own leading and tracking,
+     because a 64px serif set at body leading falls apart. */
+  --text-display-xl: clamp(2.75rem, 1.9rem + 3.4vw, 4.75rem);
+  --text-display-xl--line-height: 1;
+  --text-display-xl--letter-spacing: -0.028em;
+  --text-display-lg: clamp(2.125rem, 1.7rem + 1.7vw, 3.125rem);
+  --text-display-lg--line-height: 1.04;
+  --text-display-lg--letter-spacing: -0.022em;
+  --text-display-md: clamp(1.625rem, 1.45rem + 0.7vw, 2rem);
+  --text-display-md--line-height: 1.12;
+  --text-display-md--letter-spacing: -0.015em;
+  --text-display-sm: 1.3125rem;
+  --text-display-sm--line-height: 1.25;
+  --text-display-sm--letter-spacing: -0.01em;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
@@ -301,6 +383,72 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+
+  --animate-rise: rise var(--duration-slow) var(--ease-out) both;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(0.375rem);
+    }
+  }
+}
+
+/* The small-caps index mark: dates, counts, section eyebrows. Mono so columns
+   of times and numbers align without tabular tricks. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Serif at display sizes. Weight sits between regular and medium because
+   Newsreader's regular looks thin at 40px+ on a pale background. */
+@utility font-display {
+  font-family: var(--font-serif);
+  font-weight: 440;
+  font-optical-sizing: auto;
+}
+
+/* Paper ruled for handwriting. `--rule-gap` must match the text's line height.
+   Rules fall at every multiple of the gap from the top edge, so the one above
+   the first line hides under the border; give the element a top padding of
+   about 0.3 × the gap and each line of text sits on its rule. `--rule-offset`
+   nudges the rules for elements that cannot take that padding. */
+@utility ruled-paper {
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--rule-gap, 2rem) - 1px),
+    var(--border-subtle) calc(var(--rule-gap, 2rem) - 1px),
+    var(--border-subtle) var(--rule-gap, 2rem)
+  );
+  background-size: 100% var(--rule-gap, 2rem);
+  background-position: 0 var(--rule-offset, 0);
+  background-attachment: local;
+}
+
+/* The one focus treatment for controls: a 2px ring of the theme's ink, offset
+   so it reads against both the control and whatever surface it sits on. */
+@utility focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+
+  &:focus-visible {
+    outline-color: var(--ring);
+  }
+}
+
+/* Coordinated page entrance: blocks rise in sequence using `--rise-index`.
+   One motion, shared by every page, instead of per-component effects. */
+@utility rise-in {
+  animation: var(--animate-rise);
+  animation-delay: calc(var(--rise-index, 0) * 55ms);
 }
 
 @layer base {
@@ -308,10 +456,15 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    font-optical-sizing: auto;
+    font-feature-settings: "ss01", "cv11";
   }
 
   button,
@@ -320,6 +473,15 @@
   select {
     font: inherit;
   }
+
+  ::selection {
+    background: color-mix(in oklch, var(--accent-brand) 30%, transparent);
+  }
+
+  :focus-visible {
+    outline-offset: 2px;
+  }
+
   code {
     counter-reset: line;
   }
@@ -330,9 +492,9 @@
     width: 1rem;
     margin-right: 1.25rem;
     text-align: right;
-    color: #737373;
+    color: var(--muted-foreground);
     padding-left: 0;
-    font-size: 14px;
+    font-size: 0.8125rem;
   }
   code .line {
     padding-left: 0px !important;
@@ -344,15 +506,76 @@
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* React Flow reads its own custom properties; point them at Curio's roles so
+   the Atlas canvas is drawn in the same ink and paper as everything else. */
+.curio-theme .react-flow {
+  --xy-background-color: var(--background-page);
+  --xy-background-pattern-color: var(--border-strong);
+  --xy-edge-stroke: var(--text-muted);
+  --xy-edge-stroke-selected: var(--primary);
+  --xy-connectionline-stroke: var(--primary);
+  --xy-node-background-color: var(--background-card);
+  --xy-node-border: 1px solid var(--border-strong);
+  --xy-node-color: var(--text-primary);
+  --xy-node-boxshadow-hover: var(--shadow-md);
+  --xy-node-boxshadow-selected: 0 0 0 2px var(--primary);
+  --xy-node-border-radius: var(--radius);
+  --xy-handle-background-color: var(--background-card);
+  --xy-handle-border-color: var(--text-muted);
+  --xy-controls-button-background-color: var(--background-card);
+  --xy-controls-button-background-color-hover: var(--background-hover);
+  --xy-controls-button-color: var(--text-secondary);
+  --xy-controls-button-color-hover: var(--text-primary);
+  --xy-controls-button-border-color: var(--border-subtle);
+  --xy-controls-box-shadow: var(--shadow-sm);
+  --xy-attribution-background-color: transparent;
+  --xy-minimap-background-color: var(--background-card);
+  --xy-selection-background-color: color-mix(in oklch, var(--accent-brand) 12%, transparent);
+  --xy-selection-border: 1px dashed var(--primary);
+}
+
+.curio-theme .react-flow__node {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  padding: 0.75rem 1.25rem;
 }
 
 /* Rich text editor content.
    `@tailwindcss/typography` is deliberately not installed: every node type the
    editor renders carries its own classes, and the plugin's `prose` defaults
-   would override this palette's colours and Inter font stack. */
+   would override this palette's colours and type. Notes are read as much as
+   written, so the body is set in the reading serif like every other long-form
+   surface; the editor's controls stay in the interface sans. */
 @layer components {
   .curio-rich-text {
-    font-family: var(--font-sans);
+    font-family: var(--font-serif);
+    font-optical-sizing: auto;
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+
+  .curio-rich-text :is(h1, h2, h3, h4) {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    letter-spacing: -0.012em;
+  }
+
+  .curio-rich-text :is(code, pre, kbd) {
+    font-family: var(--font-mono);
   }
 
   .curio-rich-text ul,

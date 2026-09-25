@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useState, type FormEvent } from "react";
 
 import type { CalendarView } from "@/api/calendar";
-import { AppSidebar } from "@/components/app-sidebar";
 import {
   calendarPermissions,
   labelOptions,
@@ -29,7 +28,7 @@ import { calendarEditing } from "@/components/event-calendar/features/editing";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { Notice } from "@/components/ui/notice";
 import { Spinner } from "@/components/ui/spinner";
 import {
   useCalendarEvents,
@@ -143,12 +142,12 @@ const Calendar = () => {
   const { mutate: createEvent } = useCreateCalendarEvent();
   const events = calendarQuery.data?.events ?? EMPTY_EVENTS;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const taskErrorMessage =
-    calendarQuery.isError && events.length === 0
-      ? calendarQuery.error instanceof Error
-        ? calendarQuery.error.message
-        : "Please try again."
-      : undefined;
+  const loadErrorMessage = calendarQuery.isError
+    ? calendarQuery.error instanceof Error
+      ? calendarQuery.error.message
+      : "Please try again."
+    : undefined;
+  const taskErrorMessage = events.length === 0 ? loadErrorMessage : undefined;
 
   const handleTaskClick = useCallback((task: TaskItem) => {
     setSelectedEventId(task.id);
@@ -204,69 +203,87 @@ const Calendar = () => {
   );
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="flex h-full w-full min-w-0 flex-col">
-          <PageHeader>
-            <CalendarViewSwitcher
-              pageView={pageView}
-              taskLayout={taskLayout}
-              onPageViewChange={setPageView}
-              onTaskLayoutChange={setTaskLayout}
-            />
-          </PageHeader>
-          <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
-            {pageView === "calendar" ? (
-              <EventCalendar
-                data={events}
-                onItemAdded={handleItemAdded}
-                statusOptions={statusOptions}
-                priorityOptions={priorityOptions}
-                labelOptions={labelOptions}
-                statusColors={statusColors}
-                flagPriority={isHighPriority}
-                view={calendarView}
-                onViewChange={setCalendarView}
-                date={calendarDate}
-                onDateChange={setCalendarDate}
-                now={now}
-                showMiniNav
-                editable
-                editing={calendarEditing}
-                permissions={calendarPermissions}
-                renderQuickComposer={renderCreateComposer}
-                selectedId={selectedEventId}
-                onSelect={setSelectedEventId}
-                onTaskClick={handleTaskClick}
-                onRangeChange={handleRangeChange}
-                renderTooltip={renderTooltip}
-                className="h-full rounded-none border-0"
-              />
-            ) : (
-              <Suspense
-                fallback={
-                  <div
-                    role="status"
-                    className="flex h-full items-center justify-center gap-2 bg-background text-sm text-muted-foreground"
-                  >
-                    <Spinner aria-hidden="true" />
-                    <span>Loading tasks…</span>
-                  </div>
-                }
+    <>
+      <PageHeader
+        title="Calendar"
+        actions={
+          <CalendarViewSwitcher
+            pageView={pageView}
+            taskLayout={taskLayout}
+            onPageViewChange={setPageView}
+            onTaskLayoutChange={setTaskLayout}
+          />
+        }
+      />
+      {pageView === "calendar" && loadErrorMessage ? (
+        <Notice
+          tone="error"
+          title="Events could not be loaded"
+          action={
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={calendarQuery.isFetching}
+              onClick={() => void calendarQuery.refetch()}
+            >
+              {calendarQuery.isFetching ? "Retrying…" : "Retry"}
+            </Button>
+          }
+          className="mx-3 mt-3 sm:mx-5"
+        >
+          {loadErrorMessage} Anything you add now may not be saved.
+        </Notice>
+      ) : null}
+      <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        {pageView === "calendar" ? (
+          <EventCalendar
+            data={events}
+            onItemAdded={handleItemAdded}
+            statusOptions={statusOptions}
+            priorityOptions={priorityOptions}
+            labelOptions={labelOptions}
+            statusColors={statusColors}
+            flagPriority={isHighPriority}
+            view={calendarView}
+            onViewChange={setCalendarView}
+            date={calendarDate}
+            onDateChange={setCalendarDate}
+            now={now}
+            showMiniNav
+            editable
+            editing={calendarEditing}
+            permissions={calendarPermissions}
+            renderQuickComposer={renderCreateComposer}
+            selectedId={selectedEventId}
+            onSelect={setSelectedEventId}
+            onTaskClick={handleTaskClick}
+            onRangeChange={handleRangeChange}
+            renderTooltip={renderTooltip}
+            className="h-full rounded-none border-0"
+          />
+        ) : (
+          <Suspense
+            fallback={
+              <div
+                role="status"
+                className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"
               >
-                <CalendarTaskViews
-                  layout={taskLayout}
-                  tasks={events}
-                  isLoading={calendarQuery.isPending && events.length === 0}
-                  errorMessage={taskErrorMessage}
-                />
-              </Suspense>
-            )}
-          </main>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+                <Spinner aria-hidden="true" />
+                <span>Loading tasks…</span>
+              </div>
+            }
+          >
+            <CalendarTaskViews
+              layout={taskLayout}
+              tasks={events}
+              isLoading={calendarQuery.isPending && events.length === 0}
+              errorMessage={taskErrorMessage}
+            />
+          </Suspense>
+        )}
+      </div>
+    </>
   );
 };
 

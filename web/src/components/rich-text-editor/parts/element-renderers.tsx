@@ -59,7 +59,7 @@ export function H1Element(props: ElementProps) {
     <Wrapped
       {...withAs(props, "h1")}
       className={cn(
-        "mt-10 mb-4 text-4xl font-serif font-bold tracking-tight",
+        "mt-10 mb-4 text-4xl font-serif font-medium tracking-tight",
         props.className,
       )}
     >
@@ -73,7 +73,7 @@ export function H2Element(props: ElementProps) {
     <Wrapped
       {...withAs(props, "h2")}
       className={cn(
-        "mt-8 mb-3 text-3xl font-serif font-bold tracking-tight",
+        "mt-8 mb-3 text-3xl font-serif font-medium tracking-tight",
         props.className,
       )}
     >
@@ -86,7 +86,7 @@ export function H3Element(props: ElementProps) {
   return (
     <Wrapped
       {...withAs(props, "h3")}
-      className={cn("mt-6 mb-2 text-2xl font-serif font-bold", props.className)}
+      className={cn("mt-6 mb-2 text-2xl font-serif font-medium", props.className)}
     >
       {props.children}
     </Wrapped>
@@ -98,7 +98,7 @@ export function H4Element(props: ElementProps) {
     <Wrapped
       {...withAs(props, "h4")}
       className={cn(
-        "mt-4 mb-2 text-xl font-serif font-semibold",
+        "mt-4 mb-2 text-xl font-serif font-medium",
         props.className,
       )}
     >

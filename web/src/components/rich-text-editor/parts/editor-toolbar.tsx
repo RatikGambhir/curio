@@ -221,7 +221,7 @@ function FontFamilySelect() {
     <select
       onMouseDown={(e) => e.preventDefault()}
       onChange={handleChange}
-      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+      className="focus-ring h-8 cursor-pointer rounded-md border border-input bg-card px-2 text-xs text-secondary-foreground hover:bg-secondary"
       title="Font family"
       aria-label="Font family"
       defaultValue="default"
@@ -252,7 +252,7 @@ function FontSizeSelect() {
     <select
       onMouseDown={(e) => e.preventDefault()}
       onChange={handleChange}
-      className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+      className="focus-ring h-8 cursor-pointer rounded-md border border-input bg-card px-2 text-xs text-secondary-foreground hover:bg-secondary"
       title="Font size"
       aria-label="Font size"
       defaultValue="default"
@@ -283,7 +283,7 @@ function FontColorInput() {
       type="color"
       onMouseDown={(e) => e.preventDefault()}
       onChange={handleChange}
-      className="h-8 w-8 cursor-pointer rounded-md border border-input bg-background"
+      className="focus-ring h-8 w-8 cursor-pointer rounded-md border border-input bg-card p-1"
       title="Text color"
       aria-label="Text color"
       defaultValue="#000000"
@@ -310,7 +310,7 @@ export function EditorToolbar({ className, onImageUpload }: EditorToolbarProps) 
       role="toolbar"
       aria-label="Rich text editor toolbar"
       className={cn(
-        "flex flex-wrap items-center gap-1 border-b border-border bg-card px-2 py-1.5",
+        "flex flex-wrap items-center gap-1 border-b border-border bg-card px-3 py-1.5 sm:px-4",
         className
       )}
     >

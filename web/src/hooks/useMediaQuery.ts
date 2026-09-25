@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 
+function matches(query: string): boolean {
+  return typeof window !== "undefined" && window.matchMedia(query).matches;
+}
+
+/* Reads the query synchronously on first render so layout that depends on it
+   does not paint the wrong arrangement for a frame before correcting itself. */
 export const useMediaQuery = (query: string): boolean => {
-  const [matches, setMatches] = useState(false);
+  const [isMatch, setIsMatch] = useState(() => matches(query));
 
   useEffect(() => {
     const mediaQuery = window.matchMedia(query);
-    setMatches(mediaQuery.matches);
+    setIsMatch(mediaQuery.matches);
 
-    const handleChange = () => setMatches(mediaQuery.matches);
+    const handleChange = () => setIsMatch(mediaQuery.matches);
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, [query]);
 
-  return matches;
+  return isMatch;
 };

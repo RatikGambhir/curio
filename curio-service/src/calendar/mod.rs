@@ -1,6 +1,6 @@
-mod error;
+//! Calendar composition root: domain use cases plus PostgreSQL and HTTP adapters.
+mod domain;
 mod handlers;
-mod models;
 mod repository;
 mod service;
 #[cfg(test)]
@@ -10,13 +10,13 @@ mod time;
 
 use axum::{Router, middleware, routing::post};
 
-use crate::{
-    calendar::{repository::CalendarRepository, service::CalendarService},
-    database::Database,
-};
+use self::{repository::PostgresCalendarRepository, service::CalendarService};
+use crate::database::Database;
 
-pub fn api_routes(database: Database) -> Router {
-    let service = CalendarService::new(CalendarRepository::new(database));
+type Service = CalendarService<PostgresCalendarRepository>;
+
+pub(crate) fn router(database: Database) -> Router {
+    let service = CalendarService::new(PostgresCalendarRepository::new(database));
     let events = Router::new().route(
         "/events",
         post(handlers::create_event).get(handlers::list_events),

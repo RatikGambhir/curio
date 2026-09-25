@@ -4,6 +4,8 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span, error, info_span};
 
+use super::{domain::ModelEvent as OpenAiEvent, service::ModelProvider};
+
 const PROVIDER_ERROR_MESSAGE: &str = "The model provider could not complete the response.";
 const PROVIDER_STREAM_ERROR_MESSAGE: &str = "The model provider returned an invalid stream.";
 const PROVIDER_UNAVAILABLE_MESSAGE: &str = "The model provider is temporarily unavailable.";
@@ -14,13 +16,6 @@ pub struct OpenAiClient {
     api_key: String,
     model: String,
     base_url: String,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum OpenAiEvent {
-    Token(String),
-    Done(String),
-    Error { code: &'static str, message: String },
 }
 
 #[derive(Serialize)]
@@ -530,3 +525,9 @@ fn truncate_message(mut message: String) -> String {
 #[cfg(test)]
 #[path = "../../tests/unit/chat/openai.rs"]
 mod tests;
+
+impl ModelProvider for OpenAiClient {
+    fn stream(&self, prompt: String) -> mpsc::Receiver<OpenAiEvent> {
+        OpenAiClient::stream(self, prompt)
+    }
+}

@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import curioLogo from "@/assets/curio-logo.png";
-import { ProfileSetupStepper } from "@/components/profile-setup/profile-setup-stepper";
+import { AuthLayout } from "@/components/auth/auth-layout";
+import {
+  ProfileSetupProgress,
+  ProfileSetupStepper,
+} from "@/components/profile-setup/profile-setup-stepper";
 import {
   INITIAL_PROFILE_SETUP_FORM_DATA,
   PROFILE_SETUP_STEPS,
@@ -16,27 +19,8 @@ import { ContactStep } from "@/components/profile-setup/steps/contact-step";
 import { ReviewStep } from "@/components/profile-setup/steps/review-step";
 import { SocialStep } from "@/components/profile-setup/steps/social-step";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { initialsFor } from "@/lib/initials";
 import { validateEmail } from "@/lib/validators/auth";
-
-function getInitials(name: string, username: string): string {
-  const source = name.trim() || username.trim() || "Curio Member";
-  const parts = source.split(/\s+/).filter(Boolean);
-
-  if (parts.length === 0) {
-    return "CU";
-  }
-
-  const joined = parts.slice(0, 2).map((part) => part[0]).join("");
-  return joined.toUpperCase();
-}
 
 function getStepErrors(
   step: ProfileSetupStep,
@@ -81,7 +65,7 @@ function ProfileSetupWizard() {
   );
 
   const avatarInitials = useMemo(
-    () => getInitials(formData.name, formData.username),
+    () => initialsFor(formData.name.trim() || formData.username.trim()),
     [formData.name, formData.username],
   );
 
@@ -163,65 +147,51 @@ function ProfileSetupWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-muted/30 px-4 py-8 sm:py-10">
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6">
-        <img
-          src={curioLogo}
-          alt="Curio Logo"
-          className="h-auto w-48 sm:w-56"
-          style={{ mixBlendMode: "multiply" }}
+    <AuthLayout
+      statement="Let’s set up your notebook."
+      aside={
+        <ProfileSetupStepper
+          currentStep={currentStep}
+          steps={PROFILE_SETUP_STEPS}
         />
+      }
+    >
+      <ProfileSetupProgress currentStep={currentStep} steps={PROFILE_SETUP_STEPS} />
+      <p className="eyebrow mt-5 text-muted-foreground lg:mt-0">
+        Profile setup · Step {currentStep} of {PROFILE_SETUP_STEPS.length}
+      </p>
+      <h1 className="mt-3 font-display text-display-md text-foreground">
+        {currentStepMeta.title}
+      </h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {currentStepMeta.description} You can change these details at any time.
+      </p>
 
-        <div className="w-full space-y-5">
-          <header className="space-y-2 text-center">
-            <h1 className="text-3xl font-semibold text-foreground">
-              Complete Your Profile
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Tell us a little about yourself. You can update these details at
-              any time.
-            </p>
-          </header>
+      <div key={currentStep} className="rise-in mt-8">
+        {renderStep()}
+      </div>
 
-          <ProfileSetupStepper currentStep={currentStep} steps={PROFILE_SETUP_STEPS} />
-
-          <Card className="w-full rounded-2xl border-border/80 shadow-lg">
-            <CardHeader className="space-y-1 border-b border-border">
-              <CardTitle className="text-xl">{currentStepMeta.title}</CardTitle>
-              <CardDescription>{currentStepMeta.description}</CardDescription>
-            </CardHeader>
-
-            <CardContent className="pt-6">{renderStep()}</CardContent>
-
-            <CardFooter className="flex flex-col gap-3 border-t border-border pt-6">
-              <div className="flex w-full items-center justify-between gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleBack}
-                  disabled={currentStep === 1}
-                >
-                  Back
-                </Button>
-                <Button type="button" onClick={handleContinue}>
-                  {currentStep === 4 ? "Complete Setup" : "Continue"}
-                </Button>
-              </div>
-
-              {currentStep < 4 ? (
-                <button
-                  type="button"
-                  onClick={handleSkipToReview}
-                  className="self-end text-sm font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Skip to review
-                </button>
-              ) : null}
-            </CardFooter>
-          </Card>
+      <div className="mt-10 flex items-center justify-between gap-3 border-t border-border pt-6">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleBack}
+          disabled={currentStep === 1}
+        >
+          Back
+        </Button>
+        <div className="flex items-center gap-4">
+          {currentStep < 4 ? (
+            <Button type="button" variant="link" onClick={handleSkipToReview}>
+              Skip to review
+            </Button>
+          ) : null}
+          <Button type="button" onClick={handleContinue}>
+            {currentStep === 4 ? "Finish setup" : "Continue"}
+          </Button>
         </div>
       </div>
-    </div>
+    </AuthLayout>
   );
 }
 

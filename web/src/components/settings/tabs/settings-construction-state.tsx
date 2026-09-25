@@ -1,19 +1,24 @@
 import { Hammer } from "lucide-react"
 
+import { SettingsSection } from "@/components/settings/settings-section"
+import { EmptyState } from "@/components/ui/empty-state"
+
 type SettingsConstructionStateProps = {
   title: string
 }
 
 export function SettingsConstructionState({ title }: SettingsConstructionStateProps) {
   return (
-    <section className="flex min-h-[26rem] items-center justify-center p-6 sm:p-8">
-      <div className="flex max-w-sm flex-col items-center text-center">
-        <div className="flex size-14 items-center justify-center rounded-md bg-accent text-accent-foreground">
-          <Hammer className="size-6" />
-        </div>
-        <h2 className="mt-4 text-2xl font-bold text-card-foreground">{title}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">We're working on this section.</p>
-      </div>
-    </section>
+    <SettingsSection title={title}>
+      <EmptyState
+        icon={Hammer}
+        title="Not built yet"
+        headingLevel={3}
+        className="rounded-lg border border-dashed border-border-strong py-16"
+      >
+        This part of Curio is still being made. Nothing here changes your
+        account yet.
+      </EmptyState>
+    </SettingsSection>
   )
 }
