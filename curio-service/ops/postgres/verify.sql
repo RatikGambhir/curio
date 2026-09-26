@@ -36,6 +36,12 @@ DECLARE
         'conversations',
         'messages',
         'calendar_events',
+        'spaces',
+        'tasks',
+        'task_tags',
+        'task_tag_assignments',
+        'task_comments',
+        'task_links',
         'document_files',
         'document_file_versions',
         'document_file_blobs',
@@ -139,6 +145,67 @@ BEGIN
         RAISE EXCEPTION 'messages.created_at is not timestamptz(3)';
     END IF;
 
+    SELECT pg_catalog.array_agg(expected_object ORDER BY expected_object)
+    INTO missing_objects
+    FROM pg_catalog.unnest(ARRAY[
+        'spaces_pkey', 'spaces_owner_id_key',
+        'spaces_owner_name_ci_idx', 'spaces_owner_created_idx'
+    ]) AS expected(expected_object)
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_index AS index_record
+        JOIN pg_catalog.pg_class AS index_class ON index_class.oid = index_record.indexrelid
+        JOIN pg_catalog.pg_class AS table_class ON table_class.oid = index_record.indrelid
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = table_class.relnamespace
+        WHERE namespace.nspname = schema_name
+          AND table_class.relname = 'spaces'
+          AND index_class.relname = expected_object
+          AND index_record.indisvalid
+          AND (expected_object = 'spaces_owner_created_idx' OR index_record.indisunique)
+    );
+    IF missing_objects IS NOT NULL THEN
+        RAISE EXCEPTION 'spaces is missing required valid indexes: %', missing_objects;
+    END IF;
+
+    SELECT pg_catalog.array_agg(expected_object ORDER BY expected_object)
+    INTO missing_objects
+    FROM pg_catalog.unnest(ARRAY[
+        'spaces_owner_id_fkey', 'spaces_name_check', 'spaces_description_check'
+    ]) AS expected(expected_object)
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_constraint AS constraint_record
+        JOIN pg_catalog.pg_class AS table_class ON table_class.oid = constraint_record.conrelid
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = table_class.relnamespace
+        WHERE namespace.nspname = schema_name
+          AND table_class.relname = 'spaces'
+          AND constraint_record.conname = expected_object
+          AND constraint_record.convalidated
+    );
+    IF missing_objects IS NOT NULL THEN
+        RAISE EXCEPTION 'spaces is missing required constraints: %', missing_objects;
+    END IF;
+
+    SELECT pg_catalog.array_agg(expected_object ORDER BY expected_object)
+    INTO missing_objects
+    FROM pg_catalog.unnest(ARRAY[
+        'tasks_owner_created_idx', 'tasks_space_order_idx', 'tasks_parent_order_idx',
+        'tasks_due_on_idx', 'tasks_due_at_idx', 'tasks_status_created_idx',
+        'tasks_flagged_created_idx', 'task_tags_owner_created_idx',
+        'task_tag_assignments_tag_idx', 'task_comments_task_created_idx',
+        'task_links_task_order_idx'
+    ]) AS expected(expected_object)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_index AS index_record
+        JOIN pg_catalog.pg_class AS index_class ON index_class.oid = index_record.indexrelid
+        JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = index_class.relnamespace
+        WHERE namespace.nspname = schema_name
+          AND index_class.relname = expected_object AND index_record.indisvalid
+    );
+    IF missing_objects IS NOT NULL THEN
+        RAISE EXCEPTION 'tasks is missing required valid indexes: %', missing_objects;
+    END IF;
+
     IF NOT EXISTS (
         SELECT 1
         FROM pg_catalog.pg_class AS migrations
@@ -187,6 +254,22 @@ BEGIN
     ) THEN
         RAISE EXCEPTION 'required SQLx migration 202609250001 is not successful';
     END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM _sqlx_migrations WHERE version = 202609250002 AND success
+    ) THEN
+        RAISE EXCEPTION 'required SQLx migration 202609250002 is not successful';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM _sqlx_migrations WHERE version = 202609250003 AND success
+    ) THEN
+        RAISE EXCEPTION 'required SQLx migration 202609250003 is not successful';
+    END IF;
+    IF NOT EXISTS (
+        SELECT 1 FROM _sqlx_migrations WHERE version = 202609250004 AND success
+    ) THEN
+        RAISE EXCEPTION 'required SQLx migration 202609250004 is not successful';
+    END IF;
 END
 $migration$;
 
@@ -214,6 +297,18 @@ SELECT 'document_files', pg_catalog.count(*)::bigint FROM document_files
 UNION ALL
 SELECT 'messages', pg_catalog.count(*)::bigint FROM messages
 UNION ALL
+SELECT 'spaces', pg_catalog.count(*)::bigint FROM spaces
+UNION ALL
+SELECT 'tasks', pg_catalog.count(*)::bigint FROM tasks
+UNION ALL
+SELECT 'task_tags', pg_catalog.count(*)::bigint FROM task_tags
+UNION ALL
+SELECT 'task_tag_assignments', pg_catalog.count(*)::bigint FROM task_tag_assignments
+UNION ALL
+SELECT 'task_comments', pg_catalog.count(*)::bigint FROM task_comments
+UNION ALL
+SELECT 'task_links', pg_catalog.count(*)::bigint FROM task_links
+UNION ALL
 SELECT 'users', pg_catalog.count(*)::bigint FROM users
 ORDER BY table_name;
 
@@ -226,6 +321,16 @@ SELECT 'calendar_events_without_user', pg_catalog.count(*)::bigint
 FROM calendar_events AS event
 LEFT JOIN users AS app_user ON app_user.id = event.user_id
 WHERE app_user.id IS NULL
+UNION ALL
+SELECT 'spaces_without_owner', pg_catalog.count(*)::bigint
+FROM spaces AS space
+LEFT JOIN users AS app_user ON app_user.id = space.owner_id
+WHERE app_user.id IS NULL
+UNION ALL
+SELECT 'task_parent_space_mismatch', pg_catalog.count(*)::bigint
+FROM tasks AS child
+JOIN tasks AS parent ON parent.owner_id = child.owner_id AND parent.id = child.parent_id
+WHERE child.space_id IS DISTINCT FROM parent.space_id
 UNION ALL
 SELECT 'documents_without_owner', pg_catalog.count(*)::bigint
 FROM document_files AS document_file

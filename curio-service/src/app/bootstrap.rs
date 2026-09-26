@@ -22,7 +22,9 @@ use crate::{
             ingestion::service::IngestionService, search::service::SearchService,
             store::repository::DocumentStore, viewing::service::StoredDocumentService,
         },
+        spaces::{self, repository::SpaceRepository, service::SpaceService},
         system,
+        tasks::{self, repository::TaskRepository, service::TaskService},
         users::{self, repository::UserRepository, service::UserService},
     },
     shared::diagnostics,
@@ -86,6 +88,8 @@ fn assemble_api(config: &ServiceConfig, database: Database) -> Router {
     let calendar = Arc::new(CalendarService::new(CalendarRepository::new(
         database.clone(),
     )));
+    let spaces = Arc::new(SpaceService::new(SpaceRepository::new(database.clone())));
+    let tasks = Arc::new(TaskService::new(TaskRepository::new(database.clone())));
     let users = Arc::new(UserService::new(UserRepository::new(database.clone())));
     let chat = Arc::new(ChatService::new(
         ChatRepository::new(database),
@@ -115,6 +119,8 @@ fn assemble_api(config: &ServiceConfig, database: Database) -> Router {
         .merge(chat::route::routes(chat))
         .merge(protected(calendar::route::routes(calendar)))
         .merge(protected(users::route::routes(users)))
+        .merge(protected(spaces::route::routes(spaces)))
+        .merge(protected(tasks::route::routes(tasks)))
         .merge(protected(documents::route::routes(
             Arc::new(document_ingestion),
             document_jobs,
