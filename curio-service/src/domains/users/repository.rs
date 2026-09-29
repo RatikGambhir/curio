@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     adapters::postgres::client::Database,
-    adapters::postgres::query::{Assignment, FieldWriter, InsertQuery, SqlColumn, SqlField},
+    adapters::postgres::query::{Insert, SqlColumn, SqlField, WriteField, current_timestamp},
 };
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ impl UserRepository {
 impl UserStore for UserRepository {
     async fn save(&self, profile: UserProfile<'_>) -> Result<UserRecord, UserError> {
         use UserColumn::*;
-        InsertQuery::new("users")
+        Insert::into("users")
             .value(UserField::Id(profile.id()))
             .value(UserField::Name(profile.name()))
             .value(UserField::Email(profile.email()))
@@ -32,10 +32,10 @@ impl UserStore for UserRepository {
             .on_conflict(
                 Id,
                 [
-                    Assignment::Excluded(Name),
-                    Assignment::Excluded(Email),
-                    Assignment::Excluded(AvatarUrl),
-                    Assignment::CurrentTimestamp(UpdatedAt),
+                    (Name, Name.of("EXCLUDED")),
+                    (Email, Email.of("EXCLUDED")),
+                    (AvatarUrl, AvatarUrl.of("EXCLUDED")),
+                    (UpdatedAt, current_timestamp()),
                 ],
             )
             .returning([Id, Name, Email, AvatarUrl, CreatedAt, UpdatedAt])
@@ -83,7 +83,7 @@ fn storage_error(error: sqlx::Error) -> UserError {
 }
 
 #[derive(Clone, Copy)]
-enum UserColumn {
+pub(crate) enum UserColumn {
     Id,
     Name,
     Email,
@@ -111,14 +111,13 @@ enum UserField<'a> {
     Email(&'a str),
     AvatarUrl(Option<&'a str>),
 }
-impl SqlField for UserField<'_> {
-    type Column = UserColumn;
-    fn write(self, writer: &mut impl FieldWriter<UserColumn>) {
+impl<'a> SqlField<'a> for UserField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(UserColumn::Id, value),
-            Self::Name(value) => writer.bind(UserColumn::Name, value),
-            Self::Email(value) => writer.bind(UserColumn::Email, value),
-            Self::AvatarUrl(value) => writer.bind(UserColumn::AvatarUrl, value),
+            Self::Id(value) => UserColumn::Id.value(value),
+            Self::Name(value) => UserColumn::Name.value(value),
+            Self::Email(value) => UserColumn::Email.value(value),
+            Self::AvatarUrl(value) => UserColumn::AvatarUrl.value(value),
         }
     }
 }

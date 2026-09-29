@@ -5,7 +5,22 @@ use super::{
     model::{NewSpace, Space, SpaceError, SpacePage},
     service::SpaceStore,
 };
-use crate::adapters::postgres::client::Database;
+use crate::adapters::postgres::{
+    client::Database,
+    query::{Delete, Insert, Select, SqlColumn, col, sql_columns, tuple, val},
+};
+use crate::domains::users::repository::UserColumn;
+sql_columns! { pub(crate) enum SpaceColumn {
+    Id => "id", OwnerId => "owner_id", Name => "name", Description => "description",
+    CreatedAt => "created_at", UpdatedAt => "updated_at"
+} }
+const SPACE_COLUMNS: [SpaceColumn; 5] = [
+    SpaceColumn::Id,
+    SpaceColumn::Name,
+    SpaceColumn::Description,
+    SpaceColumn::CreatedAt,
+    SpaceColumn::UpdatedAt,
+];
 
 pub struct SpaceRepository {
     database: Database,
@@ -19,36 +34,39 @@ impl SpaceRepository {
 
 impl SpaceStore for SpaceRepository {
     async fn insert(&self, owner: &str, space: NewSpace<'_>) -> Result<Space, SpaceError> {
-        sqlx::query_as::<_, SpaceRow>(
-            "INSERT INTO spaces (id, owner_id, name, description) VALUES ($1, $2, $3, $4)
-             RETURNING id, name, description, created_at, updated_at",
-        )
-        .bind(space.id())
-        .bind(owner)
-        .bind(space.name())
-        .bind(space.description())
-        .fetch_one(self.database.pool())
-        .await
-        .map(Into::into)
-        .map_err(|error| storage_error("spaces_insert", error))
+        Insert::into("spaces")
+            .value(SpaceColumn::Id.value(space.id()))
+            .value(SpaceColumn::OwnerId.value(owner))
+            .value(SpaceColumn::Name.value(space.name()))
+            .value(SpaceColumn::Description.value(space.description()))
+            .returning(SPACE_COLUMNS)
+            .build()
+            .map_err(|error| storage_error("spaces_insert", error))?
+            .build_query_as::<SpaceRow>()
+            .fetch_one(self.database.pool())
+            .await
+            .map(Into::into)
+            .map_err(|error| storage_error("spaces_insert", error))
     }
 
     async fn list(&self, owner: &str, page: &SpacePage) -> Result<Vec<Space>, SpaceError> {
-        let cursor = page.cursor();
-        sqlx::query_as::<_, SpaceRow>(
-            "SELECT id, name, description, created_at, updated_at FROM spaces
-             WHERE owner_id = $1
-               AND ($2::timestamptz IS NULL OR (created_at, id) < ($2, $3))
-             ORDER BY created_at DESC, id DESC LIMIT $4",
-        )
-        .bind(owner)
-        .bind(cursor.map(|value| value.created_at()))
-        .bind(cursor.map(|value| value.id()))
-        .bind((page.limit() + 1) as i64)
-        .fetch_all(self.database.pool())
-        .await
-        .map(|rows| rows.into_iter().map(Into::into).collect())
-        .map_err(|error| storage_error("spaces_list", error))
+        Select::from("spaces")
+            .columns(SPACE_COLUMNS)
+            .where_(SpaceColumn::OwnerId.is_equal_to(owner))
+            .where_optional(page.cursor().map(|cursor| {
+                tuple([col(SpaceColumn::CreatedAt), col(SpaceColumn::Id)])
+                    .lt(tuple([val(cursor.created_at()), val(cursor.id())]))
+            }))
+            .order_by(SpaceColumn::CreatedAt.desc())
+            .order_by(SpaceColumn::Id.desc())
+            .limit(val((page.limit() + 1) as i64))
+            .build()
+            .map_err(|error| storage_error("spaces_list", error))?
+            .build_query_as::<SpaceRow>()
+            .fetch_all(self.database.pool())
+            .await
+            .map(|rows| rows.into_iter().map(Into::into).collect())
+            .map_err(|error| storage_error("spaces_list", error))
     }
 
     async fn delete(&self, owner: &str, id: &str) -> Result<(), SpaceError> {
@@ -59,31 +77,41 @@ impl SpaceStore for SpaceRepository {
             .await
             .map_err(|error| storage_error("spaces_delete_begin", error))?;
         // Share the Tasks lock order so creates/reparents cannot race detachment.
-        sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
-            .bind(owner)
+        Select::from("users")
+            .columns([UserColumn::Id])
+            .where_(UserColumn::Id.is_equal_to(owner))
+            .for_update()
+            .build()
+            .map_err(|error| storage_error("spaces_delete_lock", error))?
+            .build()
             .fetch_optional(&mut *tx)
             .await
             .map_err(|error| storage_error("spaces_delete_lock", error))?;
-        sqlx::query_scalar::<_, String>(
-            "SELECT id FROM spaces WHERE owner_id=$1 AND id=$2 FOR UPDATE",
-        )
-        .bind(owner)
-        .bind(id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(|error| storage_error("spaces_delete_lookup", error))?
-        .ok_or(SpaceError::NotFound)?;
+        Select::from("spaces")
+            .columns([SpaceColumn::Id])
+            .where_(SpaceColumn::OwnerId.is_equal_to(owner))
+            .where_(SpaceColumn::Id.is_equal_to(id))
+            .for_update()
+            .build()
+            .map_err(|error| storage_error("spaces_delete_lookup", error))?
+            .build_query_scalar::<String>()
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|error| storage_error("spaces_delete_lookup", error))?
+            .ok_or(SpaceError::NotFound)?;
         crate::domains::tasks::repository::detach_space_tasks(&mut tx, owner, id)
             .await
             .map_err(|error| storage_error("spaces_detach_tasks", error))?;
-        sqlx::query_scalar::<_, String>(
-            "DELETE FROM spaces WHERE id=$1 AND owner_id=$2 RETURNING id",
-        )
-        .bind(id)
-        .bind(owner)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|error| storage_error("spaces_delete", error))?;
+        Delete::from("spaces")
+            .where_(SpaceColumn::Id.is_equal_to(id))
+            .where_(SpaceColumn::OwnerId.is_equal_to(owner))
+            .returning([SpaceColumn::Id])
+            .build()
+            .map_err(|error| storage_error("spaces_delete", error))?
+            .build_query_scalar::<String>()
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|error| storage_error("spaces_delete", error))?;
         tx.commit()
             .await
             .map_err(|error| storage_error("spaces_delete_commit", error))

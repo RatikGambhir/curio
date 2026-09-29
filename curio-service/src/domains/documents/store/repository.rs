@@ -2,8 +2,7 @@
 //!
 //! One transaction writes the file, its content version, the version bytes,
 //! and the version's chunks, so a document is never stored without its index.
-//! Single-table writes use the shared query builders; joins, row locks, and
-//! casts use explicit SQL with bound parameters.
+//! Reads and writes use the shared query builder, including joins and locks.
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgConnection};
 
@@ -13,7 +12,8 @@ use super::model::{
 use crate::{
     adapters::postgres::client::Database,
     adapters::postgres::query::{
-        Comparison, Expression, FieldWriter, InsertQuery, SqlColumn, SqlField, UpdateQuery,
+        Expr, Function, Insert, Select, SqlColumn, SqlField, SqlType, Update, WriteField, call,
+        col, current_timestamp, int, sql_columns, table, val,
     },
     domains::documents::{
         index::repository::replace_version_chunks, ingestion::service::IngestionStore,
@@ -32,87 +32,28 @@ impl DocumentStore {
     }
 }
 
-const FIND_CURRENT_BY_HASH: &str = r#"
-SELECT file.id AS file_id, file.owner_id, file.display_name, version.id AS version_id
-FROM document_files AS file
-JOIN document_file_versions AS version ON version.file_id = file.id
-WHERE file.owner_id = $1
-  AND file.deleted_at IS NULL
-  AND version.is_current
-  AND version.content_sha256 = $2
-"#;
+sql_columns! { pub(crate) enum FileColumn {
+    Id => "id", OwnerId => "owner_id", DisplayName => "display_name", SourceUri => "source_uri",
+    Metadata => "metadata", CreatedAt => "created_at", UpdatedAt => "updated_at", DeletedAt => "deleted_at"
+} }
+sql_columns! { enum DerivedColumn { Deleted => "deleted" } }
 
-const LOCK_FILE: &str = r#"
-SELECT owner_id, deleted_at IS NOT NULL AS deleted
-FROM document_files
-WHERE id = $1
-FOR UPDATE
-"#;
-
-const UPSERT_FILE: &str = r#"
-INSERT INTO document_files (id, owner_id, display_name, source_uri, metadata)
-VALUES ($1, $2, $3, $4, $5::jsonb)
-ON CONFLICT (id) DO UPDATE SET
-    display_name = EXCLUDED.display_name,
-    source_uri = EXCLUDED.source_uri,
-    metadata = EXCLUDED.metadata,
-    updated_at = CURRENT_TIMESTAMP
-"#;
-
-const FIND_VERSION: &str = r#"
-SELECT id, byte_size, is_current
-FROM document_file_versions
-WHERE file_id = $1 AND content_sha256 = $2
-"#;
-
-const BLOB_MATCHES: &str = r#"
-SELECT file_bytes = $2 FROM document_file_blobs WHERE version_id = $1
-"#;
-
-const NEXT_VERSION_NUMBER: &str = r#"
-SELECT COALESCE(MAX(version_number), 0) + 1
-FROM document_file_versions
-WHERE file_id = $1
-"#;
-
-const READ_BACK_IDENTITY: &str = r#"
-SELECT file.id AS file_id, file.owner_id, file.display_name, version.id AS version_id
-FROM document_files AS file
-JOIN document_file_versions AS version ON version.file_id = file.id
-WHERE file.id = $1 AND version.id = $2 AND version.is_current
-"#;
-
-const LIST_CURRENT: &str = r#"
-SELECT
-    file.id AS file_id,
-    file.display_name,
-    version.mime_type,
-    version.byte_size,
-    version.id AS version_id,
-    version.version_number,
-    file.created_at,
-    file.updated_at
-FROM document_files AS file
-JOIN document_file_versions AS version
-  ON version.file_id = file.id AND version.is_current
-WHERE file.owner_id = $1 AND file.deleted_at IS NULL
-ORDER BY file.display_name ASC, file.id ASC
-"#;
-
-const CURRENT_BLOB: &str = r#"
-SELECT file.id AS file_id, file.display_name, version.mime_type, blob.file_bytes
-FROM document_files AS file
-JOIN document_file_versions AS version
-  ON version.file_id = file.id AND version.is_current
-JOIN document_file_blobs AS blob ON blob.version_id = version.id
-WHERE file.owner_id = $1 AND file.id = $2 AND file.deleted_at IS NULL
-"#;
-
-const SOFT_DELETE: &str = r#"
-UPDATE document_files
-SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
-"#;
+fn file_versions<'a>() -> Select<'a> {
+    Select::from(table("document_files").alias("file")).join(
+        table("document_file_versions").alias("version"),
+        VersionColumn::FileId
+            .of("version")
+            .eq(FileColumn::Id.of("file")),
+    )
+}
+fn identity<'a>() -> Select<'a> {
+    file_versions().columns([
+        FileColumn::Id.of("file").alias(VersionColumn::FileId),
+        FileColumn::OwnerId.of("file"),
+        FileColumn::DisplayName.of("file"),
+        VersionColumn::Id.of("version").alias(BlobColumn::VersionId),
+    ])
+}
 
 impl IngestionStore for DocumentStore {
     async fn find_current_by_hash(
@@ -120,9 +61,18 @@ impl IngestionStore for DocumentStore {
         owner_id: &str,
         content_sha256: &str,
     ) -> Result<Option<PersistedFileIdentity>, DocumentError> {
-        let rows = sqlx::query_as::<_, IdentityRow>(FIND_CURRENT_BY_HASH)
-            .bind(owner_id)
-            .bind(content_sha256)
+        let rows = identity()
+            .where_(FileColumn::OwnerId.of("file").eq(val(owner_id)))
+            .where_(FileColumn::DeletedAt.of("file").is_null())
+            .where_(VersionColumn::IsCurrent.of("version"))
+            .where_(
+                VersionColumn::ContentSha256
+                    .of("version")
+                    .eq(val(content_sha256)),
+            )
+            .build()
+            .map_err(|error| storage_error("documents_find_by_hash", error))?
+            .build_query_as::<IdentityRow>()
             .fetch_all(self.database.pool())
             .await
             .map_err(|error| storage_error("documents_find_by_hash", error))?;
@@ -146,8 +96,25 @@ impl IngestionStore for DocumentStore {
 
 impl StoredDocuments for DocumentStore {
     async fn list(&self, owner_id: &str) -> Result<Vec<DocumentSummary>, DocumentError> {
-        sqlx::query_as::<_, SummaryRow>(LIST_CURRENT)
-            .bind(owner_id)
+        file_versions()
+            .columns([
+                FileColumn::Id.of("file").alias(VersionColumn::FileId),
+                FileColumn::DisplayName.of("file"),
+                VersionColumn::MimeType.of("version"),
+                VersionColumn::ByteSize.of("version"),
+                VersionColumn::Id.of("version").alias(BlobColumn::VersionId),
+                VersionColumn::VersionNumber.of("version"),
+                FileColumn::CreatedAt.of("file"),
+                FileColumn::UpdatedAt.of("file"),
+            ])
+            .where_(VersionColumn::IsCurrent.of("version"))
+            .where_(FileColumn::OwnerId.of("file").eq(val(owner_id)))
+            .where_(FileColumn::DeletedAt.of("file").is_null())
+            .order_by(FileColumn::DisplayName.of("file").asc())
+            .order_by(FileColumn::Id.of("file").asc())
+            .build()
+            .map_err(|error| storage_error("documents_list", error))?
+            .build_query_as::<SummaryRow>()
             .fetch_all(self.database.pool())
             .await
             .map(|rows| rows.into_iter().map(Into::into).collect())
@@ -159,9 +126,26 @@ impl StoredDocuments for DocumentStore {
         owner_id: &str,
         file_id: &str,
     ) -> Result<Option<StoredDocumentBlob>, DocumentError> {
-        sqlx::query_as::<_, BlobRow>(CURRENT_BLOB)
-            .bind(owner_id)
-            .bind(file_id)
+        file_versions()
+            .join(
+                table("document_file_blobs").alias("blob"),
+                BlobColumn::VersionId
+                    .of("blob")
+                    .eq(VersionColumn::Id.of("version")),
+            )
+            .columns([
+                FileColumn::Id.of("file").alias(VersionColumn::FileId),
+                FileColumn::DisplayName.of("file"),
+                VersionColumn::MimeType.of("version"),
+                BlobColumn::FileBytes.of("blob"),
+            ])
+            .where_(VersionColumn::IsCurrent.of("version"))
+            .where_(FileColumn::OwnerId.of("file").eq(val(owner_id)))
+            .where_(FileColumn::Id.of("file").eq(val(file_id)))
+            .where_(FileColumn::DeletedAt.of("file").is_null())
+            .build()
+            .map_err(|error| storage_error("documents_current_blob", error))?
+            .build_query_as::<BlobRow>()
             .fetch_optional(self.database.pool())
             .await
             .map(|row| row.map(Into::into))
@@ -169,9 +153,15 @@ impl StoredDocuments for DocumentStore {
     }
 
     async fn soft_delete(&self, owner_id: &str, file_id: &str) -> Result<bool, DocumentError> {
-        sqlx::query(SOFT_DELETE)
-            .bind(file_id)
-            .bind(owner_id)
+        Update::table("document_files")
+            .set(FileColumn::DeletedAt.expression(current_timestamp()))
+            .set(FileColumn::UpdatedAt.expression(current_timestamp()))
+            .where_(FileColumn::Id.is_equal_to(file_id))
+            .where_(FileColumn::OwnerId.is_equal_to(owner_id))
+            .where_(FileColumn::DeletedAt.is_null())
+            .build()
+            .map_err(|error| storage_error("documents_soft_delete", error))?
+            .build()
             .execute(self.database.pool())
             .await
             .map(|result| result.rows_affected() == 1)
@@ -235,8 +225,17 @@ async fn validate_existing_file(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let Some(existing) = sqlx::query_as::<_, ExistingFileRow>(LOCK_FILE)
-        .bind(&file.file_id)
+    let Some(existing) = Select::from("document_files")
+        .columns([
+            col(FileColumn::OwnerId),
+            FileColumn::DeletedAt
+                .is_not_null()
+                .alias(DerivedColumn::Deleted),
+        ])
+        .where_(FileColumn::Id.is_equal_to(&file.file_id))
+        .for_update()
+        .build()?
+        .build_query_as::<ExistingFileRow>()
         .fetch_optional(&mut *connection)
         .await?
     else {
@@ -257,12 +256,26 @@ async fn upsert_file(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let result = sqlx::query(UPSERT_FILE)
-        .bind(&file.file_id)
-        .bind(&file.owner_id)
-        .bind(&file.display_name)
-        .bind(file.source_uri.as_deref())
-        .bind(&file.metadata_json)
+    let result = Insert::into("document_files")
+        .value(FileColumn::Id.value(&file.file_id))
+        .value(FileColumn::OwnerId.value(&file.owner_id))
+        .value(FileColumn::DisplayName.value(&file.display_name))
+        .value(FileColumn::SourceUri.value(file.source_uri.as_deref()))
+        .value(FileColumn::Metadata.expression(val(&file.metadata_json).cast(SqlType::Jsonb)))
+        .on_conflict(
+            FileColumn::Id,
+            [
+                (
+                    FileColumn::DisplayName,
+                    FileColumn::DisplayName.of("EXCLUDED"),
+                ),
+                (FileColumn::SourceUri, FileColumn::SourceUri.of("EXCLUDED")),
+                (FileColumn::Metadata, FileColumn::Metadata.of("EXCLUDED")),
+                (FileColumn::UpdatedAt, current_timestamp()),
+            ],
+        )
+        .build()?
+        .build()
         .execute(&mut *connection)
         .await?;
     require_one_row(result.rows_affected(), "document file upsert")
@@ -272,9 +285,16 @@ async fn find_existing_version(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<Option<ExistingVersionRow>, PersistError> {
-    Ok(sqlx::query_as::<_, ExistingVersionRow>(FIND_VERSION)
-        .bind(&file.file_id)
-        .bind(&file.content_sha256)
+    Ok(Select::from("document_file_versions")
+        .columns([
+            VersionColumn::Id,
+            VersionColumn::ByteSize,
+            VersionColumn::IsCurrent,
+        ])
+        .where_(VersionColumn::FileId.is_equal_to(&file.file_id))
+        .where_(VersionColumn::ContentSha256.is_equal_to(&file.content_sha256))
+        .build()?
+        .build_query_as::<ExistingVersionRow>()
         .fetch_optional(&mut *connection)
         .await?)
 }
@@ -289,9 +309,11 @@ async fn verify_idempotent_version_and_blob(
             "stored version does not match its derived identity or byte size",
         ));
     }
-    let matches = sqlx::query_scalar::<_, bool>(BLOB_MATCHES)
-        .bind(&existing.id)
-        .bind(&file.file_bytes)
+    let matches = Select::from("document_file_blobs")
+        .columns([BlobColumn::FileBytes.is_equal_to(&file.file_bytes)])
+        .where_(BlobColumn::VersionId.is_equal_to(&existing.id))
+        .build()?
+        .build_query_scalar::<bool>()
         .fetch_optional(&mut *connection)
         .await?;
     match matches {
@@ -305,8 +327,18 @@ async fn next_version_number(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<i64, PersistError> {
-    Ok(sqlx::query_scalar::<_, i64>(NEXT_VERSION_NUMBER)
-        .bind(&file.file_id)
+    Ok(Select::from("document_file_versions")
+        .columns([call(
+            Function::Coalesce,
+            [
+                call(Function::Max, [col(VersionColumn::VersionNumber)]),
+                int(0),
+            ],
+        )
+        .plus(int(1))])
+        .where_(VersionColumn::FileId.is_equal_to(&file.file_id))
+        .build()?
+        .build_query_scalar::<i64>()
         .fetch_one(&mut *connection)
         .await?)
 }
@@ -315,10 +347,10 @@ async fn clear_current_version(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let result = UpdateQuery::new("document_file_versions")
-        .value(VersionField::IsCurrent(false))
-        .filter(VersionColumn::FileId, Comparison::Equal, &file.file_id)
-        .filter(VersionColumn::IsCurrent, Comparison::Equal, true)
+    let result = Update::table("document_file_versions")
+        .set(VersionField::IsCurrent(false))
+        .where_(VersionColumn::FileId.is_equal_to(&file.file_id))
+        .where_(VersionColumn::IsCurrent.is_equal_to(true))
         .build()?
         .build()
         .execute(&mut *connection)
@@ -333,10 +365,10 @@ async fn set_current_version(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let result = UpdateQuery::new("document_file_versions")
-        .value(VersionField::IsCurrent(true))
-        .filter(VersionColumn::Id, Comparison::Equal, &file.version_id)
-        .filter(VersionColumn::FileId, Comparison::Equal, &file.file_id)
+    let result = Update::table("document_file_versions")
+        .set(VersionField::IsCurrent(true))
+        .where_(VersionColumn::Id.is_equal_to(&file.version_id))
+        .where_(VersionColumn::FileId.is_equal_to(&file.file_id))
         .build()?
         .build()
         .execute(&mut *connection)
@@ -349,7 +381,7 @@ async fn insert_version(
     file: &FilePersistence,
     version_number: i64,
 ) -> Result<(), PersistError> {
-    let result = InsertQuery::new("document_file_versions")
+    let result = Insert::into("document_file_versions")
         .value(VersionField::Id(&file.version_id))
         .value(VersionField::FileId(&file.file_id))
         .value(VersionField::VersionNumber(version_number))
@@ -369,7 +401,7 @@ async fn insert_blob(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let result = InsertQuery::new("document_file_blobs")
+    let result = Insert::into("document_file_blobs")
         .value(BlobField::VersionId(&file.version_id))
         .value(BlobField::FileBytes(&file.file_bytes))
         .build()?
@@ -383,9 +415,9 @@ async fn mark_version_indexed(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<(), PersistError> {
-    let result = UpdateQuery::new("document_file_versions")
-        .value(VersionField::IndexedAt(Expression::CurrentTimestamp))
-        .filter(VersionColumn::Id, Comparison::Equal, &file.version_id)
+    let result = Update::table("document_file_versions")
+        .set(VersionField::IndexedAt(current_timestamp()))
+        .where_(VersionColumn::Id.is_equal_to(&file.version_id))
         .build()?
         .build()
         .execute(&mut *connection)
@@ -397,9 +429,12 @@ async fn read_back_identity(
     connection: &mut PgConnection,
     file: &FilePersistence,
 ) -> Result<PersistedFileIdentity, PersistError> {
-    let rows = sqlx::query_as::<_, IdentityRow>(READ_BACK_IDENTITY)
-        .bind(&file.file_id)
-        .bind(&file.version_id)
+    let rows = identity()
+        .where_(FileColumn::Id.of("file").eq(val(&file.file_id)))
+        .where_(VersionColumn::Id.of("version").eq(val(&file.version_id)))
+        .where_(VersionColumn::IsCurrent.of("version"))
+        .build()?
+        .build_query_as::<IdentityRow>()
         .fetch_all(&mut *connection)
         .await?;
     let [row] = rows.as_slice() else {
@@ -521,7 +556,7 @@ impl From<BlobRow> for StoredDocumentBlob {
 }
 
 #[derive(Clone, Copy)]
-enum VersionColumn {
+pub(crate) enum VersionColumn {
     Id,
     FileId,
     VersionNumber,
@@ -557,21 +592,20 @@ enum VersionField<'a> {
     ContentSha256(&'a str),
     ByteSize(i64),
     IsCurrent(bool),
-    IndexedAt(Expression),
+    IndexedAt(Expr<'a>),
 }
-impl SqlField for VersionField<'_> {
-    type Column = VersionColumn;
-    fn write(self, writer: &mut impl FieldWriter<VersionColumn>) {
+impl<'a> SqlField<'a> for VersionField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(VersionColumn::Id, value),
-            Self::FileId(value) => writer.bind(VersionColumn::FileId, value),
-            Self::VersionNumber(value) => writer.bind(VersionColumn::VersionNumber, value),
-            Self::OriginalFilename(value) => writer.bind(VersionColumn::OriginalFilename, value),
-            Self::MimeType(value) => writer.bind(VersionColumn::MimeType, value),
-            Self::ContentSha256(value) => writer.bind(VersionColumn::ContentSha256, value),
-            Self::ByteSize(value) => writer.bind(VersionColumn::ByteSize, value),
-            Self::IsCurrent(value) => writer.bind(VersionColumn::IsCurrent, value),
-            Self::IndexedAt(expression) => writer.expression(VersionColumn::IndexedAt, expression),
+            Self::Id(value) => VersionColumn::Id.value(value),
+            Self::FileId(value) => VersionColumn::FileId.value(value),
+            Self::VersionNumber(value) => VersionColumn::VersionNumber.value(value),
+            Self::OriginalFilename(value) => VersionColumn::OriginalFilename.value(value),
+            Self::MimeType(value) => VersionColumn::MimeType.value(value),
+            Self::ContentSha256(value) => VersionColumn::ContentSha256.value(value),
+            Self::ByteSize(value) => VersionColumn::ByteSize.value(value),
+            Self::IsCurrent(value) => VersionColumn::IsCurrent.value(value),
+            Self::IndexedAt(expression) => VersionColumn::IndexedAt.expression(expression),
         }
     }
 }
@@ -594,12 +628,11 @@ enum BlobField<'a> {
     VersionId(&'a str),
     FileBytes(&'a [u8]),
 }
-impl SqlField for BlobField<'_> {
-    type Column = BlobColumn;
-    fn write(self, writer: &mut impl FieldWriter<BlobColumn>) {
+impl<'a> SqlField<'a> for BlobField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::VersionId(value) => writer.bind(BlobColumn::VersionId, value),
-            Self::FileBytes(value) => writer.bind(BlobColumn::FileBytes, value),
+            Self::VersionId(value) => BlobColumn::VersionId.value(value),
+            Self::FileBytes(value) => BlobColumn::FileBytes.value(value),
         }
     }
 }

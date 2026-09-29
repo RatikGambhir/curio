@@ -10,8 +10,7 @@ use super::{
 use crate::{
     adapters::postgres::client::Database,
     adapters::postgres::query::{
-        Assignment, Comparison, Direction, Expression, FieldWriter, InsertQuery, SelectQuery,
-        SqlColumn, SqlField, UpdateQuery,
+        Expr, Insert, Select, SqlColumn, SqlField, Update, WriteField, current_timestamp,
     },
 };
 
@@ -71,31 +70,28 @@ impl ChatStore for ChatRepository {
     }
 
     async fn list_conversations(&self) -> Result<Vec<ConversationRecord>, ChatStorageError> {
-        SelectQuery::new(
-            "conversations",
-            [
+        Select::from("conversations")
+            .columns([
                 ConversationColumn::Id,
                 ConversationColumn::CreatedAt,
                 ConversationColumn::UpdatedAt,
-            ],
-        )
-        .order_by(ConversationColumn::UpdatedAt, Direction::Descending)
-        .order_by(ConversationColumn::Id, Direction::Ascending)
-        .build()
-        .map_err(|error| storage_error("chat_query", error))?
-        .build_query_as::<ConversationRecord>()
-        .fetch_all(self.database.pool())
-        .await
-        .map_err(|error| storage_error("chat_list_conversations", error))
+            ])
+            .order_by(ConversationColumn::UpdatedAt.desc())
+            .order_by(ConversationColumn::Id.asc())
+            .build()
+            .map_err(|error| storage_error("chat_query", error))?
+            .build_query_as::<ConversationRecord>()
+            .fetch_all(self.database.pool())
+            .await
+            .map_err(|error| storage_error("chat_list_conversations", error))
     }
 
     async fn conversation_messages(
         &self,
         conversation_id: &str,
     ) -> Result<Vec<MessageRecord>, ChatStorageError> {
-        SelectQuery::new(
-            "messages",
-            [
+        Select::from("messages")
+            .columns([
                 MessageColumn::Id,
                 MessageColumn::ConversationId,
                 MessageColumn::Role,
@@ -105,38 +101,33 @@ impl ChatStore for ChatRepository {
                 MessageColumn::ErrorCode,
                 MessageColumn::CreatedAt,
                 MessageColumn::UpdatedAt,
-            ],
-        )
-        .filter(
-            MessageColumn::ConversationId,
-            Comparison::Equal,
-            conversation_id,
-        )
-        .order_by(MessageColumn::CreatedAt, Direction::Ascending)
-        .order_by(MessageColumn::SortOrder, Direction::Ascending)
-        .build()
-        .map_err(|error| storage_error("chat_query", error))?
-        .build_query_as::<MessageRecord>()
-        .fetch_all(self.database.pool())
-        .await
-        .map_err(|error| storage_error("chat_conversation_messages", error))
+            ])
+            .where_(MessageColumn::ConversationId.is_equal_to(conversation_id))
+            .order_by(MessageColumn::CreatedAt.asc())
+            .order_by(MessageColumn::SortOrder.asc())
+            .build()
+            .map_err(|error| storage_error("chat_query", error))?
+            .build_query_as::<MessageRecord>()
+            .fetch_all(self.database.pool())
+            .await
+            .map_err(|error| storage_error("chat_conversation_messages", error))
     }
 }
 
 impl ChatRepository {
     async fn start_transaction(&self, request: &ChatStreamRequest) -> Result<(), sqlx::Error> {
         let mut transaction = self.database.pool().begin().await?;
-        InsertQuery::new("conversations")
+        Insert::into("conversations")
             .value(ConversationField::Id(&request.conversation_id))
             .on_conflict(
                 ConversationColumn::Id,
-                [Assignment::CurrentTimestamp(ConversationColumn::UpdatedAt)],
+                [(ConversationColumn::UpdatedAt, current_timestamp())],
             )
             .build()?
             .build()
             .execute(&mut *transaction)
             .await?;
-        InsertQuery::new("messages")
+        Insert::into("messages")
             .value(MessageField::Id(&request.user_message_id))
             .value(MessageField::ConversationId(&request.conversation_id))
             .value(MessageField::Role("user"))
@@ -146,7 +137,7 @@ impl ChatRepository {
             .build()
             .execute(&mut *transaction)
             .await?;
-        InsertQuery::new("messages")
+        Insert::into("messages")
             .value(MessageField::Id(&request.assistant_message_id))
             .value(MessageField::ConversationId(&request.conversation_id))
             .value(MessageField::Role("assistant"))
@@ -171,23 +162,15 @@ impl ChatRepository {
             AssistantOutcome::Interrupted { code } => ("interrupted", None, Some(code)),
         };
         let mut transaction = self.database.pool().begin().await?;
-        let result = UpdateQuery::new("messages")
-            .value(MessageField::Content(content))
-            .value(MessageField::Status(status))
-            .value(MessageField::ResponseId(response_id))
-            .value(MessageField::ErrorCode(error_code))
-            .value(MessageField::UpdatedAt(Expression::CurrentTimestamp))
-            .filter(
-                MessageColumn::Id,
-                Comparison::Equal,
-                &request.assistant_message_id,
-            )
-            .filter(
-                MessageColumn::ConversationId,
-                Comparison::Equal,
-                &request.conversation_id,
-            )
-            .filter(MessageColumn::Role, Comparison::Equal, "assistant")
+        let result = Update::table("messages")
+            .set(MessageField::Content(content))
+            .set(MessageField::Status(status))
+            .set(MessageField::ResponseId(response_id))
+            .set(MessageField::ErrorCode(error_code))
+            .set(MessageField::UpdatedAt(current_timestamp()))
+            .where_(MessageColumn::Id.is_equal_to(&request.assistant_message_id))
+            .where_(MessageColumn::ConversationId.is_equal_to(&request.conversation_id))
+            .where_(MessageColumn::Role.is_equal_to("assistant"))
             .build()?
             .build()
             .execute(&mut *transaction)
@@ -195,13 +178,9 @@ impl ChatRepository {
         if result.rows_affected() != 1 {
             return Err(sqlx::Error::RowNotFound);
         }
-        UpdateQuery::new("conversations")
-            .value(ConversationField::UpdatedAt(Expression::CurrentTimestamp))
-            .filter(
-                ConversationColumn::Id,
-                Comparison::Equal,
-                &request.conversation_id,
-            )
+        Update::table("conversations")
+            .set(ConversationField::UpdatedAt(current_timestamp()))
+            .where_(ConversationColumn::Id.is_equal_to(&request.conversation_id))
             .build()?
             .build()
             .execute(&mut *transaction)
@@ -269,20 +248,19 @@ enum MessageField<'a> {
     Status(&'a str),
     ResponseId(Option<&'a str>),
     ErrorCode(Option<&'a str>),
-    UpdatedAt(Expression),
+    UpdatedAt(Expr<'a>),
 }
-impl SqlField for MessageField<'_> {
-    type Column = MessageColumn;
-    fn write(self, writer: &mut impl FieldWriter<MessageColumn>) {
+impl<'a> SqlField<'a> for MessageField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(MessageColumn::Id, value),
-            Self::ConversationId(value) => writer.bind(MessageColumn::ConversationId, value),
-            Self::Role(value) => writer.bind(MessageColumn::Role, value),
-            Self::Content(value) => writer.bind(MessageColumn::Content, value),
-            Self::Status(value) => writer.bind(MessageColumn::Status, value),
-            Self::ResponseId(value) => writer.bind(MessageColumn::ResponseId, value),
-            Self::ErrorCode(value) => writer.bind(MessageColumn::ErrorCode, value),
-            Self::UpdatedAt(value) => writer.expression(MessageColumn::UpdatedAt, value),
+            Self::Id(value) => MessageColumn::Id.value(value),
+            Self::ConversationId(value) => MessageColumn::ConversationId.value(value),
+            Self::Role(value) => MessageColumn::Role.value(value),
+            Self::Content(value) => MessageColumn::Content.value(value),
+            Self::Status(value) => MessageColumn::Status.value(value),
+            Self::ResponseId(value) => MessageColumn::ResponseId.value(value),
+            Self::ErrorCode(value) => MessageColumn::ErrorCode.value(value),
+            Self::UpdatedAt(value) => MessageColumn::UpdatedAt.expression(value),
         }
     }
 }
@@ -290,14 +268,13 @@ impl SqlField for MessageField<'_> {
 /// Typed write fields: a variant owns its column mapping and payload type.
 enum ConversationField<'a> {
     Id(&'a str),
-    UpdatedAt(Expression),
+    UpdatedAt(Expr<'a>),
 }
-impl SqlField for ConversationField<'_> {
-    type Column = ConversationColumn;
-    fn write(self, writer: &mut impl FieldWriter<ConversationColumn>) {
+impl<'a> SqlField<'a> for ConversationField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(ConversationColumn::Id, value),
-            Self::UpdatedAt(value) => writer.expression(ConversationColumn::UpdatedAt, value),
+            Self::Id(value) => ConversationColumn::Id.value(value),
+            Self::UpdatedAt(value) => ConversationColumn::UpdatedAt.expression(value),
         }
     }
 }

@@ -4,8 +4,13 @@
 //! SQL, so no database extension is required; this scans the owner's current
 //! chunks and is intended for modest per-owner corpora. Keyword search uses
 //! the built-in English full-text configuration over a generated `tsvector`.
+use crate::adapters::postgres::query::{
+    Delete, Expr, Function, Insert, Select, SqlColumn, SqlType, call, int, rows_from, sql_columns,
+    table, val,
+};
+use crate::domains::documents::store::repository::{FileColumn, VersionColumn};
 use chrono::{DateTime, Utc};
-use sqlx::{FromRow, PgConnection, Postgres, QueryBuilder};
+use sqlx::{FromRow, PgConnection};
 
 use super::model::{
     ChunkRecord, IndexedChunk, KeywordChunkHit, KeywordSearch, VectorChunkHit, VectorSearch,
@@ -20,81 +25,141 @@ use crate::{
 /// 14 binds per row keeps each statement far below PostgreSQL's bind limit.
 const CHUNK_INSERT_BATCH: usize = 500;
 
-const DELETE_VERSION_CHUNKS: &str = "DELETE FROM document_chunks WHERE version_id = $1";
+sql_columns! { enum ChunkColumn {
+    Id => "id", OwnerId => "owner_id", FileId => "file_id", VersionId => "version_id",
+    ChunkIndex => "chunk_index", Text => "text", Embedding => "embedding", ChunkSha256 => "chunk_sha256",
+    TokenCount => "token_count", PageStart => "page_start", PageEnd => "page_end",
+    CharStart => "char_start", CharEnd => "char_end", SectionPath => "section_path", CreatedAt => "created_at", TextSearch => "text_search"
+} }
+sql_columns! { enum DerivedColumn { ChunkId => "chunk_id", Distance => "distance", Score => "score", Query => "query", StoredValue => "stored_value", QueryValue => "query_value" } }
 
-const INSERT_CHUNKS_PREFIX: &str = "INSERT INTO document_chunks (id, owner_id, file_id, version_id, \
-chunk_index, text, embedding, chunk_sha256, token_count, page_start, page_end, char_start, \
-char_end, section_path) ";
-
-const FILE_IS_VISIBLE: &str = r#"
-SELECT EXISTS (
-    SELECT 1 FROM document_files
-    WHERE id = $1 AND owner_id = $2 AND deleted_at IS NULL
-)
-"#;
-
-const CURRENT_FILE_CHUNKS: &str = r#"
-SELECT
-    chunk.id AS chunk_id, chunk.file_id, chunk.version_id, file.display_name,
-    chunk.chunk_index, chunk.text, chunk.chunk_sha256, chunk.token_count,
-    chunk.page_start, chunk.page_end, chunk.char_start, chunk.char_end,
-    chunk.section_path, chunk.created_at
-FROM document_chunks AS chunk
-JOIN document_file_versions AS version
-  ON version.id = chunk.version_id AND version.is_current
-JOIN document_files AS file
-  ON file.id = chunk.file_id AND file.deleted_at IS NULL
-WHERE chunk.owner_id = $1 AND chunk.file_id = $2
-ORDER BY chunk.chunk_index ASC
-"#;
-
-const VECTOR_SEARCH: &str = r#"
-SELECT
-    chunk.id AS chunk_id, chunk.file_id, chunk.version_id, file.display_name,
-    chunk.chunk_index, chunk.text, chunk.chunk_sha256, chunk.token_count,
-    chunk.page_start, chunk.page_end, chunk.char_start, chunk.char_end,
-    chunk.section_path, chunk.created_at,
-    -- Clamp rounding error so the public range is exactly [0, 2]. GREATEST and
-    -- LEAST ignore NULL, so clamp only after NULL distances are filtered out.
-    GREATEST(0, LEAST(2, similarity.distance)) AS distance
-FROM document_chunks AS chunk
-JOIN document_file_versions AS version
-  ON version.id = chunk.version_id AND version.is_current
-JOIN document_files AS file
-  ON file.id = chunk.file_id AND file.deleted_at IS NULL
-CROSS JOIN LATERAL (
-    SELECT 1 - SUM(pair.stored_value::float8 * pair.query_value::float8)
-        / NULLIF(
-            SQRT(SUM(pair.stored_value::float8 * pair.stored_value::float8))
-                * SQRT(SUM(pair.query_value::float8 * pair.query_value::float8)),
-            0
-        ) AS distance
-    FROM UNNEST(chunk.embedding, $2::real[]) AS pair(stored_value, query_value)
-) AS similarity
-WHERE chunk.owner_id = $1
-  AND cardinality(chunk.embedding) = cardinality($2::real[])
-  AND similarity.distance IS NOT NULL
-ORDER BY similarity.distance ASC, chunk.id ASC
-LIMIT $3
-"#;
-
-const KEYWORD_SEARCH: &str = r#"
-SELECT
-    chunk.id AS chunk_id, chunk.file_id, chunk.version_id, file.display_name,
-    chunk.chunk_index, chunk.text, chunk.chunk_sha256, chunk.token_count,
-    chunk.page_start, chunk.page_end, chunk.char_start, chunk.char_end,
-    chunk.section_path, chunk.created_at,
-    ts_rank_cd(chunk.text_search, search.query)::float8 AS score
-FROM document_chunks AS chunk
-JOIN document_file_versions AS version
-  ON version.id = chunk.version_id AND version.is_current
-JOIN document_files AS file
-  ON file.id = chunk.file_id AND file.deleted_at IS NULL
-CROSS JOIN websearch_to_tsquery('english', $2) AS search(query)
-WHERE chunk.owner_id = $1 AND chunk.text_search @@ search.query
-ORDER BY score DESC, chunk.id ASC
-LIMIT $3
-"#;
+fn current_chunks<'a>(owner: &'a str) -> Select<'a> {
+    Select::from(table("document_chunks").alias("chunk"))
+        .columns([
+            ChunkColumn::Id.of("chunk").alias(DerivedColumn::ChunkId),
+            ChunkColumn::FileId.of("chunk"),
+            ChunkColumn::VersionId.of("chunk"),
+            FileColumn::DisplayName.of("file"),
+            ChunkColumn::ChunkIndex.of("chunk"),
+            ChunkColumn::Text.of("chunk"),
+            ChunkColumn::ChunkSha256.of("chunk"),
+            ChunkColumn::TokenCount.of("chunk"),
+            ChunkColumn::PageStart.of("chunk"),
+            ChunkColumn::PageEnd.of("chunk"),
+            ChunkColumn::CharStart.of("chunk"),
+            ChunkColumn::CharEnd.of("chunk"),
+            ChunkColumn::SectionPath.of("chunk"),
+            ChunkColumn::CreatedAt.of("chunk"),
+        ])
+        .join(
+            table("document_file_versions").alias("version"),
+            VersionColumn::Id
+                .of("version")
+                .eq(ChunkColumn::VersionId.of("chunk"))
+                .and(VersionColumn::IsCurrent.of("version")),
+        )
+        .join(
+            table("document_files").alias("file"),
+            FileColumn::Id
+                .of("file")
+                .eq(ChunkColumn::FileId.of("chunk"))
+                .and(FileColumn::DeletedAt.of("file").is_null()),
+        )
+        .where_(ChunkColumn::OwnerId.of("chunk").eq(val(owner)))
+}
+fn pair_value<'a>(column: DerivedColumn) -> Expr<'a> {
+    column.of("pair").cast(SqlType::Float8)
+}
+fn norm<'a>(column: DerivedColumn) -> Expr<'a> {
+    call(
+        Function::Sqrt,
+        [call(
+            Function::Sum,
+            [pair_value(column).times(pair_value(column))],
+        )],
+    )
+}
+fn vector_query<'a>(search: &'a VectorSearch) -> Select<'a> {
+    let similarity = Select::from(
+        rows_from(call(
+            Function::Unnest,
+            [
+                ChunkColumn::Embedding.of("chunk"),
+                val(search.embedding()).cast(SqlType::RealArray),
+            ],
+        ))
+        .alias("pair")
+        .columns([DerivedColumn::StoredValue, DerivedColumn::QueryValue]),
+    )
+    .columns([int(1)
+        .minus(
+            call(
+                Function::Sum,
+                [pair_value(DerivedColumn::StoredValue)
+                    .times(pair_value(DerivedColumn::QueryValue))],
+            )
+            .divided_by(call(
+                Function::NullIf,
+                [
+                    norm(DerivedColumn::StoredValue).times(norm(DerivedColumn::QueryValue)),
+                    int(0),
+                ],
+            )),
+        )
+        .alias(DerivedColumn::Distance)]);
+    current_chunks(search.owner_id())
+        // Filter NULL before clamping because GREATEST/LEAST ignore NULL.
+        .columns([call(
+            Function::Greatest,
+            [
+                int(0),
+                call(
+                    Function::Least,
+                    [int(2), DerivedColumn::Distance.of("similarity")],
+                ),
+            ],
+        )
+        .alias(DerivedColumn::Distance)])
+        .cross_join(similarity.lateral("similarity"))
+        .where_(
+            call(Function::Cardinality, [ChunkColumn::Embedding.of("chunk")]).eq(call(
+                Function::Cardinality,
+                [val(search.embedding()).cast(SqlType::RealArray)],
+            )),
+        )
+        .where_(DerivedColumn::Distance.of("similarity").is_not_null())
+        .order_by(DerivedColumn::Distance.of("similarity").asc())
+        .order_by(ChunkColumn::Id.of("chunk").asc())
+        .limit(val(search.limit()))
+}
+fn keyword_query<'a>(search: &'a KeywordSearch) -> Select<'a> {
+    current_chunks(search.owner_id())
+        .columns([call(
+            Function::TsRankCd,
+            [
+                ChunkColumn::TextSearch.of("chunk"),
+                DerivedColumn::Query.of("search"),
+            ],
+        )
+        .cast(SqlType::Float8)
+        .alias(DerivedColumn::Score)])
+        .cross_join(
+            rows_from(call(
+                Function::WebsearchToTsquery,
+                [val("english").cast(SqlType::Regconfig), val(search.text())],
+            ))
+            .alias("search")
+            .columns([DerivedColumn::Query]),
+        )
+        .where_(
+            ChunkColumn::TextSearch
+                .of("chunk")
+                .matches_text(DerivedColumn::Query.of("search")),
+        )
+        .order_by(DerivedColumn::Score.desc())
+        .order_by(ChunkColumn::Id.of("chunk").asc())
+        .limit(val(search.limit()))
+}
 
 /// Replaces a version's chunks inside the caller's aggregate transaction.
 pub(crate) async fn replace_version_chunks(
@@ -102,30 +167,55 @@ pub(crate) async fn replace_version_chunks(
     version_id: &str,
     chunks: &[IndexedChunk],
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(DELETE_VERSION_CHUNKS)
-        .bind(version_id)
+    Delete::from("document_chunks")
+        .where_(ChunkColumn::VersionId.is_equal_to(version_id))
+        .build()?
+        .build()
         .execute(&mut *connection)
         .await?;
 
     for batch in chunks.chunks(CHUNK_INSERT_BATCH) {
-        let mut insert = QueryBuilder::<Postgres>::new(INSERT_CHUNKS_PREFIX);
-        insert.push_values(batch, |mut row, chunk| {
-            row.push_bind(&chunk.chunk_id)
-                .push_bind(&chunk.owner_id)
-                .push_bind(&chunk.file_id)
-                .push_bind(&chunk.version_id)
-                .push_bind(chunk.chunk_index)
-                .push_bind(&chunk.text)
-                .push_bind(chunk.embedding.as_slice())
-                .push_bind(&chunk.chunk_sha256)
-                .push_bind(chunk.token_count)
-                .push_bind(chunk.page_start)
-                .push_bind(chunk.page_end)
-                .push_bind(chunk.char_start)
-                .push_bind(chunk.char_end)
-                .push_bind(&chunk.section_path);
-        });
-        let result = insert.build().execute(&mut *connection).await?;
+        let result = Insert::rows(
+            "document_chunks",
+            [
+                ChunkColumn::Id,
+                ChunkColumn::OwnerId,
+                ChunkColumn::FileId,
+                ChunkColumn::VersionId,
+                ChunkColumn::ChunkIndex,
+                ChunkColumn::Text,
+                ChunkColumn::Embedding,
+                ChunkColumn::ChunkSha256,
+                ChunkColumn::TokenCount,
+                ChunkColumn::PageStart,
+                ChunkColumn::PageEnd,
+                ChunkColumn::CharStart,
+                ChunkColumn::CharEnd,
+                ChunkColumn::SectionPath,
+            ],
+            batch.iter().map(|chunk| {
+                vec![
+                    val(&chunk.chunk_id),
+                    val(&chunk.owner_id),
+                    val(&chunk.file_id),
+                    val(&chunk.version_id),
+                    val(chunk.chunk_index),
+                    val(&chunk.text),
+                    val(chunk.embedding.as_slice()),
+                    val(&chunk.chunk_sha256),
+                    val(chunk.token_count),
+                    val(chunk.page_start),
+                    val(chunk.page_end),
+                    val(chunk.char_start),
+                    val(chunk.char_end),
+                    val(&chunk.section_path),
+                ]
+            }),
+        )
+        .build()?
+        .build()
+        .execute(&mut *connection)
+        .await?;
         if result.rows_affected() != batch.len() as u64 {
             return Err(sqlx::Error::Protocol(
                 "document chunk insert affected an unexpected row count".to_owned(),
@@ -152,18 +242,27 @@ impl DocumentChunks for ChunkIndex {
         owner_id: &str,
         file_id: &str,
     ) -> Result<Option<Vec<ChunkRecord>>, DocumentError> {
-        let visible = sqlx::query_scalar::<_, bool>(FILE_IS_VISIBLE)
-            .bind(file_id)
-            .bind(owner_id)
-            .fetch_one(self.database.pool())
-            .await
-            .map_err(|error| storage_error("documents_chunk_owner", error))?;
+        let visible = Select::expressions([Select::from("document_files")
+            .columns([int(1)])
+            .where_(FileColumn::Id.is_equal_to(file_id))
+            .where_(FileColumn::OwnerId.is_equal_to(owner_id))
+            .where_(FileColumn::DeletedAt.is_null())
+            .exists()])
+        .build()
+        .map_err(|error| storage_error("documents_chunk_owner", error))?
+        .build_query_scalar::<bool>()
+        .fetch_one(self.database.pool())
+        .await
+        .map_err(|error| storage_error("documents_chunk_owner", error))?;
         if !visible {
             return Ok(None);
         }
-        sqlx::query_as::<_, ChunkRow>(CURRENT_FILE_CHUNKS)
-            .bind(owner_id)
-            .bind(file_id)
+        current_chunks(owner_id)
+            .where_(ChunkColumn::FileId.of("chunk").eq(val(file_id)))
+            .order_by(ChunkColumn::ChunkIndex.of("chunk").asc())
+            .build()
+            .map_err(|error| storage_error("documents_current_chunks", error))?
+            .build_query_as::<ChunkRow>()
             .fetch_all(self.database.pool())
             .await
             .map(|rows| Some(rows.into_iter().map(Into::into).collect()))
@@ -176,10 +275,10 @@ impl ChunkSearch for ChunkIndex {
         &self,
         search: &VectorSearch,
     ) -> Result<Vec<VectorChunkHit>, DocumentError> {
-        sqlx::query_as::<_, VectorHitRow>(VECTOR_SEARCH)
-            .bind(search.owner_id())
-            .bind(search.embedding())
-            .bind(search.limit())
+        vector_query(search)
+            .build()
+            .map_err(|error| storage_error("documents_vector_search", error))?
+            .build_query_as::<VectorHitRow>()
             .fetch_all(self.database.pool())
             .await
             .map(|rows| {
@@ -197,10 +296,10 @@ impl ChunkSearch for ChunkIndex {
         &self,
         search: &KeywordSearch,
     ) -> Result<Vec<KeywordChunkHit>, DocumentError> {
-        sqlx::query_as::<_, KeywordHitRow>(KEYWORD_SEARCH)
-            .bind(search.owner_id())
-            .bind(search.text())
-            .bind(search.limit())
+        keyword_query(search)
+            .build()
+            .map_err(|error| storage_error("documents_keyword_search", error))?
+            .build_query_as::<KeywordHitRow>()
             .fetch_all(self.database.pool())
             .await
             .map(|rows| {

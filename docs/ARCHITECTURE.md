@@ -615,7 +615,7 @@ inward: `app` depends on everything, `domains` depend on `adapters` and
 | `app/config.rs` | `ServiceConfig`/`DocumentsConfig` environment parsing with redacted `Debug` |
 | `app/http/` | `create_router` (CORS) and `protected`, the development bearer middleware |
 | `adapters/postgres/client.rs` | `Database`: pool, schema search path, migration verification, readiness, and `validate_schema_name` |
-| `adapters/postgres/query/` | Shared enum-based SQL builders |
+| `adapters/postgres/query/` | Shared fluent SQL builder and bound expression composition |
 | `adapters/openai/client.rs` | Streaming chat client (`gen_chat_response_streaming`), provider SSE parser, and `ChatStreamError` sanitization |
 | `adapters/openai/documents.rs` | `OpenAiDocumentsClient`: batched embeddings and image descriptions |
 | `adapters/office/converter.rs` | Time-limited LibreOffice (`soffice`) PDF conversion |
@@ -680,40 +680,65 @@ into domain errors and log only sanitized diagnostics.
 
 ### Reusable SQL composition
 
-`curio-service/src/adapters/postgres/query` exposes `SelectQuery`, `InsertQuery`, and `UpdateQuery`
-through `mod.rs`, with separate `select.rs`, `insert.rs`, `update.rs`, and private
-`bindings.rs` implementations. It adds no dependency or schema changes.
+`curio-service/src/adapters/postgres/query` exposes one fluent builder family:
+`Select::from`, `Insert::into`, `Update::table`, and `Delete::from`. The former
+`SelectQuery`, `InsertQuery`, and `UpdateQuery` implementations have been removed.
+`mod.rs` is the public entry point; `composer/` separates statement, expression,
+source, field, and clause composition. Private `bindings.rs` owns the shared
+fallible SQLx encoder and placeholder allocation. No dependencies or migrations
+are added by this layer.
 
-Feature repositories define two related enums:
+Feature repositories define code-owned `SqlColumn` enums, either manually or
+with `sql_columns!`. Readable operations include:
 
-- `SqlColumn` enums name code-owned columns for projections, predicates,
-  sorting, conflict targets, and `RETURNING`.
-- `SqlField` enums carry write values, such as `UserField::Email(&str)` or
-  `EventField::AllDay(bool)`. An exhaustive `FieldWriter` match maps each variant
-  and its typed payload to its column. INSERT and UPDATE both use
-  `.value(field)` or `.values(fields)`; callers never manually assign bind slots.
+```rust
+Select::from("users")
+    .columns([UserColumn::Id])
+    .where_(UserColumn::Name.is_equal_to(name));
+Insert::into("users").value(UserColumn::Id.value(id));
+Update::table("users")
+    .set(UserColumn::Email.value(email))
+    .where_(UserColumn::Id.is_equal_to(id));
+Delete::from("users").where_(UserColumn::Id.is_equal_to(id));
+```
 
-SQLx's `PgArguments` encodes payloads and allocates PostgreSQL placeholders in
-one sequence, including UPDATE predicates. Encoding failures and the PostgreSQL
-parameter limit return errors at build time. Table names remain code-owned
-static strings. Column enums must map to trusted, correctly quoted identifiers;
-these helpers are not an authorization layer or a schema/type checker.
+Rust reserves `where`; `.where_(...)` and `.r#where(...)` are equivalent, and
+`.filter(...)` is an alias. Repeated predicates are ANDed; expressions provide
+explicit nested `.and(...)` and `.or(...)` groups. `SqlField<'a>` optionally
+associates columns with specific Rust payload types through a data-carrying
+enum (for example `UserField::Email(&str)`); `into_field` returns the same
+`WriteField` accepted by `.value` and `.set`. Lists use `.values` and `.sets`.
+There is no separate write renderer for typed fields.
 
-SELECT supports optional AND filters, explicit `IS NULL`, array `ANY` (including
-empty arrays), enum sorting, and bound pagination. INSERT supports enum-based
-upsert assignments and `RETURNING`. UPDATE separates assignment composition from
-its filtered stage: there is no `build` before a required predicate. Empty or
-duplicate write fields are rejected. Explicit expression enums represent
-`CURRENT_TIMESTAMP`; runtime strings are always bound as data.
+`column.expression(expr)` assigns computed SQL values. `col(column)`,
+`column.of("alias")`, and `val(value)` compose column references and bound
+values. SQL functions and casts are allowlisted. SELECT supports joins and
+lateral sources, optional predicates, NULL/array/tuple comparisons, subqueries,
+EXISTS, ordering, pagination, DISTINCT, GROUP BY/HAVING, window functions,
+CTEs (including recursive UNION ALL), and row locks. INSERT supports batch
+rows, INSERT SELECT, upserts, and RETURNING. UPDATE supports FROM and CTEs;
+UPDATE and DELETE require a predicate at build time. This guard does not prove
+ownership or that a predicate restricts rows. Empty projections, empty or
+duplicate write fields, mismatched insert row widths, invalid identifiers,
+encoding errors, and PostgreSQL's parameter limit return build errors.
 
-Builders return a SQLx `QueryBuilder` for typed fetching or execution against a
-pool or transaction. Documents uses the builders for single-table version/blob
-writes and explicit, fully bound SQL constants for statements the builders
-intentionally do not model: joins, `FOR UPDATE` locks, `jsonb`/array casts,
-batched multi-row chunk inserts, and vector/full-text ranking. Feature repositories retain transaction boundaries,
-owner/resource scope, row mapping, and domain policy. The helper intentionally
-does not provide arbitrary SQL fragments, joins, generic CRUD, or implicit
-schema/migration management. Runnable examples live in `query/mod.rs`.
+All runtime values use SQLx parameters numbered in final SQL order, including
+nested queries and writes. Table/alias names are static code-owned identifiers;
+column mappings must use valid identifiers. The builder checks identifier syntax
+but is not a schema/type checker or an authorization layer. It deliberately
+provides no public raw-SQL expression constructor.
+
+All domain repositories now use this builder, including document joins, batch
+chunk writes and vector/full-text ranking, and Tasks' recursive hierarchy,
+keyset filters, and window-based ordering. Tasks persistence is split under
+`domains/tasks/repository/` into columns, row mapping, reads, writes, hierarchy,
+ordering, tags, comments, links, references, and shared query expressions.
+Repositories retain transactions, row mapping, owner/resource predicates, and
+domain policy. The builder returns SQLx `QueryBuilder` for execution against a
+pool or transaction. Database lifecycle/catalog tools remain separate from
+domain query composition. Runnable API examples live in `query/mod.rs`;
+`tests/query_architecture.rs` rejects inline SQL and direct SQLx query building
+in domain repositories.
 
 ### PostgreSQL lifecycle
 
@@ -1312,8 +1337,10 @@ Coverage includes:
   terminal commit ordering, provider/storage failures, disconnect interruption,
   and late disconnects after a committed terminal state;
 - query-builder bind ordering, data-carrying field enums, dynamic field vectors,
-  NULLs, optional predicates, array filters, pagination, upserts, and scoped
-  updates, including PostgreSQL round trips and fallible encoders;
+  NULLs, optional/grouped predicates, array filters, pagination, upserts, scoped
+  updates/deletes, CTEs, subqueries, joins, grouping, and window functions,
+  including PostgreSQL round trips, fallible encoders, and a repository SQL
+  composition architecture gate;
 - chat persistence after closing and reopening a pool on the same disposable
   schema;
 - calendar authentication/ownership, create/list, UUIDs, range overlap,

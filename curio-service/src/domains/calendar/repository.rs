@@ -1,7 +1,5 @@
 //! PostgreSQL adapter for the calendar persistence port.
-use crate::adapters::postgres::query::{
-    Comparison, Direction, FieldWriter, InsertQuery, SelectQuery, SqlColumn, SqlField,
-};
+use crate::adapters::postgres::query::{Insert, Select, SqlColumn, SqlField, WriteField};
 use chrono::{DateTime, Utc};
 
 use crate::{
@@ -26,7 +24,7 @@ impl CalendarRepository {
 impl CalendarStore for CalendarRepository {
     async fn insert(&self, event: NewCalendarEvent<'_>) -> Result<CalendarEvent, CalendarError> {
         use EventColumn::*;
-        InsertQuery::new("calendar_events")
+        Insert::into("calendar_events")
             .value(EventField::Id(event.id()))
             .value(EventField::UserId(event.user_id()))
             .value(EventField::Title(event.title()))
@@ -61,9 +59,8 @@ impl CalendarStore for CalendarRepository {
     }
 
     async fn in_range(&self, range: EventRange<'_>) -> Result<Vec<CalendarEvent>, CalendarError> {
-        SelectQuery::new(
-            "calendar_events",
-            [
+        Select::from("calendar_events")
+            .columns([
                 EventColumn::Id,
                 EventColumn::UserId,
                 EventColumn::Title,
@@ -75,20 +72,19 @@ impl CalendarStore for CalendarRepository {
                 EventColumn::EndDate,
                 EventColumn::CreatedAt,
                 EventColumn::UpdatedAt,
-            ],
-        )
-        .filter(EventColumn::UserId, Comparison::Equal, range.user_id())
-        .filter(EventColumn::StartsAt, Comparison::Less, range.end())
-        .filter(EventColumn::EndsAt, Comparison::Greater, range.start())
-        .order_by(EventColumn::StartsAt, Direction::Ascending)
-        .order_by(EventColumn::Id, Direction::Ascending)
-        .build()
-        .map_err(|error| storage_error("calendar_list", error))?
-        .build_query_as::<CalendarEventRow>()
-        .fetch_all(self.database.pool())
-        .await
-        .map(|rows| rows.into_iter().map(Into::into).collect())
-        .map_err(|error| storage_error("calendar_list", error))
+            ])
+            .where_(EventColumn::UserId.is_equal_to(range.user_id()))
+            .where_(EventColumn::StartsAt.is_less_than(range.end()))
+            .where_(EventColumn::EndsAt.is_greater_than(range.start()))
+            .order_by(EventColumn::StartsAt.asc())
+            .order_by(EventColumn::Id.asc())
+            .build()
+            .map_err(|error| storage_error("calendar_list", error))?
+            .build_query_as::<CalendarEventRow>()
+            .fetch_all(self.database.pool())
+            .await
+            .map(|rows| rows.into_iter().map(Into::into).collect())
+            .map_err(|error| storage_error("calendar_list", error))
     }
 }
 
@@ -189,21 +185,20 @@ enum EventField<'a> {
     StartsAt(DateTime<Utc>),
     EndsAt(DateTime<Utc>),
 }
-impl SqlField for EventField<'_> {
-    type Column = EventColumn;
-    fn write(self, writer: &mut impl FieldWriter<EventColumn>) {
+impl<'a> SqlField<'a> for EventField<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(EventColumn::Id, value),
-            Self::UserId(value) => writer.bind(EventColumn::UserId, value),
-            Self::Title(value) => writer.bind(EventColumn::Title, value),
-            Self::Description(value) => writer.bind(EventColumn::Description, value),
-            Self::Status(value) => writer.bind(EventColumn::Status, value),
-            Self::Priority(value) => writer.bind(EventColumn::Priority, value),
-            Self::AllDay(value) => writer.bind(EventColumn::AllDay, value),
-            Self::StartDate(value) => writer.bind(EventColumn::StartDate, value),
-            Self::EndDate(value) => writer.bind(EventColumn::EndDate, value),
-            Self::StartsAt(value) => writer.bind(EventColumn::StartsAt, value),
-            Self::EndsAt(value) => writer.bind(EventColumn::EndsAt, value),
+            Self::Id(value) => EventColumn::Id.value(value),
+            Self::UserId(value) => EventColumn::UserId.value(value),
+            Self::Title(value) => EventColumn::Title.value(value),
+            Self::Description(value) => EventColumn::Description.value(value),
+            Self::Status(value) => EventColumn::Status.value(value),
+            Self::Priority(value) => EventColumn::Priority.value(value),
+            Self::AllDay(value) => EventColumn::AllDay.value(value),
+            Self::StartDate(value) => EventColumn::StartDate.value(value),
+            Self::EndDate(value) => EventColumn::EndDate.value(value),
+            Self::StartsAt(value) => EventColumn::StartsAt.value(value),
+            Self::EndsAt(value) => EventColumn::EndsAt.value(value),
         }
     }
 }

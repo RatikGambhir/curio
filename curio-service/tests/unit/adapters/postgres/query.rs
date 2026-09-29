@@ -25,30 +25,28 @@ impl SqlColumn for Column {
 
 #[test]
 fn optional_predicates_keep_contiguous_binds_and_ordering_is_applied_last() {
-    let query = SelectQuery::new("users", [Column::Id])
-        .order_by(Column::Name, Direction::Descending)
-        .filter_optional(Column::Email, Comparison::Equal, None::<&str>)
-        .filter(
-            Column::Name,
-            Comparison::Equal,
-            "Robert'); DROP TABLE users;--",
-        )
-        .filter_optional(Column::Id, Comparison::Greater, Some("a"))
-        .filter_null(Column::Avatar)
+    let query = Select::from("users")
+        .columns([Column::Id])
+        .order_by(Column::Name.desc())
+        .where_optional(None::<&str>.map(|value| Column::Email.is_equal_to(value)))
+        .where_(Column::Name.is_equal_to("Robert'); DROP TABLE users;--"))
+        .where_optional(Some("a").map(|value| Column::Id.is_greater_than(value)))
+        .where_(Column::Avatar.is_null())
         .page(NonZeroU32::new(10).unwrap(), 5)
         .build()
         .unwrap();
     assert_eq!(
         query.sql(),
-        "SELECT id FROM users WHERE name = $1 AND id > $2 AND avatar_url IS NULL ORDER BY name DESC LIMIT $3 OFFSET $4"
+        "SELECT id FROM users WHERE (name = $1) AND (id > $2) AND (avatar_url IS NULL) ORDER BY name DESC LIMIT $3 OFFSET $4"
     );
     assert!(!query.sql().contains("Robert"));
 }
 
 #[test]
 fn no_filters_has_no_dangling_where_clause() {
-    let query = SelectQuery::new("users", [Column::Id])
-        .filter_optional(Column::Id, Comparison::Equal, None::<String>)
+    let query = Select::from("users")
+        .columns([Column::Id])
+        .where_optional(None::<String>.map(|value| Column::Id.is_equal_to(value)))
         .build()
         .unwrap();
     assert_eq!(query.sql(), "SELECT id FROM users");
@@ -56,7 +54,7 @@ fn no_filters_has_no_dangling_where_clause() {
 
 #[test]
 fn insert_pairs_columns_and_slots_in_call_order() {
-    let query = InsertQuery::new("users")
+    let query = Insert::into("users")
         .value(Field::Email("email"))
         .value(Field::Avatar(None))
         .value(Field::Id("id"))
@@ -64,8 +62,8 @@ fn insert_pairs_columns_and_slots_in_call_order() {
         .on_conflict(
             Column::Id,
             [
-                Assignment::Excluded(Column::Name),
-                Assignment::CurrentTimestamp(Column::UpdatedAt),
+                (Column::Name, Column::Name.of("EXCLUDED")),
+                (Column::UpdatedAt, current_timestamp()),
             ],
         )
         .returning([Column::Id, Column::Name])
@@ -79,9 +77,9 @@ fn insert_pairs_columns_and_slots_in_call_order() {
 
 #[test]
 fn insert_rejects_empty_and_duplicate_columns() {
-    assert!(InsertQuery::<Column>::new("users").build().is_err());
+    assert!(Insert::into("users").build().is_err());
     assert!(
-        InsertQuery::new("users")
+        Insert::into("users")
             .value(Field::Id("a"))
             .value(Field::Id("b"))
             .build()
@@ -107,15 +105,16 @@ impl<'q> Encode<'q, Postgres> for BadValue {
 #[test]
 fn encoding_errors_are_returned_without_panicking_or_losing_the_first_error() {
     assert!(matches!(
-        InsertQuery::new("users")
+        Insert::into("users")
             .value(Field::Bad(BadValue))
             .value(Field::Id("id"))
             .build(),
         Err(sqlx::Error::Encode(_))
     ));
     assert!(matches!(
-        SelectQuery::new("users", [Column::Id])
-            .filter(Column::Name, Comparison::Equal, BadValue)
+        Select::from("users")
+            .columns([Column::Id])
+            .where_(Column::Name.is_equal_to(BadValue))
             .build(),
         Err(sqlx::Error::Encode(_))
     ));
@@ -128,7 +127,7 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
     };
     let pool = postgres.database().pool();
     let name = "Robert'); DROP TABLE users;--";
-    let record: (String, String, String, Option<String>) = InsertQuery::new("users")
+    let record: (String, String, String, Option<String>) = Insert::into("users")
         .value(Field::Email("one@example.test"))
         .value(Field::Avatar(None))
         .value(Field::Name(name))
@@ -145,15 +144,15 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
         ("one".into(), name.into(), "one@example.test".into(), None)
     );
     for (id, name) in [("two", "Second"), ("one", "Updated")] {
-        InsertQuery::new("users")
+        Insert::into("users")
             .value(Field::Id(id))
             .value(Field::Name(name))
             .value(Field::Email(&format!("{id}@example.test")))
             .on_conflict(
                 Column::Id,
                 [
-                    Assignment::Excluded(Column::Name),
-                    Assignment::CurrentTimestamp(Column::UpdatedAt),
+                    (Column::Name, Column::Name.of("EXCLUDED")),
+                    (Column::UpdatedAt, current_timestamp()),
                 ],
             )
             .build()
@@ -163,11 +162,12 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
             .await
             .unwrap();
     }
-    let rows: Vec<(String, String)> = SelectQuery::new("users", [Column::Id, Column::Name])
-        .filter_any(Column::Id, vec!["one", "two"])
-        .filter_optional(Column::Email, Comparison::Equal, None::<&str>)
-        .filter_null(Column::Avatar)
-        .order_by(Column::Id, Direction::Ascending)
+    let rows: Vec<(String, String)> = Select::from("users")
+        .columns([Column::Id, Column::Name])
+        .where_(Column::Id.is_any_of(vec!["one", "two"]))
+        .where_optional(None::<&str>.map(|value| Column::Email.is_equal_to(value)))
+        .where_(Column::Avatar.is_null())
+        .order_by(Column::Id.asc())
         .page(NonZeroU32::new(1).unwrap(), 0)
         .build()
         .unwrap()
@@ -176,8 +176,9 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
         .await
         .unwrap();
     assert_eq!(rows, vec![("one".into(), "Updated".into())]);
-    let empty: Vec<(String,)> = SelectQuery::new("users", [Column::Id])
-        .filter_any(Column::Id, Vec::<String>::new())
+    let empty: Vec<(String,)> = Select::from("users")
+        .columns([Column::Id])
+        .where_(Column::Id.is_any_of(Vec::<String>::new()))
         .build()
         .unwrap()
         .build_query_as()
@@ -185,7 +186,7 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
         .await
         .unwrap();
     assert!(empty.is_empty());
-    let skipped = InsertQuery::new("users")
+    let skipped = Insert::into("users")
         .value(Field::Id("one"))
         .value(Field::Name("Ignored"))
         .value(Field::Email("different@example.test"))
@@ -202,41 +203,41 @@ async fn binds_round_trip_reordered_values_nulls_arrays_upserts_and_pagination()
 
 #[test]
 fn update_assignments_and_predicates_share_one_bind_sequence() {
-    let query = UpdateQuery::new("users")
-        .value(Field::Name("new name"))
-        .value(Field::Avatar(None))
-        .value(Field::UpdatedAt(Expression::CurrentTimestamp))
-        .filter(Column::Id, Comparison::Equal, "owner")
-        .filter(Column::Email, Comparison::Equal, "email")
+    let query = Update::table("users")
+        .set(Field::Name("new name"))
+        .set(Field::Avatar(None))
+        .set(Field::UpdatedAt(current_timestamp()))
+        .where_(Column::Id.is_equal_to("owner"))
+        .where_(Column::Email.is_equal_to("email"))
         .returning([Column::Id, Column::Name])
         .build()
         .unwrap();
     assert_eq!(
         query.sql(),
-        "UPDATE users SET name = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 AND email = $4 RETURNING id, name"
+        "UPDATE users SET name = $1, avatar_url = $2, updated_at = CURRENT_TIMESTAMP WHERE (id = $3) AND (email = $4) RETURNING id, name"
     );
 }
 
 #[test]
 fn updates_reject_missing_or_duplicate_assignments_and_encoding_failures() {
     assert!(
-        UpdateQuery::new("users")
-            .filter(Column::Id, Comparison::Equal, "id")
+        Update::table("users")
+            .where_(Column::Id.is_equal_to("id"))
             .build()
             .is_err()
     );
     assert!(
-        UpdateQuery::new("users")
-            .value(Field::Name("a"))
-            .value(Field::Name("b"))
-            .filter(Column::Id, Comparison::Equal, "id")
+        Update::table("users")
+            .set(Field::Name("a"))
+            .set(Field::Name("b"))
+            .where_(Column::Id.is_equal_to("id"))
             .build()
             .is_err()
     );
     assert!(matches!(
-        UpdateQuery::new("users")
-            .value(Field::Bad(BadValue))
-            .filter(Column::Id, Comparison::Equal, "id")
+        Update::table("users")
+            .set(Field::Bad(BadValue))
+            .where_(Column::Id.is_equal_to("id"))
             .build(),
         Err(sqlx::Error::Encode(_))
     ));
@@ -248,7 +249,7 @@ async fn updates_bind_values_to_columns_and_require_all_predicates_to_match() {
         return;
     };
     let pool = postgres.database().pool();
-    InsertQuery::new("users")
+    Insert::into("users")
         .value(Field::Id("owner"))
         .value(Field::Name("Original"))
         .value(Field::Email("owner@example.test"))
@@ -258,12 +259,12 @@ async fn updates_bind_values_to_columns_and_require_all_predicates_to_match() {
         .execute(pool)
         .await
         .unwrap();
-    let row: (String, String, Option<String>) = UpdateQuery::new("users")
-        .value(Field::Avatar(Some("https://example.test/avatar")))
-        .value(Field::Name("Updated"))
-        .value(Field::UpdatedAt(Expression::CurrentTimestamp))
-        .filter(Column::Id, Comparison::Equal, "owner")
-        .filter(Column::Email, Comparison::Equal, "owner@example.test")
+    let row: (String, String, Option<String>) = Update::table("users")
+        .set(Field::Avatar(Some("https://example.test/avatar")))
+        .set(Field::Name("Updated"))
+        .set(Field::UpdatedAt(current_timestamp()))
+        .where_(Column::Id.is_equal_to("owner"))
+        .where_(Column::Email.is_equal_to("owner@example.test"))
         .returning([Column::Id, Column::Name, Column::Avatar])
         .build()
         .unwrap()
@@ -279,10 +280,10 @@ async fn updates_bind_values_to_columns_and_require_all_predicates_to_match() {
             Some("https://example.test/avatar".into())
         )
     );
-    let result = UpdateQuery::new("users")
-        .value(Field::Name("Incorrect"))
-        .filter(Column::Id, Comparison::Equal, "owner")
-        .filter(Column::Email, Comparison::Equal, "wrong@example.test")
+    let result = Update::table("users")
+        .set(Field::Name("Incorrect"))
+        .where_(Column::Id.is_equal_to("owner"))
+        .where_(Column::Email.is_equal_to("wrong@example.test"))
         .build()
         .unwrap()
         .build()
@@ -290,9 +291,9 @@ async fn updates_bind_values_to_columns_and_require_all_predicates_to_match() {
         .await
         .unwrap();
     assert_eq!(result.rows_affected(), 0);
-    let avatar: Option<String> = UpdateQuery::new("users")
-        .value(Field::Avatar(None))
-        .filter(Column::Id, Comparison::Equal, "owner")
+    let avatar: Option<String> = Update::table("users")
+        .set(Field::Avatar(None))
+        .where_(Column::Id.is_equal_to("owner"))
         .returning([Column::Avatar])
         .build()
         .unwrap()
@@ -306,10 +307,15 @@ async fn updates_bind_values_to_columns_and_require_all_predicates_to_match() {
 
 #[test]
 fn empty_projection_and_postgres_parameter_overflow_return_errors() {
-    assert!(SelectQuery::<Column>::new("users", []).build().is_err());
-    let mut query = SelectQuery::new("users", [Column::Id]);
+    assert!(
+        Select::from("users")
+            .columns([] as [Column; 0])
+            .build()
+            .is_err()
+    );
+    let mut query = Select::from("users").columns([Column::Id]);
     for _ in 0..65_536 {
-        query = query.filter(Column::Id, Comparison::Equal, "id");
+        query = query.where_(Column::Id.is_equal_to("id"));
     }
     assert!(matches!(query.build(), Err(sqlx::Error::Protocol(_))));
 }
@@ -319,19 +325,18 @@ enum Field<'a> {
     Name(&'a str),
     Email(&'a str),
     Avatar(Option<&'a str>),
-    UpdatedAt(Expression),
+    UpdatedAt(Expr<'a>),
     Bad(BadValue),
 }
-impl SqlField for Field<'_> {
-    type Column = Column;
-    fn write(self, writer: &mut impl FieldWriter<Column>) {
+impl<'a> SqlField<'a> for Field<'a> {
+    fn into_field(self) -> WriteField<'a> {
         match self {
-            Self::Id(value) => writer.bind(Column::Id, value),
-            Self::Name(value) => writer.bind(Column::Name, value),
-            Self::Email(value) => writer.bind(Column::Email, value),
-            Self::Avatar(value) => writer.bind(Column::Avatar, value),
-            Self::UpdatedAt(value) => writer.expression(Column::UpdatedAt, value),
-            Self::Bad(value) => writer.bind(Column::Name, value),
+            Self::Id(value) => Column::Id.value(value),
+            Self::Name(value) => Column::Name.value(value),
+            Self::Email(value) => Column::Email.value(value),
+            Self::Avatar(value) => Column::Avatar.value(value),
+            Self::UpdatedAt(value) => Column::UpdatedAt.expression(value),
+            Self::Bad(value) => Column::Name.value(value),
         }
     }
 }
@@ -339,18 +344,18 @@ impl SqlField for Field<'_> {
 #[test]
 fn dynamic_field_vectors_bind_heterogeneous_values_with_the_same_api() {
     let fields = vec![Field::Id("owner"), Field::Avatar(None), Field::Name("Ada")];
-    let insert = InsertQuery::new("users").values(fields).build().unwrap();
+    let insert = Insert::into("users").values(fields).build().unwrap();
     assert_eq!(
         insert.sql(),
         "INSERT INTO users (id, avatar_url, name) VALUES ($1, $2, $3)"
     );
-    let update = UpdateQuery::new("users")
-        .values([Field::Name("Ada"), Field::Avatar(None)])
-        .filter(Column::Id, Comparison::Equal, "owner")
+    let update = Update::table("users")
+        .sets([Field::Name("Ada"), Field::Avatar(None)])
+        .where_(Column::Id.is_equal_to("owner"))
         .build()
         .unwrap();
     assert_eq!(
         update.sql(),
-        "UPDATE users SET name = $1, avatar_url = $2 WHERE id = $3"
+        "UPDATE users SET name = $1, avatar_url = $2 WHERE (id = $3)"
     );
 }
